@@ -1,6 +1,7 @@
 "use client";
 
 import { SlidersHorizontal } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { BASE_CASE, DATA_AS_OF, type ScenarioName } from "@/engine";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { dateLabel } from "@/lib/format";
+import { PATHS } from "@/lib/site";
 import { en } from "@/messages/en";
 import { Actions } from "./Actions";
 import { BidCalculator } from "./BidCalculator";
@@ -46,6 +48,14 @@ export function Calculator() {
         <p className="text-xs text-muted-foreground">
           {t.header.disclaimer} {t.header.dataAsOf} {dateLabel(DATA_AS_OF)}.
         </p>
+        <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          <Link href={PATHS.methodology} className="font-medium text-link hover:underline">
+            {t.site.calculatorLinks.methodology} →
+          </Link>
+          <Link href={PATHS.sources} className="font-medium text-link hover:underline">
+            {t.site.calculatorLinks.sources} →
+          </Link>
+        </p>
       </header>
 
       <div className="z-20 -mx-4 bg-background/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 lg:sticky lg:top-0">
@@ -77,7 +87,7 @@ export function Calculator() {
           </Card>
         </aside>
 
-        <main className="min-w-0">
+        <section className="min-w-0" aria-label={t.site.resultsLabel}>
           <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
             <TabsList>
               {(Object.keys(t.tabs) as Tab[]).map((key) => (
@@ -111,15 +121,12 @@ export function Calculator() {
               <ChecksList result={r} t={t} />
             </TabsContent>
           </Tabs>
-        </main>
+        </section>
       </div>
 
-      <footer className="mt-6 border-t border-border pt-4 text-xs text-muted-foreground">
-        <p>{t.header.disclaimer}</p>
-        <p className="mt-1">
-          {t.footer.author} · {t.footer.sourcesNote} · {t.header.dataAsOf} {dateLabel(DATA_AS_OF)}
-        </p>
-      </footer>
+      <p className="text-xs text-muted-foreground">
+        {t.footer.author} · {t.footer.sourcesNote}
+      </p>
     </div>
   );
 }

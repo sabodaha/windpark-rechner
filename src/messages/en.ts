@@ -2,7 +2,7 @@
 
 export const en = {
   meta: {
-    title: "Wind Farm Investment Calculator — Igor Sabodakha",
+    title: "Wind Farm Investment Calculator",
     description:
       "Project-finance model of a fictional 31.5 MW onshore wind farm in Hesse, Germany: EEG 2023 market premium, " +
       "KfW debt sized on DSCR, German taxes, scenarios, sensitivity and a bid calculator. Runs in your browser.",
@@ -316,6 +316,40 @@ export const en = {
   footer: {
     author: "A model by Igor Sabodakha",
     sourcesNote: "Every input has a public source or is marked as an assumption.",
+  },
+  site: {
+    name: "Igor Sabodakha",
+    skip: "Skip to content",
+    navLabel: "Main",
+    nav: {
+      calculator: "Wind farm calculator",
+      calculatorShort: "Calculator",
+      methodology: "Methodology",
+      sources: "Sources",
+      about: "About",
+    },
+    calculatorLinks: { methodology: "How the model works", sources: "All sources" },
+    resultsLabel: "Results",
+    footer: {
+      aboutTitle: "About the author",
+      about:
+        "Igor Sabodakha is a finance professional in Wiesbaden with more than 15 years of international experience in " +
+        "audit, transaction advisory, valuation and financial modelling.",
+      more: "More about me",
+      site: "Site",
+      legal: "Legal",
+      impressum: "Legal notice (Impressum)",
+      privacy: "Privacy policy",
+      dataAsOf: "Model data as of",
+      noTracking: "No cookies, no tracking: the calculator runs in your browser.",
+    },
+    placeholder: "To be completed before publication",
+    notFound: {
+      title: "Page not found",
+      text: "This page does not exist. It may have moved.",
+      home: "Go to the home page",
+      calculator: "Open the wind farm calculator",
+    },
   },
 };
 

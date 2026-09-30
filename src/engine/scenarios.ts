@@ -53,8 +53,8 @@ function edit(inputs: Inputs, fn: (copy: Inputs) => void): Inputs {
 export const TORNADO_DRIVERS: TornadoDriver[] = [
   {
     id: "siteQuality",
-    lowLabel: "60 %",
-    highLabel: "76 %",
+    lowLabel: "60%",
+    highLabel: "76%",
     apply: (i, s) => edit(i, (c) => void (c.energy.siteQuality = s === "low" ? 0.6 : 0.76)),
   },
   {
@@ -77,8 +77,8 @@ export const TORNADO_DRIVERS: TornadoDriver[] = [
   },
   {
     id: "capex",
-    lowLabel: "−10 %",
-    highLabel: "+10 %",
+    lowLabel: "−10%",
+    highLabel: "+10%",
     apply: (i, s) =>
       edit(i, (c) => {
         const k = s === "low" ? 0.9 : 1.1;
@@ -87,8 +87,8 @@ export const TORNADO_DRIVERS: TornadoDriver[] = [
   },
   {
     id: "opex",
-    lowLabel: "−10 %",
-    highLabel: "+10 %",
+    lowLabel: "−10%",
+    highLabel: "+10%",
     apply: (i, s) =>
       edit(i, (c) => {
         const k = s === "low" ? 0.9 : 1.1;
@@ -100,8 +100,8 @@ export const TORNADO_DRIVERS: TornadoDriver[] = [
   },
   {
     id: "interestRate",
-    lowLabel: "4.40 %",
-    highLabel: "6.05 %",
+    lowLabel: "4.40%",
+    highLabel: "6.05%",
     apply: (i, s) => edit(i, (c) => void (c.financing.interestRate = s === "low" ? 0.044 : 0.0605)),
   },
   {
@@ -117,20 +117,20 @@ export const TORNADO_DRIVERS: TornadoDriver[] = [
   },
   {
     id: "negativePrices",
-    lowLabel: "3 %",
-    highLabel: "9 %",
+    lowLabel: "3%",
+    highLabel: "9%",
     apply: (i, s) => edit(i, (c) => void (c.energy.negativePriceOutputShare = s === "low" ? 0.03 : 0.09)),
   },
   {
     id: "lease",
-    lowLabel: "6 %",
-    highLabel: "14 %",
+    lowLabel: "6%",
+    highLabel: "14%",
     apply: (i, s) => edit(i, (c) => void (c.opex.leaseShareOfRevenue = s === "low" ? 0.06 : 0.14)),
   },
   {
     id: "hebesatz",
-    lowLabel: "320 %",
-    highLabel: "450 %",
+    lowLabel: "320%",
+    highLabel: "450%",
     apply: (i, s) => edit(i, (c) => void (c.tax.hebesatz = s === "low" ? 3.2 : 4.5)),
   },
   {

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>og</title>
+    <style>
+      @font-face {
+        font-family: Inter;
+        src: url("__INTER__") format("woff2");
+        font-weight: 100 900;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+      }
+      body {
+        position: relative;
+        font-family: Inter, "Segoe UI", sans-serif;
+        background: #1f2a3c;
+        color: #ffffff;
+      }
+      .wrap {
+        position: absolute;
+        inset: 0;
+        padding: 76px 84px 64px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+      .kicker {
+        font-size: 26px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #aab4c3;
+      }
+      h1 {
+        margin: 20px 0 0;
+        max-width: 720px;
+        font-size: 74px;
+        line-height: 1.04;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .sub {
+        margin-top: 26px;
+        max-width: 700px;
+        text-wrap: balance;
+        font-size: 29px;
+        line-height: 1.4;
+        color: #d5dbe4;
+      }
+      .foot {
+        display: flex;
+        gap: 22px;
+        font-size: 24px;
+        color: #aab4c3;
+      }
+      .foot b {
+        color: #ffffff;
+        font-weight: 600;
+      }
+      svg {
+        position: absolute;
+        right: 64px;
+        top: 70px;
+      }
+    </style>
+  </head>
+  <body>
+    <svg width="340" height="500" viewBox="0 0 340 500" aria-hidden="true">
+      <!-- tower -->
+      <path d="M163 150 h14 l9 350 h-32 z" fill="#ffffff" opacity="0.92" />
+      <!-- blades -->
+      <g fill="#ffffff" opacity="0.92">
+        <path d="M170 146 c-5 0 -8 -6 -6 -13 L170 8 l6 125 c2 7 -1 13 -6 13 z" />
+        <path d="M170 146 c-5 0 -8 -6 -6 -13 L170 8 l6 125 c2 7 -1 13 -6 13 z" transform="rotate(120 170 142)" />
+        <path d="M170 146 c-5 0 -8 -6 -6 -13 L170 8 l6 125 c2 7 -1 13 -6 13 z" transform="rotate(240 170 142)" />
+      </g>
+      <circle cx="170" cy="142" r="12" fill="#ffffff" stroke="#1f2a3c" stroke-width="4" />
+      <!-- cash-flow bars -->
+      <g>
+        <rect x="18" y="430" width="22" height="70" rx="4" fill="#2a78d6" />
+        <rect x="46" y="410" width="22" height="90" rx="4" fill="#2a78d6" />
+        <rect x="74" y="398" width="22" height="102" rx="4" fill="#2a78d6" />
+        <rect x="244" y="392" width="22" height="108" rx="4" fill="#2a78d6" />
+        <rect x="272" y="380" width="22" height="120" rx="4" fill="#2a78d6" />
+        <rect x="300" y="366" width="22" height="134" rx="4" fill="#1baf7a" />
+      </g>
+    </svg>
+    <div class="wrap">
+      <div>
+        <div class="kicker">Igor Sabodakha</div>
+        <h1>Wind Farm Investment Calculator</h1>
+        <div class="sub">An open project-finance model of a German onshore wind farm: EEG&nbsp;2023, KfW&nbsp;debt, German&nbsp;taxes.</div>
+      </div>
+      <div class="foot"><b>igorsabodakha.com</b><span>Every input with a public source</span></div>
+    </div>
+  </body>
+</html>

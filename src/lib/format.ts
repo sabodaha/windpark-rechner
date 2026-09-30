@@ -14,14 +14,17 @@ function nf(min: number, max: number, style: "decimal" | "percent" = "decimal"):
 
 export const NA = "n/a";
 
+/** Typographic minus sign (U+2212); a value that rounds to zero gets no sign ("0", never "−0"). */
+const minus = (s: string) => (/^-[0.,%]+$/.test(s) ? s.slice(1) : s.replace("-", "−"));
+
 export function num(v: number | null | undefined, decimals = 0): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return NA;
-  return nf(decimals, decimals).format(v === 0 ? 0 : v);
+  return minus(nf(decimals, decimals).format(v));
 }
 
 export function pct(v: number | null | undefined, decimals = 1): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return NA;
-  return nf(decimals, decimals, "percent").format(v);
+  return minus(nf(decimals, decimals, "percent").format(v));
 }
 
 /** € amounts in millions: "€21.5m". */
@@ -35,17 +38,17 @@ export function meur(v: number | null | undefined, decimals = 1): string {
 export function keur(v: number | null | undefined): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return NA;
   const r = Math.round(v / 1000);
-  return r === 0 ? "0" : nf(0, 0).format(r);
+  return minus(nf(0, 0).format(r));
 }
 
 export function ratio(v: number | null | undefined, decimals = 2): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return NA;
-  return `${nf(decimals, decimals).format(v)}x`;
+  return `${minus(nf(decimals, decimals).format(v))}x`;
 }
 
 export function ct(v: number | null | undefined, decimals = 2): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return NA;
-  return `${nf(decimals, decimals).format(v)} ct/kWh`;
+  return `${minus(nf(decimals, decimals).format(v))} ct/kWh`;
 }
 
 export function dateLabel(iso: string): string {

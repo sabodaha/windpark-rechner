@@ -229,7 +229,7 @@ export const SOURCES: Record<string, Source> = {
     date: "2025-10-23",
   },
   hessenSecurity: {
-    title: "Hessian Landtag Drucksache 21/2671: decommissioning security = hub height × € 1,000",
+    title: "Hessian Landtag Drucksache 21/2671: decommissioning security = hub height × €1,000",
     url: "https://starweb.hessen.de/cache/DRS/21/1/02671.pdf",
     date: "2025-09-09",
   },
@@ -239,7 +239,7 @@ export const SOURCES: Record<string, Source> = {
     date: "2023-08-29",
   },
   gearing: {
-    title: "Energie-Atlas Bayern: banks usually finance 75–85 % of the investment",
+    title: "Energie-Atlas Bayern: banks usually finance 75–85% of the investment",
     url: "https://www.energieatlas.bayern.de/erneuerbare-energien/windenergie/kommunen/finanzierung-teilhabe",
     date: "2026-02-01",
   },
@@ -269,7 +269,7 @@ export const SOURCES: Record<string, Source> = {
     date: "2026-04-09",
   },
   ecb: {
-    title: "European Central Bank: 2 % inflation target; staff projections September 2026",
+    title: "European Central Bank: 2% inflation target; staff projections September 2026",
     url: "https://www.ecb.europa.eu/press/projections/html/ecb.projections202609_ecbstaff~8e340fc69d.en.html",
     date: "2026-09-10",
   },

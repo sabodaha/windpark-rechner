@@ -7,6 +7,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build && node scripts/postbuild.mjs",
+    "serve": "node scripts/serve.mjs",
+    "check:launch": "node scripts/check-launch.mjs",
+    "images": "node scripts/images/render.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",

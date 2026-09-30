@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { BASE_CASE, runScenarios } from "../src/engine";
 import { buildWorkbook } from "../src/lib/export";
 import { FIELDS, FIELD_BY_ID, sameValue, withField } from "../src/lib/fields";
-import { ct, keur, meur, pct, ratio } from "../src/lib/format";
+import { ct, keur, meur, num, pct, ratio } from "../src/lib/format";
 import { decodeInputs, encodeInputs } from "../src/lib/url-state";
 import { buildXlsx, colName, excelDate, roundStored } from "../src/lib/xlsx";
 import { en } from "../src/messages/en";
@@ -74,6 +74,14 @@ describe("format (en-GB)", () => {
     expect(ratio(1.3663)).toBe("1.37x");
     expect(ct(7.2524)).toBe("7.25 ct/kWh");
     expect(pct(null)).toBe("n/a");
+  });
+
+  it("prints negatives with a minus sign and never shows −0", () => {
+    expect(pct(-0.030867, 2)).toBe("−3.09%");
+    expect(ratio(-1.5)).toBe("−1.50x");
+    expect(num(-0.004)).toBe("0");
+    expect(keur(-400)).toBe("0");
+    expect(keur(-1_265_000)).toBe("−1,265");
   });
 });
 
