@@ -1,5 +1,5 @@
 export * from "./types";
-export { BASE_CASE, DATA_AS_OF, INPUT_SOURCES, SOURCES } from "./defaults";
+export { BASE_CASE, DATA_AS_OF, SOURCES, TENDER_FACTS, type Source } from "./defaults";
 export { correctionFactor, anzulegenderWert, marketPremium, CORRECTION_FACTOR_TABLE } from "./eeg";
 export { xirr, xnpv, annuityFactor } from "./finance";
 export { TAX, corporateTaxRate, corporateLossShare } from "./tax";

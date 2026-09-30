@@ -1,0 +1,131 @@
+import { unzipSync, strFromU8 } from "fflate";
+import { describe, expect, it } from "vitest";
+import { BASE_CASE, runScenarios } from "../src/engine";
+import { buildWorkbook } from "../src/lib/export";
+import { FIELDS, FIELD_BY_ID, sameValue, withField } from "../src/lib/fields";
+import { ct, keur, meur, pct, ratio } from "../src/lib/format";
+import { decodeInputs, encodeInputs } from "../src/lib/url-state";
+import { buildXlsx, colName, excelDate, roundStored } from "../src/lib/xlsx";
+import { en } from "../src/messages/en";
+
+describe("fields", () => {
+  it("every field has a label and reads the base case", () => {
+    for (const f of FIELDS) {
+      expect(en.fields[f.id]?.label ?? (f.opexCell ? "grid" : undefined), f.id).toBeTruthy();
+      expect(f.get(BASE_CASE), f.id).not.toBeUndefined();
+    }
+  });
+
+  it("set then get returns the value for every concrete field", () => {
+    for (const f of FIELDS.filter((x) => !x.virtual)) {
+      const v = f.get(BASE_CASE);
+      const next =
+        typeof v === "number"
+          ? f.decimals === 0
+            ? v + 1 // integer fields (turbines, years, months) round on set
+            : v * 1.1 + 0.01
+          : typeof v === "boolean"
+            ? !v
+            : f.kind === "month"
+              ? "2027-02"
+              : (f.options?.find((o) => o !== v) ?? v);
+      const changed = withField(BASE_CASE, f, next);
+      expect(sameValue(f.get(changed), next), f.id).toBe(true);
+      expect(sameValue(f.get(BASE_CASE), v), `${f.id} must not mutate the base case`).toBe(true);
+    }
+  });
+
+  it("total capex rescales all items and keeps their proportions", () => {
+    const f = FIELD_BY_ID.get("capexTotal")!;
+    const doubled = withField(BASE_CASE, f, (f.get(BASE_CASE) as number) * 2);
+    expect(f.get(doubled)).toBeCloseTo((f.get(BASE_CASE) as number) * 2, 6);
+    expect(doubled.capex.items[0]!.eurPerKw / doubled.capex.items[1]!.eurPerKw).toBeCloseTo(
+      BASE_CASE.capex.items[0]!.eurPerKw / BASE_CASE.capex.items[1]!.eurPerKw,
+      9,
+    );
+  });
+});
+
+describe("url state", () => {
+  it("writes nothing for the base case", () => {
+    expect(encodeInputs(BASE_CASE, BASE_CASE)).toBe("");
+  });
+
+  it("round-trips changed inputs", () => {
+    let i = withField(BASE_CASE, FIELD_BY_ID.get("award")!, 5.2);
+    i = withField(i, FIELD_BY_ID.get("legalForm")!, "GmbH");
+    i = withField(i, FIELD_BY_ID.get("twoSided")!, true);
+    i = withField(i, FIELD_BY_ID.get("om2")!, 18);
+    const q = encodeInputs(i, BASE_CASE);
+    expect(q).toContain("award=5.2");
+    expect(decodeInputs(q, BASE_CASE)).toEqual(i);
+  });
+
+  it("ignores unknown keys and values outside the allowed range", () => {
+    expect(decodeInputs("foo=1&award=999&siteQuality=abc", BASE_CASE)).toBeNull();
+  });
+});
+
+describe("format (en-GB)", () => {
+  it("formats the KPI types", () => {
+    expect(pct(0.030124, 2)).toBe("3.01%");
+    expect(meur(-16_044_536)).toBe("−€16.0m");
+    expect(keur(21_509_505)).toBe("21,510");
+    expect(ratio(1.3663)).toBe("1.37x");
+    expect(ct(7.2524)).toBe("7.25 ct/kWh");
+    expect(pct(null)).toBe("n/a");
+  });
+});
+
+describe("xlsx writer", () => {
+  it("column names and Excel dates", () => {
+    expect([0, 25, 26, 27, 701, 702].map(colName)).toEqual(["A", "Z", "AA", "AB", "ZZ", "AAA"]);
+    expect(excelDate("1900-03-01")).toBe(61);
+    expect(excelDate("2027-01-01")).toBe(46388);
+  });
+
+  it("writes a valid package with escaped inline strings", () => {
+    const bytes = buildXlsx([{ name: "A & B", rows: [["x < y", 1.5, true, null], [{ v: 0.25, s: "pct" }]] }]);
+    const files = unzipSync(bytes);
+    expect(Object.keys(files).sort()).toEqual(
+      ["[Content_Types].xml", "_rels/.rels", "xl/_rels/workbook.xml.rels", "xl/styles.xml", "xl/workbook.xml", "xl/worksheets/sheet1.xml"].sort(),
+    );
+    const sheet = strFromU8(files["xl/worksheets/sheet1.xml"]!);
+    expect(sheet).toContain("x &lt; y");
+    expect(sheet).toContain('<c r="B1"><v>1.5</v></c>');
+    expect(sheet).toContain('t="b"><v>1</v>');
+    expect(sheet).toContain('<c r="A2" s="4"><v>0.25</v></c>');
+    expect(strFromU8(files["xl/workbook.xml"]!)).toContain('name="A &amp; B"');
+  });
+
+  it("stores numbers rounded to 0.001 of the unit shown", () => {
+    expect(roundStored(36_685_445.88758783, "int")).toBe(36_685_445.888);
+    expect(roundStored(0.030124662010084603, "pct")).toBe(0.03012); // 3.012 %
+    expect(roundStored(0.0535, "pct")).toBe(0.0535); // an input rate stays exact
+    expect(roundStored(10.299999999999999)).toBe(10.3);
+    expect(roundStored(-2.0625)).toBe(-2.063); // exact half: away from zero, like Excel's ROUND
+    expect(Object.is(roundStored(-0.0000004), 0)).toBe(true);
+    const sheet = strFromU8(unzipSync(buildXlsx([{ name: "R", rows: [[{ v: 1.3662561242174736, s: "dec2" }]] }]))["xl/worksheets/sheet1.xml"]!);
+    expect(sheet).toContain("<v>1.366</v>");
+  });
+
+  it("exports no number with more than three decimals of its shown unit", () => {
+    const files = unzipSync(buildWorkbook(BASE_CASE, runScenarios(BASE_CASE), en, "http://localhost/"));
+    let seen = 0;
+    for (const [name, data] of Object.entries(files).filter(([k]) => k.startsWith("xl/worksheets/"))) {
+      for (const m of strFromU8(data).matchAll(/<c r="[A-Z]+\d+"(?: s="(\d+)")?><v>(-?[\d.e+-]+)<\/v>/g)) {
+        const decimals = m[2]!.split(".")[1]?.length ?? 0;
+        expect(decimals, `${name} ${m[0]}`).toBeLessThanOrEqual(m[1] === "4" ? 5 : 3);
+        seen++;
+      }
+    }
+    expect(seen).toBeGreaterThan(900); // the pattern really reads the numeric cells
+  });
+
+  it("exports the model with six sheets", () => {
+    const bytes = buildWorkbook(BASE_CASE, runScenarios(BASE_CASE), en, "http://localhost/wind-farm-calculator/");
+    const files = unzipSync(bytes);
+    expect(Object.keys(files).filter((k) => k.startsWith("xl/worksheets/"))).toHaveLength(6);
+    expect(strFromU8(files["xl/worksheets/sheet1.xml"]!)).toContain(en.header.disclaimer.slice(0, 20));
+  });
+});

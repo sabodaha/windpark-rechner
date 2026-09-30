@@ -17,6 +17,9 @@ coverage/
 # env files (never commit)
 .env*
 
+# local tool configuration
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
