@@ -732,12 +732,24 @@ Solidarity    = 5.5% × corporate tax`}</pre>
               the base scenario never breaches its covenant, never runs out of cash and passes every calculation check.
             </li>
             <li>
-              On 30 September 2026 a spreadsheet built from the written specification — not from the code — recomputed
-              the base case of the engine as it then stood in Microsoft Excel. It took the engine’s loan and total uses as
-              inputs and confirmed that they satisfy the spreadsheet’s own equations; all 20 key figures and twelve
-              annual lines agreed to the cent. That check covered the base switches only (KG, equal instalments, the EEG
-              floor, one-sided premium, market sales after support). Two external reviews followed, and the engine was
-              corrected; a formula workbook that recalculates every switch is the next step.
+              The <a href={PATHS.workbook}>Excel workbook</a> is a second implementation of the model in spreadsheet
+              formulas. Its copy without stored results was recalculated by Microsoft Excel alone. In 25 variants that
+              cover every switch — legal form, repayment profile, lender’s basis, two-sided stress, PPA, equity first,
+              declining-balance depreciation, Südregion, dates and lags — all of its roughly 26,000 formula cells agree
+              with the engine: money to the cent, rates and ratios to 10⁻⁷. In a negative control, a trade-tax
+              multiplier of 410 % instead of 400 % moves the tax lines and the equity IRR but not revenue, the loan or
+              capex.
+            </li>
+            <li>
+              The workbook takes three results from the website as pasted values: the loan, the total uses and, for a
+              sculpted loan, the principal per year. They are the fixed points of the model’s circular links. Its
+              Checks sheet recomputes the loan from the DSCR targets and the gearing cap and says when the pasted
+              values no longer fit.
+            </li>
+            <li>
+              On 30 September 2026, before the reviews, a spreadsheet built from the written specification — not from
+              the code — recomputed the base case of the first engine in Microsoft Excel. All 20 key figures and twelve
+              annual lines agreed to the cent.
             </li>
             <li>
               The source code, including the tests, is public on <a href={SITE.repository}>GitHub</a>.
@@ -761,7 +773,11 @@ Solidarity    = 5.5% × corporate tax`}</pre>
               Uncompensated grid curtailment (a draft of the grid package) and generator grid fees (the regulator’s
               AgNes process) are not in the base case; the fee is available as an input.
             </li>
-            <li>The Excel export contains values, not formulas.</li>
+            <li>
+              In the Excel workbook the loan, the total uses and the sculpted principal are solved on the website; after
+              a change that affects them, re-solve there and download again. The tornado and the bid calculator are
+              included as values.
+            </li>
             <li>The wind farm is fictional and the results are illustrative.</li>
           </ul>
         </article>

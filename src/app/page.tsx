@@ -50,7 +50,8 @@ const FEATURES: { title: string; text: string }[] = [
     title: "Open and checked",
     text:
       "Every input has a unit, a hint and a dated public source or a documented assumption. Checks on the calculation, " +
-      "funding, covenant and model scope run on every recalculation, and the results export to Excel.",
+      "funding, covenant and model scope run on every recalculation, and the model downloads as an Excel workbook " +
+      "with live formulas.",
   },
 ];
 

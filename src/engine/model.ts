@@ -36,7 +36,7 @@ import type { EngineTrace, LoanMonth, OperationsTrace, TaxTrace } from "./trace"
 import { InvalidInputsError, validateInputs } from "./validate";
 
 /** Anlage 2 Nr. 7 EEG: up to 2 % unavailability is already part of the Standortertrag. */
-const AVAILABILITY_IN_SITE_YIELD = 0.98;
+export const AVAILABILITY_IN_SITE_YIELD = 0.98;
 /** z-value of the 90 % one-sided quantile of a normal distribution. */
 export const P90_Z = 1.2816;
 const TOLERANCE = 1; // € — accounting checks

@@ -378,7 +378,7 @@ export const en = {
   },
   actions: {
     excel: "Download Excel",
-    excelNote: "Values only: the calculator's inputs and results at the time of download. The calculation itself runs on the website.",
+    excelNote: "A formula workbook: change an input and every result follows. The loan is solved on the website.",
     preparing: "Preparing…",
     calculating: "Calculating…",
     copyLink: "Copy link",

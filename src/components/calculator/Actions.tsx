@@ -23,13 +23,15 @@ export function Actions({ snapshot, pending, t, isCustom, onReset }: Props) {
     if (!snapshot.results) return;
     setBusy(true);
     try {
-      const [{ buildWorkbook }, { buildSnapshot }] = await Promise.all([import("@/lib/export"), import("@/engine")]);
-      const bytes = buildWorkbook(buildSnapshot(snapshot.inputs), t, window.location.href);
+      // Let the button repaint before the workbook is built (about a second on a laptop).
+      await new Promise((r) => setTimeout(r, 30));
+      const { workbookForInputs } = await import("@/lib/workbook/build");
+      const { bytes } = workbookForInputs(snapshot.inputs, t, window.location.href);
       const blob = new Blob([bytes as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "wind-farm-calculator.xlsx";
+      a.download = "wind-farm-model.xlsx";
       document.body.appendChild(a);
       a.click();
       a.remove();

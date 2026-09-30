@@ -24,7 +24,10 @@ DSCR, German taxes — that runs entirely in the browser.
   depreciation and a decommissioning provision.
 - **Results:** equity and project IRR, NPV, LCOE, DSCR, LLCR and payback; the lender's one-year P90 stress, a
   ten-year P90 and a downside case with the loan held fixed and the § 36h site-quality review; a tornado of twelve
-  drivers; a bid calculator that checks financeability and the tender ceiling; Excel export.
+  drivers; a bid calculator that checks financeability and the tender ceiling.
+- **Excel:** the model rebuilt with live formulas (14 sheets), generated in the browser from the current inputs; the
+  loan and the total uses are solved on the website and pasted, with check rows. Base case:
+  https://igorsabodakha.com/wind-farm-calculator/wind-farm-model.xlsx
 - **Validity:** every run is checked for input ranges, calculation integrity, funding, covenant and model scope;
   returns of a case that runs out of cash are shown as not meaningful.
 
@@ -62,6 +65,9 @@ npm run check:launch  # fails if a page shows a placeholder or lacks the disclai
   loan calendar and premium timing, the model and its scenarios, the bid calculator and the Excel export.
 - A seeded sweep of 500 random input sets runs as a test: with the one-sided premium, the base scenario never
   breaches its covenant, never runs out of cash and passes every calculation check.
+- The formula workbook is recalculated by Microsoft Excel in 25 switch variants (`scripts/workbook/`: `verify.ts build`,
+  `recalc.ps1`, `verify.ts compare`, plus a negative control): every formula cell agrees with the engine, money to the
+  cent and ratios to 1e-7.
 - On 30 September 2026 a spreadsheet built from the written specification — not from the code — recomputed the base
   case of the first engine in Microsoft Excel from the engine's loan and total uses (base switches only); all 20 key
   figures and twelve annual lines agreed to the cent. The engine has since been corrected after two external

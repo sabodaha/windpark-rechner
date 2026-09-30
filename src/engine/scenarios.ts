@@ -187,6 +187,26 @@ function tryRun(inputs: Inputs): ModelResult | null {
   }
 }
 
+/** All four metrics from one set of runs (25 instead of 100). */
+export function tornadoAll(inputs: Inputs, drivers = TORNADO_DRIVERS): Record<TornadoMetric, TornadoBar[]> {
+  const metrics: TornadoMetric[] = ["equityIrr", "projectIrrPostTax", "minDscr", "lcoeRealCt"];
+  const baseRun = tryRun(inputs);
+  const runs = drivers.map((d) => ({ d, low: tryRun(d.apply(inputs, "low")), high: tryRun(d.apply(inputs, "high")) }));
+  const out = {} as Record<TornadoMetric, TornadoBar[]>;
+  for (const metric of metrics) {
+    const base = baseRun ? metricOf(baseRun.kpis, metric) : null;
+    out[metric] = runs
+      .map(({ d, low, high }) => {
+        const lo = low ? metricOf(low.kpis, metric) : null;
+        const hi = high ? metricOf(high.kpis, metric) : null;
+        const range = Math.abs((hi ?? base ?? 0) - (lo ?? base ?? 0));
+        return { id: d.id, lowLabel: d.lowLabel, highLabel: d.highLabel, low: lo, high: hi, base, range };
+      })
+      .sort((a, b) => b.range - a.range);
+  }
+  return out;
+}
+
 /** Each bar is a full re-run with the loan re-sized — the view before financial close. */
 export function tornado(inputs: Inputs, metric: TornadoMetric, drivers = TORNADO_DRIVERS): TornadoBar[] {
   const at = (i: Inputs) => {

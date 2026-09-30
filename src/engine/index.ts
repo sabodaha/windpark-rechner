@@ -21,6 +21,7 @@ export {
   runScenarios,
   scenarioAdjustments,
   tornado,
+  tornadoAll,
   solveAwardPrice,
   p90Factor,
   DOWNSIDE,

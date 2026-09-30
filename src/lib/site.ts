@@ -38,6 +38,7 @@ export const CONTACT: { addressLines: string[] | null; email: string | null; pho
 export const PATHS = {
   home: "/",
   calculator: "/wind-farm-calculator/",
+  workbook: "/wind-farm-calculator/wind-farm-model.xlsx",
   methodology: "/wind-farm-calculator/methodology/",
   sources: "/wind-farm-calculator/sources/",
   about: "/about/",

@@ -1,11 +1,8 @@
-import { unzipSync, strFromU8 } from "fflate";
 import { describe, expect, it } from "vitest";
-import { BASE_CASE, buildSnapshot, validateInputs } from "../src/engine";
-import { buildWorkbook } from "../src/lib/export";
+import { BASE_CASE, validateInputs } from "../src/engine";
 import { FIELDS, FIELD_BY_ID, sameValue, withField } from "../src/lib/fields";
 import { ct, keur, meur, num, pct, ratio } from "../src/lib/format";
 import { decodeInputs, encodeInputs } from "../src/lib/url-state";
-import { buildXlsx, colName, excelDate, roundStored } from "../src/lib/xlsx";
 import { en } from "../src/messages/en";
 
 describe("fields", () => {
@@ -107,58 +104,5 @@ describe("format (en-GB)", () => {
     expect(num(-0.004)).toBe("0");
     expect(keur(-400)).toBe("0");
     expect(keur(-1_265_000)).toBe("−1,265");
-  });
-});
-
-describe("xlsx writer", () => {
-  it("column names and Excel dates", () => {
-    expect([0, 25, 26, 27, 701, 702].map(colName)).toEqual(["A", "Z", "AA", "AB", "ZZ", "AAA"]);
-    expect(excelDate("1900-03-01")).toBe(61);
-    expect(excelDate("2027-01-01")).toBe(46388);
-  });
-
-  it("writes a valid package with escaped inline strings", () => {
-    const bytes = buildXlsx([{ name: "A & B", rows: [["x < y", 1.5, true, null], [{ v: 0.25, s: "pct" }]] }]);
-    const files = unzipSync(bytes);
-    expect(Object.keys(files).sort()).toEqual(
-      ["[Content_Types].xml", "_rels/.rels", "xl/_rels/workbook.xml.rels", "xl/styles.xml", "xl/workbook.xml", "xl/worksheets/sheet1.xml"].sort(),
-    );
-    const sheet = strFromU8(files["xl/worksheets/sheet1.xml"]!);
-    expect(sheet).toContain("x &lt; y");
-    expect(sheet).toContain('<c r="B1"><v>1.5</v></c>');
-    expect(sheet).toContain('t="b"><v>1</v>');
-    expect(sheet).toContain('<c r="A2" s="4"><v>0.25</v></c>');
-    expect(strFromU8(files["xl/workbook.xml"]!)).toContain('name="A &amp; B"');
-  });
-
-  it("stores numbers rounded to 0.001 of the unit shown", () => {
-    expect(roundStored(36_685_445.88758783, "int")).toBe(36_685_445.888);
-    expect(roundStored(0.030124662010084603, "pct")).toBe(0.03012); // 3.012 %
-    expect(roundStored(0.0535, "pct")).toBe(0.0535); // an input rate stays exact
-    expect(roundStored(10.299999999999999)).toBe(10.3);
-    expect(roundStored(-2.0625)).toBe(-2.063); // exact half: away from zero, like Excel's ROUND
-    expect(Object.is(roundStored(-0.0000004), 0)).toBe(true);
-    const sheet = strFromU8(unzipSync(buildXlsx([{ name: "R", rows: [[{ v: 1.3662561242174736, s: "dec2" }]] }]))["xl/worksheets/sheet1.xml"]!);
-    expect(sheet).toContain("<v>1.366</v>");
-  });
-
-  it("exports no number with more than three decimals of its shown unit", () => {
-    const files = unzipSync(buildWorkbook(buildSnapshot(BASE_CASE), en, "http://localhost/"));
-    let seen = 0;
-    for (const [name, data] of Object.entries(files).filter(([k]) => k.startsWith("xl/worksheets/"))) {
-      for (const m of strFromU8(data).matchAll(/<c r="[A-Z]+\d+"(?: s="(\d+)")?><v>(-?[\d.e+-]+)<\/v>/g)) {
-        const decimals = m[2]!.split(".")[1]?.length ?? 0;
-        expect(decimals, `${name} ${m[0]}`).toBeLessThanOrEqual(m[1] === "4" ? 5 : 3);
-        seen++;
-      }
-    }
-    expect(seen).toBeGreaterThan(900); // the pattern really reads the numeric cells
-  });
-
-  it("exports the model with six sheets", () => {
-    const bytes = buildWorkbook(buildSnapshot(BASE_CASE), en, "http://localhost/wind-farm-calculator/");
-    const files = unzipSync(bytes);
-    expect(Object.keys(files).filter((k) => k.startsWith("xl/worksheets/"))).toHaveLength(6);
-    expect(strFromU8(files["xl/worksheets/sheet1.xml"]!)).toContain(en.header.disclaimer.slice(0, 20));
   });
 });
