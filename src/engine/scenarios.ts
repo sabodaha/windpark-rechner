@@ -34,10 +34,11 @@ export function scenarioAdjustments(inputs: Inputs, name: ScenarioName): Partial
  * Base sizes the loan. The stress scenarios keep that loan (amount and every instalment) — the lender's view
  * after financial close — so their DSCRs show how much headroom the base case has.
  */
-export function runScenarios(inputs: Inputs): Record<ScenarioName, ModelResult> {
-  const base = runModel(inputs);
+export function runScenarios(inputs: Inputs, options: { trace?: boolean } = {}): Record<ScenarioName, ModelResult> {
+  const trace = options.trace ?? false;
+  const base = runModel(inputs, { trace });
   const locked = (name: ScenarioName) =>
-    runModel(inputs, { scenario: scenarioAdjustments(inputs, name), lockedDebt: base.lockedDebt });
+    runModel(inputs, { scenario: scenarioAdjustments(inputs, name), lockedDebt: base.lockedDebt, trace });
   return { base, p90: locked("p90"), resource: locked("resource"), downside: locked("downside") };
 }
 

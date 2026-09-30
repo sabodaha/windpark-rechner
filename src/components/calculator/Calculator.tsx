@@ -146,7 +146,8 @@ export function Calculator() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        {t.footer.author} · {t.footer.sourcesNote}
+        {t.footer.author} · {t.footer.sourcesNote} ·{" "}
+        <span className="tabular">{t.footer.version(snapshot.engineVersion, snapshot.inputHash)}</span>
       </p>
     </div>
   );

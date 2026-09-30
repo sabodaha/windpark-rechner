@@ -1,6 +1,6 @@
 import { unzipSync, strFromU8 } from "fflate";
 import { describe, expect, it } from "vitest";
-import { BASE_CASE, runScenarios, validateInputs } from "../src/engine";
+import { BASE_CASE, buildSnapshot, validateInputs } from "../src/engine";
 import { buildWorkbook } from "../src/lib/export";
 import { FIELDS, FIELD_BY_ID, sameValue, withField } from "../src/lib/fields";
 import { ct, keur, meur, num, pct, ratio } from "../src/lib/format";
@@ -143,7 +143,7 @@ describe("xlsx writer", () => {
   });
 
   it("exports no number with more than three decimals of its shown unit", () => {
-    const files = unzipSync(buildWorkbook(BASE_CASE, runScenarios(BASE_CASE), en, "http://localhost/"));
+    const files = unzipSync(buildWorkbook(buildSnapshot(BASE_CASE), en, "http://localhost/"));
     let seen = 0;
     for (const [name, data] of Object.entries(files).filter(([k]) => k.startsWith("xl/worksheets/"))) {
       for (const m of strFromU8(data).matchAll(/<c r="[A-Z]+\d+"(?: s="(\d+)")?><v>(-?[\d.e+-]+)<\/v>/g)) {
@@ -156,7 +156,7 @@ describe("xlsx writer", () => {
   });
 
   it("exports the model with six sheets", () => {
-    const bytes = buildWorkbook(BASE_CASE, runScenarios(BASE_CASE), en, "http://localhost/wind-farm-calculator/");
+    const bytes = buildWorkbook(buildSnapshot(BASE_CASE), en, "http://localhost/wind-farm-calculator/");
     const files = unzipSync(bytes);
     expect(Object.keys(files).filter((k) => k.startsWith("xl/worksheets/"))).toHaveLength(6);
     expect(strFromU8(files["xl/worksheets/sheet1.xml"]!)).toContain(en.header.disclaimer.slice(0, 20));

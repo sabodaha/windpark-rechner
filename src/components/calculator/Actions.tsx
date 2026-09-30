@@ -23,8 +23,8 @@ export function Actions({ snapshot, pending, t, isCustom, onReset }: Props) {
     if (!snapshot.results) return;
     setBusy(true);
     try {
-      const { buildWorkbook } = await import("@/lib/export");
-      const bytes = buildWorkbook(snapshot.inputs, snapshot.results, t, window.location.href);
+      const [{ buildWorkbook }, { buildSnapshot }] = await Promise.all([import("@/lib/export"), import("@/engine")]);
+      const bytes = buildWorkbook(buildSnapshot(snapshot.inputs), t, window.location.href);
       const blob = new Blob([bytes as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");

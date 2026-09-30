@@ -1,3 +1,5 @@
+import type { EngineTrace } from "./trace";
+
 /** Calendar date as ISO string "YYYY-MM-DD" (UTC, no time of day). */
 export type IsoDate = string;
 
@@ -374,4 +376,6 @@ export interface ModelResult {
   lockedDebt: LockedDebt;
   iterations: number;
   converged: boolean;
+  /** Every intermediate line, when the run was asked for it (RunOptions.trace). */
+  trace?: EngineTrace;
 }

@@ -3,6 +3,8 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   BASE_CASE,
+  ENGINE_VERSION,
+  hashInputs,
   InvalidInputsError,
   runScenarios,
   type InputIssue,
@@ -17,16 +19,18 @@ import { decodeInputs, encodeInputs, loadFromStorage, saveToStorage } from "@/li
  * One completed calculation: the inputs and the results that belong to them. Everything shown or exported —
  * KPIs, charts, tables, the Excel file — comes from the same snapshot, never from newer inputs.
  */
-export type Snapshot =
-  | { inputs: Inputs; results: Record<ScenarioName, ModelResult>; issues: null }
-  | { inputs: Inputs; results: null; issues: InputIssue[] };
+export type Snapshot = { inputs: Inputs; inputHash: string; engineVersion: string } & (
+  | { results: Record<ScenarioName, ModelResult>; issues: null }
+  | { results: null; issues: InputIssue[] }
+);
 
 function calculate(inputs: Inputs): Snapshot {
+  const id = { inputs, inputHash: hashInputs(inputs), engineVersion: ENGINE_VERSION };
   try {
-    return { inputs, results: runScenarios(inputs), issues: null };
+    return { ...id, results: runScenarios(inputs), issues: null };
   } catch (e) {
-    if (e instanceof InvalidInputsError) return { inputs, results: null, issues: e.issues };
-    return { inputs, results: null, issues: [{ path: "", message: e instanceof Error ? e.message : String(e) }] };
+    if (e instanceof InvalidInputsError) return { ...id, results: null, issues: e.issues };
+    return { ...id, results: null, issues: [{ path: "", message: e instanceof Error ? e.message : String(e) }] };
   }
 }
 

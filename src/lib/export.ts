@@ -1,17 +1,13 @@
 // Excel export (values): summary, assumptions with sources, annual table, construction months, checks, sources.
-import { DATA_AS_OF, SCENARIOS, SOURCES, type Inputs, type ModelResult, type ScenarioName } from "@/engine";
+import { SCENARIOS, SOURCES, type ModelResult, type ModelSnapshot } from "@/engine";
 import type { Messages } from "@/messages/en";
 import { FIELDS, toDisplay } from "./fields";
 import { buildXlsx, excelDate, type Row, type Sheet } from "./xlsx";
 
 const b = (v: string) => ({ v, s: "bold" as const });
 
-export function buildWorkbook(
-  inputs: Inputs,
-  scenarios: Record<ScenarioName, ModelResult>,
-  t: Messages,
-  pageUrl: string,
-): Uint8Array {
+export function buildWorkbook(snapshot: ModelSnapshot, t: Messages, pageUrl: string): Uint8Array {
+  const { inputs, scenarios } = snapshot;
   const base = scenarios.base;
   const k = base.kpis;
 
@@ -20,7 +16,8 @@ export function buildWorkbook(
     [t.header.subtitle],
     [t.header.disclaimer],
     [t.actions.excelNote],
-    [`${t.header.dataAsOf}: ${DATA_AS_OF}`],
+    [`${t.header.dataAsOf}: ${snapshot.dataAsOf}`],
+    [`Engine ${snapshot.engineVersion} · input hash ${snapshot.inputHash}`],
     [pageUrl],
     [],
     [b("KPI"), ...SCENARIOS.map((sc) => b(t.scenarios[sc]))],

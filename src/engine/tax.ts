@@ -59,6 +59,20 @@ export interface TaxResult {
   tradeTax: number[];
   corporateTax: number[];
   soli: number[];
+  /** Intermediate lines, year by year: add-back, loss pools, rounded base, corporate tax rate. */
+  detail: {
+    addBack: number[];
+    tradeIncome: number[];
+    tradePoolOpen: number[];
+    tradeLossUsed: number[];
+    tradePoolClose: number[];
+    tradeBase: number[];
+    corporatePoolOpen: number[];
+    corporateLossUsed: number[];
+    corporatePoolClose: number[];
+    corporateTaxable: number[];
+    corporateRate: number[];
+  };
 }
 
 /**
@@ -66,32 +80,62 @@ export interface TaxResult {
  * paid by the partners). Taxes are not deductible (§ 4 (5b) EStG), so there is no circularity.
  */
 export function computeTaxes(years: TaxYear[], legalForm: LegalForm, hebesatz: number): TaxResult {
-  const tradeTax: number[] = [];
-  const corporateTax: number[] = [];
-  const soli: number[] = [];
+  const r: TaxResult = {
+    tradeTax: [],
+    corporateTax: [],
+    soli: [],
+    detail: {
+      addBack: [],
+      tradeIncome: [],
+      tradePoolOpen: [],
+      tradeLossUsed: [],
+      tradePoolClose: [],
+      tradeBase: [],
+      corporatePoolOpen: [],
+      corporateLossUsed: [],
+      corporatePoolClose: [],
+      corporateTaxable: [],
+      corporateRate: [],
+    },
+  };
+  const d = r.detail;
   let tradePool = 0;
   let corporatePool = 0;
   for (const y of years) {
     const addBack =
       TAX.addBackShare * Math.max(0, y.interest + TAX.immovableLeaseShare * y.lease - TAX.addBackAllowance);
-    const trade = offsetLosses(y.ebt + addBack, tradePool, TAX.tradeTaxLossShare);
+    const income = y.ebt + addBack;
+    d.addBack.push(addBack);
+    d.tradeIncome.push(income);
+    d.tradePoolOpen.push(tradePool);
+    const trade = offsetLosses(income, tradePool, TAX.tradeTaxLossShare);
+    d.tradeLossUsed.push(income > 0 ? tradePool - trade.pool : 0);
     tradePool = trade.pool;
+    d.tradePoolClose.push(tradePool);
     let base = Math.floor(trade.taxable / 100) * 100;
     if (legalForm === "KG") base = Math.max(0, base - TAX.tradeTaxAllowancePartnership);
-    tradeTax.push(base * TAX.tradeTaxBaseRate * hebesatz);
+    d.tradeBase.push(base);
+    r.tradeTax.push(base * TAX.tradeTaxBaseRate * hebesatz);
 
+    d.corporatePoolOpen.push(corporatePool);
+    d.corporateRate.push(legalForm === "GmbH" ? corporateTaxRate(y.year) : 0);
     if (legalForm === "GmbH") {
       const corp = offsetLosses(y.ebt, corporatePool, corporateLossShare(y.year));
+      d.corporateLossUsed.push(y.ebt > 0 ? corporatePool - corp.pool : 0);
       corporatePool = corp.pool;
+      d.corporateTaxable.push(corp.taxable);
       const kst = corp.taxable * corporateTaxRate(y.year);
-      corporateTax.push(kst);
-      soli.push(kst * TAX.soli);
+      r.corporateTax.push(kst);
+      r.soli.push(kst * TAX.soli);
     } else {
-      corporateTax.push(0);
-      soli.push(0);
+      d.corporateLossUsed.push(0);
+      d.corporateTaxable.push(0);
+      r.corporateTax.push(0);
+      r.soli.push(0);
     }
+    d.corporatePoolClose.push(corporatePool);
   }
-  return { tradeTax, corporateTax, soli };
+  return r;
 }
 
 /**

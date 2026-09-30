@@ -14,7 +14,7 @@ import {
   SUPPORT_YEARS,
 } from "./eeg";
 import { annuityFactor, xirr, xnpv, type DatedFlow } from "./finance";
-import { computeTaxes, depreciation, TAX } from "./tax";
+import { computeTaxes, depreciation, TAX, type TaxResult } from "./tax";
 import type {
   AnnualRow,
   Check,
@@ -32,6 +32,7 @@ import type {
   Validity,
   ValidityLevel,
 } from "./types";
+import type { EngineTrace, LoanMonth, OperationsTrace, TaxTrace } from "./trace";
 import { InvalidInputsError, validateInputs } from "./validate";
 
 /** Anlage 2 Nr. 7 EEG: up to 2 % unavailability is already part of the Standortertrag. */
@@ -53,6 +54,8 @@ export interface RunOptions {
   scenario?: Partial<ScenarioAdjustments>;
   /** Keep the loan of another run (the stress scenarios after financial close). */
   lockedDebt?: LockedDebt;
+  /** Record every intermediate line (for the formula workbook and the report). */
+  trace?: boolean;
 }
 
 interface YearSlot {
@@ -86,7 +89,7 @@ interface LoanCalendar {
   firstInstalmentDay: number | null;
   firstRepaymentYear: number;
   /** Loan months from commissioning to the last instalment, grouped by calendar year. */
-  monthsByYear: Map<number, { instalment: number }[]>;
+  monthsByYear: Map<number, { day: number; instalment: number }[]>;
   instalmentCount: number;
   instalmentsByYear: Map<number, number>;
 }
@@ -214,15 +217,16 @@ function buildLoanCalendar(inputs: Inputs, fcDay: number, codYearMonth: number, 
   const graceMonths = 12 * f.graceYears;
   const tenorMonths = 12 * f.tenorYearsFromClose;
   const instalmentCount = 4 * (f.tenorYearsFromClose - f.graceYears);
-  const monthsByYear = new Map<number, { instalment: number }[]>();
+  const monthsByYear = new Map<number, { day: number; instalment: number }[]>();
   const instalmentsByYear = new Map<number, number>();
   let firstRepaymentYear = Infinity;
   for (let j = codYearMonth; j < tenorMonths; j++) {
-    const year = parts(addMonths(fcDay, j)).year;
+    const day = addMonths(fcDay, j);
+    const year = parts(day).year;
     const sinceGrace = j - graceMonths + 1;
     const instalment = sinceGrace >= 3 && sinceGrace % 3 === 0 ? sinceGrace / 3 - 1 : -1;
     if (!monthsByYear.has(year)) monthsByYear.set(year, []);
-    monthsByYear.get(year)!.push({ instalment });
+    monthsByYear.get(year)!.push({ day, instalment });
     if (instalment >= 0) {
       instalmentsByYear.set(year, (instalmentsByYear.get(year) ?? 0) + 1);
       firstRepaymentYear = Math.min(firstRepaymentYear, year);
@@ -360,20 +364,28 @@ type PriceMode = "base" | "bankFloor";
 interface OperatingYear {
   energy: number;
   sold: number;
+  eligible: number;
   base: number;
   marketValue: number;
+  marketValuePrev: number;
   aw: number;
   premiumRate: number;
+  advanceRate: number;
+  premiumShare: number;
   revenueMarket: number;
+  premiumAccrued: number;
   revenuePremium: number;
   siteQualitySettlement: number;
   premiumAdvance: number;
+  postEegPrice: number;
   revenuePostEeg: number;
   revenue: number;
   maintenance: number;
   management: number;
   insurance: number;
   other: number;
+  leaseOnRevenue: number;
+  leaseMinimum: number;
   lease: number;
   directMarketing: number;
   municipal: number;
@@ -382,6 +394,8 @@ interface OperatingYear {
   opex: number;
   municipalRefund: number;
   ebitda: number;
+  decemberAdvance: number;
+  openSettlements: number;
   receivablesMarket: number;
   receivablesPremium: number;
   receivables: number;
@@ -442,12 +456,13 @@ function operatingYears(ctx: Context, mode: PriceMode, energyScale: number): Ope
     const revenueMarket =
       mode === "bankFloor" ? sold * s.eegShare * sum((p) => Math.min(mv, p.aw)) : energy * mv * s.eegShare;
     const siteQualitySettlement = settlement.get(y) ?? 0;
-    const revenuePremium = eligible * premiumRate + siteQualitySettlement;
+    const premiumAccrued = eligible * premiumRate;
+    const revenuePremium = premiumAccrued + siteQualitySettlement;
     const i26 = ctx.index(y, 2026);
     // After support: market sales on all output (as above), or a PPA paid on the output delivered — the farm is
     // curtailed in negative-price periods, as under a PPA with a negative-price clause.
-    const revenuePostEeg =
-      (r.postEeg === "ppa" ? (sold * r.ppaEurMwh2026 * i26 * adj.priceScale) / 1000 : energy * mv) * (1 - s.eegShare);
+    const postEegPrice = r.postEeg === "ppa" ? (r.ppaEurMwh2026 * i26 * adj.priceScale) / 1000 : mv;
+    const revenuePostEeg = (r.postEeg === "ppa" ? sold : energy) * postEegPrice * (1 - s.eegShare);
     const revenue = revenueMarket + revenuePremium + revenuePostEeg;
     const premiumAdvance = eligible * advanceRate;
 
@@ -457,10 +472,9 @@ function operatingYears(ctx: Context, mode: PriceMode, energyScale: number): Ope
     const management = o.managementPerKw[decade] * fixed;
     const insurance = o.insurancePerKw[decade] * fixed;
     const other = o.otherPerKw[decade] * fixed;
-    const lease = Math.max(
-      o.leaseShareOfRevenue * revenue,
-      o.leaseMinPerTurbine2026 * inputs.project.turbines * i26 * s.fraction,
-    );
+    const leaseOnRevenue = o.leaseShareOfRevenue * revenue;
+    const leaseMinimum = o.leaseMinPerTurbine2026 * inputs.project.turbines * i26 * s.fraction;
+    const lease = Math.max(leaseOnRevenue, leaseMinimum);
     const directMarketing = ((r.directMarketingCtKwh2026 * i26) / 100) * sold;
     const municipalShare = s.eegShare + (r.municipalAfterEeg ? 1 - s.eegShare : 0);
     const municipal = (r.municipalCtKwh / 100) * energy * municipalShare;
@@ -475,20 +489,28 @@ function operatingYears(ctx: Context, mode: PriceMode, energyScale: number): Ope
     return {
       energy,
       sold,
+      eligible,
       base: ctx.basePrice.get(y)!,
       marketValue: mv,
+      marketValuePrev: mvPrev,
       aw,
       premiumRate: mode === "bankFloor" ? aw : premiumRate,
+      advanceRate,
+      premiumShare,
       revenueMarket,
+      premiumAccrued,
       revenuePremium,
       siteQualitySettlement,
       premiumAdvance,
+      postEegPrice,
       revenuePostEeg,
       revenue,
       maintenance,
       management,
       insurance,
       other,
+      leaseOnRevenue,
+      leaseMinimum,
       lease,
       directMarketing,
       municipal,
@@ -497,6 +519,8 @@ function operatingYears(ctx: Context, mode: PriceMode, energyScale: number): Ope
       opex,
       municipalRefund,
       ebitda,
+      decemberAdvance: 0,
+      openSettlements: 0,
       receivablesMarket: 0,
       receivablesPremium: 0,
       receivables: 0,
@@ -512,17 +536,20 @@ function operatingYears(ctx: Context, mode: PriceMode, energyScale: number): Ope
     if (s.isLast) return; // at the end of life all open balances are settled on the closing date
     const billed = row.revenueMarket + row.revenuePostEeg;
     const market = s.opDays > 0 ? Math.min(billed, (billed / s.opDays) * r.receivableDays) : 0;
-    let premiumOpen = 0;
+    let december = 0;
+    let open = 0;
     if (lagYears > 0) {
-      premiumOpen += row.premiumAdvance / s.opMonths;
+      december = row.premiumAdvance / s.opMonths;
       for (let j = i; j >= 0 && ctx.years[j]!.year + lagYears > s.year; j--) {
         const q = rows[j]!;
-        premiumOpen += q.revenuePremium - q.premiumAdvance + q.municipalRefund;
+        open += q.revenuePremium - q.premiumAdvance + q.municipalRefund;
       }
     }
+    row.decemberAdvance = december;
+    row.openSettlements = open;
     row.receivablesMarket = market;
-    row.receivablesPremium = premiumOpen;
-    row.receivables = market + premiumOpen;
+    row.receivablesPremium = december + open;
+    row.receivables = market + december + open;
   });
   return rows;
 }
@@ -550,7 +577,7 @@ interface DebtSchedule {
 }
 
 /** Monthly interest at rate / 12 on the balance; instalments at quarter ends; aggregated to calendar years. */
-function debtSchedule(ctx: Context, amount: number, plan: LoanPlan): DebtSchedule {
+function debtSchedule(ctx: Context, amount: number, plan: LoanPlan, months?: LoanMonth[]): DebtSchedule {
   const r = ctx.inputs.financing.interestRate;
   const L = ctx.loan;
   const n = L.instalmentCount;
@@ -561,7 +588,10 @@ function debtSchedule(ctx: Context, amount: number, plan: LoanPlan): DebtSchedul
   for (const s of ctx.years) {
     const row: DebtYear = { open: balance, interest: 0, principal: 0, close: balance };
     for (const m of L.monthsByYear.get(s.year) ?? []) {
-      row.interest += (balance * r) / 12;
+      const interest = (balance * r) / 12;
+      row.interest += interest;
+      const record = months ? { date: toIso(m.day), year: s.year, instalment: m.instalment, opening: balance, interest, principal: 0, closing: balance } : null;
+      if (record) months!.push(record);
       if (m.instalment < 0) continue;
       let principal: number;
       if (m.instalment === n - 1) principal = balance;
@@ -573,6 +603,10 @@ function debtSchedule(ctx: Context, amount: number, plan: LoanPlan): DebtSchedul
       instalments.push(principal);
       row.principal += principal;
       balance -= principal;
+      if (record) {
+        record.principal = principal;
+        record.closing = balance;
+      }
     }
     row.close = balance;
     years.set(s.year, row);
@@ -728,18 +762,24 @@ function provisionPath(ctx: Context): number[] {
 }
 
 interface TaxPass {
+  base: number;
+  scheduled: number[];
+  residual: number[];
   depreciation: number[];
+  provision: number[];
   provisionChange: number[];
+  interest: number[];
   ebt: number[];
   tradeTax: number[];
   corporateTax: number[];
   soli: number[];
   taxes: number[];
+  detail: TaxResult["detail"];
 }
 
 function taxPass(ctx: Context, ops: OperatingYear[], depreciationBase: number, interest: number[]): TaxPass {
   const yearsList = ctx.years.map((s) => s.year);
-  const dep = depreciation(
+  const scheduled = depreciation(
     depreciationBase,
     parts(ctx.codDay).month,
     ctx.inputs.tax.depreciationYears,
@@ -747,8 +787,9 @@ function taxPass(ctx: Context, ops: OperatingYear[], depreciationBase: number, i
     yearsList,
   );
   // Dismantling at the end of life: any remaining book value is written off in the final year.
-  const residual = depreciationBase - dep.reduce((a, b) => a + b, 0);
-  if (residual > 1e-6 && dep.length > 0) dep[dep.length - 1] = dep[dep.length - 1]! + residual;
+  const left = depreciationBase - scheduled.reduce((a, b) => a + b, 0);
+  const residual = scheduled.map((_, i) => (i === scheduled.length - 1 && left > 1e-6 ? left : 0));
+  const dep = scheduled.map((d, i) => d + residual[i]!);
   const prov = provisionPath(ctx);
   const provisionChange = prov.map((p, i) => p - (i > 0 ? prov[i - 1]! : 0));
   const ebt = ops.map((o, i) => o.ebitda - dep[i]! - interest[i]! - provisionChange[i]!);
@@ -758,18 +799,106 @@ function taxPass(ctx: Context, ops: OperatingYear[], depreciationBase: number, i
     ctx.inputs.tax.hebesatz,
   );
   const taxes = t.tradeTax.map((g, i) => g + t.corporateTax[i]! + t.soli[i]!);
-  return { depreciation: dep, provisionChange, ebt, ...t, taxes };
+  return { base: depreciationBase, scheduled, residual, depreciation: dep, provision: prov, provisionChange, interest, ebt, ...t, taxes };
+}
+
+function taxTrace(ctx: Context, ops: OperatingYear[], t: TaxPass): TaxTrace {
+  let previous = ctx.startWorkingCapital;
+  const cfads = ops.map((o, i) => {
+    const deltaWc = o.receivables - previous;
+    previous = o.receivables;
+    return o.ebitda - deltaWc - t.taxes[i]!;
+  });
+  return {
+    depreciationBase: t.base,
+    depreciationScheduled: t.scheduled,
+    residualWriteOff: t.residual,
+    depreciation: t.depreciation,
+    provision: t.provision,
+    provisionChange: t.provisionChange,
+    interest: t.interest,
+    ebt: t.ebt,
+    addBack: t.detail.addBack,
+    tradeIncome: t.detail.tradeIncome,
+    tradePoolOpen: t.detail.tradePoolOpen,
+    tradeLossUsed: t.detail.tradeLossUsed,
+    tradePoolClose: t.detail.tradePoolClose,
+    tradeBase: t.detail.tradeBase,
+    tradeTax: t.tradeTax,
+    corporatePoolOpen: t.detail.corporatePoolOpen,
+    corporateLossUsed: t.detail.corporateLossUsed,
+    corporatePoolClose: t.detail.corporatePoolClose,
+    corporateTaxable: t.detail.corporateTaxable,
+    corporateRate: t.detail.corporateRate,
+    corporateTax: t.corporateTax,
+    soli: t.soli,
+    taxes: t.taxes,
+    cfads,
+  };
+}
+
+function operationsTrace(ctx: Context, ops: OperatingYear[]): OperationsTrace {
+  const col = <K extends keyof OperatingYear>(k: K) => ops.map((o) => o[k] as number);
+  let previous = ctx.startWorkingCapital;
+  const deltaWorkingCapital = ops.map((o) => {
+    const d = o.receivables - previous;
+    previous = o.receivables;
+    return d;
+  });
+  return {
+    energy: col("energy"),
+    sold: col("sold"),
+    eligible: col("eligible"),
+    basePrice: col("base"),
+    marketValue: col("marketValue"),
+    marketValuePrev: col("marketValuePrev"),
+    aw: col("aw"),
+    premiumRate: col("premiumRate"),
+    advanceRate: col("advanceRate"),
+    premiumShare: col("premiumShare"),
+    revenueMarket: col("revenueMarket"),
+    premiumAccrued: col("premiumAccrued"),
+    siteQualitySettlement: col("siteQualitySettlement"),
+    revenuePremium: col("revenuePremium"),
+    postEegPrice: col("postEegPrice"),
+    revenuePostEeg: col("revenuePostEeg"),
+    revenue: col("revenue"),
+    maintenance: col("maintenance"),
+    management: col("management"),
+    insurance: col("insurance"),
+    other: col("other"),
+    leaseOnRevenue: col("leaseOnRevenue"),
+    leaseMinimum: col("leaseMinimum"),
+    lease: col("lease"),
+    directMarketing: col("directMarketing"),
+    municipal: col("municipal"),
+    guaranteeFee: col("guaranteeFee"),
+    gridFee: col("gridFee"),
+    opex: col("opex"),
+    municipalRefund: col("municipalRefund"),
+    ebitda: col("ebitda"),
+    premiumAdvance: col("premiumAdvance"),
+    decemberAdvance: col("decemberAdvance"),
+    openSettlements: col("openSettlements"),
+    receivablesMarket: col("receivablesMarket"),
+    receivablesPremium: col("receivablesPremium"),
+    receivables: col("receivables"),
+    deltaWorkingCapital,
+  };
 }
 
 /** CFADS = EBITDA − change in working capital − taxes: one definition for sizing, covenant and lock-up. */
-function cfadsOf(ctx: Context, ops: OperatingYear[], depreciationBase: number, interest: number[]): number[] {
-  const t = taxPass(ctx, ops, depreciationBase, interest);
+function cfadsFrom(ctx: Context, ops: OperatingYear[], t: TaxPass): number[] {
   let previous = ctx.startWorkingCapital;
   return ops.map((o, i) => {
     const deltaWc = o.receivables - previous;
     previous = o.receivables;
     return o.ebitda - deltaWc - t.taxes[i]!;
   });
+}
+
+function cfadsOf(ctx: Context, ops: OperatingYear[], depreciationBase: number, interest: number[]): number[] {
+  return cfadsFrom(ctx, ops, taxPass(ctx, ops, depreciationBase, interest));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -793,16 +922,20 @@ function interestOf(ctx: Context, schedule: DebtSchedule): number[] {
   return ctx.years.map((s) => schedule.years.get(s.year)!.interest);
 }
 
-/** The lender's case for a given loan: CFADS at P50 and P90 (1-year) output on the sizing prices. */
-function lenderCase(ctx: Context, schedule: DebtSchedule, capitalized: number): LenderCase {
+/** The lender's case for a given loan: operations, taxes and CFADS at P50 and P90 (1-year) output on the sizing prices. */
+function lenderPasses(ctx: Context, schedule: DebtSchedule, capitalized: number) {
   const mode = bankMode(ctx);
   const p90 = 1 - P90_Z * ctx.inputs.energy.sigma1y;
   const interest = interestOf(ctx, schedule);
-  const cfadsP50 = cfadsOf(ctx, operatingYears(ctx, mode, ctx.adj.energyScale), capitalized, interest);
-  const cfadsP90 = cfadsOf(ctx, operatingYears(ctx, mode, ctx.adj.energyScale * p90), capitalized, interest);
+  const ops50 = operatingYears(ctx, mode, ctx.adj.energyScale);
+  const ops90 = operatingYears(ctx, mode, ctx.adj.energyScale * p90);
+  const tax50 = taxPass(ctx, ops50, capitalized, interest);
+  const tax90 = taxPass(ctx, ops90, capitalized, interest);
+  const cfadsP50 = cfadsFrom(ctx, ops50, tax50);
+  const cfadsP90 = cfadsFrom(ctx, ops90, tax90);
   const debtService = ctx.years.map((s) => debtServiceOf(schedule, s.year));
   const ratio = (cf: number, ds: number) => (ds > 1e-9 ? cf / ds : null);
-  return {
+  const summary: LenderCase = {
     years: ctx.years.map((s) => s.year),
     cfadsP50,
     cfadsP90,
@@ -810,6 +943,7 @@ function lenderCase(ctx: Context, schedule: DebtSchedule, capitalized: number): 
     dscrP50: cfadsP50.map((cf, i) => ratio(cf, debtService[i]!)),
     dscrP90: cfadsP90.map((cf, i) => ratio(cf, debtService[i]!)),
   };
+  return { summary, ops50, ops90, tax50, tax90 };
 }
 
 function sizingInfo(ctx: Context, sizing: Sizing, lender: LenderCase): SizingInfo {
@@ -1024,14 +1158,59 @@ export function runModel(inputs: Inputs, options: RunOptions = {}): ModelResult 
       locked: true,
     };
   } else sizing = sizeDebt(ctx);
-  return assemble(ctx, sizing);
+  return assemble(ctx, sizing, options.trace ?? false);
 }
 
-function assemble(ctx: Context, sizing: Sizing): ModelResult {
+/** Collects one value per year for each named line. */
+function lines<K extends string>(names: readonly K[]): Record<K, number[]> {
+  return Object.fromEntries(names.map((n) => [n, [] as number[]])) as Record<K, number[]>;
+}
+
+const WATERFALL_LINES = [
+  "cfads",
+  "debtService",
+  "deficitIn",
+  "trappedUsed",
+  "dsraOpen",
+  "dsraTarget",
+  "dsraTopUp",
+  "dsraRelease",
+  "dsraDraw",
+  "dsraClose",
+  "reserveContribution",
+  "decommissioningPaid",
+  "reserveClose",
+  "lockUp",
+  "trappedAdded",
+  "trappedReleased",
+  "finalRelease",
+  "trappedClose",
+  "deficitOut",
+  "distribution",
+] as const;
+
+const STATEMENT_LINES = [
+  "fixedAssets",
+  "receivables",
+  "dsra",
+  "reserve",
+  "trapped",
+  "cashDeficit",
+  "totalAssets",
+  "debt",
+  "provision",
+  "cumulativeDistributions",
+  "cumulativeNetIncome",
+  "bookEquity",
+  "difference",
+] as const;
+
+function assemble(ctx: Context, sizing: Sizing, tracing: boolean): ModelResult {
   const { inputs } = ctx;
   const f = inputs.financing;
   const ops = operatingYears(ctx, "base", ctx.adj.energyScale);
-  const schedule = debtSchedule(ctx, sizing.amount, sizing.plan);
+  const loanMonths: LoanMonth[] = [];
+  const schedule = debtSchedule(ctx, sizing.amount, sizing.plan, tracing ? loanMonths : undefined);
   const dsra0 = dsraTarget(ctx, schedule, ctx.codYear);
   const cons = construction(ctx, sizing.amount, dsra0);
   const interest = interestOf(ctx, schedule);
@@ -1052,6 +1231,8 @@ function assemble(ctx: Context, sizing: Sizing): ModelResult {
   let cumDepreciation = 0;
   let contributionsLeft = ctx.years.filter(inReserveWindow).length;
   const lockUpYears: number[] = [];
+  const W = lines(WATERFALL_LINES);
+  const B = lines(STATEMENT_LINES);
 
   ctx.years.forEach((s, i) => {
     const o = ops[i]!;
@@ -1061,37 +1242,45 @@ function assemble(ctx: Context, sizing: Sizing): ModelResult {
     receivablesPrev = o.receivables;
     const cfads = o.ebitda - deltaWc - taxes;
     const debtService = d.interest + d.principal;
+    const deficitIn = deficit;
     let cash = cfads - debtService + deficit;
 
     // A shortfall is covered first by cash held back under the lock-up, then by the debt service reserve.
+    let trappedUsed = 0;
     if (cash < 0 && trapped > 0) {
-      const use = Math.min(trapped, -cash);
-      trapped -= use;
-      cash += use;
+      trappedUsed = Math.min(trapped, -cash);
+      trapped -= trappedUsed;
+      cash += trappedUsed;
     }
     // Debt service reserve: top up to the target from surplus cash, release any excess, draw on a shortfall.
+    const dsraOpen = dsra;
     const target = dsraTarget(ctx, schedule, s.year);
+    let dsraTopUp = 0;
+    let dsraRelease = 0;
+    let dsraDraw = 0;
     if (target > dsra) {
-      const top = Math.min(target - dsra, Math.max(0, cash));
-      dsra += top;
-      cash -= top;
+      dsraTopUp = Math.min(target - dsra, Math.max(0, cash));
+      dsra += dsraTopUp;
+      cash -= dsraTopUp;
     } else {
-      cash += dsra - target;
+      dsraRelease = dsra - target;
+      cash += dsraRelease;
       dsra = target;
     }
     if (cash < 0) {
-      const draw = Math.min(dsra, -cash);
-      dsra -= draw;
-      cash += draw;
+      dsraDraw = Math.min(dsra, -cash);
+      dsra -= dsraDraw;
+      cash += dsraDraw;
     }
 
     // Decommissioning reserve: equal instalments in the last years, paid out at the end of life.
     let decommissioningPaid = 0;
+    let reserveContribution = 0;
     if (inReserveWindow(s) && contributionsLeft > 0) {
       const planned = (decomCost - reserve) / contributionsLeft;
-      const contribution = s.isLast ? decomCost - reserve : Math.min(Math.max(0, cash), planned);
-      reserve += contribution;
-      cash -= contribution;
+      reserveContribution = s.isLast ? decomCost - reserve : Math.min(Math.max(0, cash), planned);
+      reserve += reserveContribution;
+      cash -= reserveContribution;
       contributionsLeft -= 1;
     }
     if (s.isLast) {
@@ -1101,18 +1290,25 @@ function assemble(ctx: Context, sizing: Sizing): ModelResult {
 
     // Lock-up: distributions stay in the company while the DSCR is below the threshold.
     const dscr = debtService > 1e-9 ? cfads / debtService : null;
-    if (dscr !== null && dscr < f.lockupDscr && s.year <= ctx.loan.maturityYear) {
+    const lockUp = dscr !== null && dscr < f.lockupDscr && s.year <= ctx.loan.maturityYear;
+    let trappedAdded = 0;
+    let trappedReleased = 0;
+    if (lockUp) {
       lockUpYears.push(s.year);
       if (cash > 0) {
+        trappedAdded = cash;
         trapped += cash;
         cash = 0;
       }
     } else if (trapped > 0) {
+      trappedReleased = trapped;
       cash += trapped;
       trapped = 0;
     }
+    let finalRelease = 0;
     if (s.isLast) {
-      cash += dsra + trapped + reserve;
+      finalRelease = dsra + trapped + reserve;
+      cash += finalRelease;
       dsra = 0;
       trapped = 0;
       reserve = 0;
@@ -1124,6 +1320,31 @@ function assemble(ctx: Context, sizing: Sizing): ModelResult {
       deficit = 0;
     } else deficit = cash;
     cumDistribution += distribution;
+    if (tracing) {
+      const w = {
+        cfads,
+        debtService,
+        deficitIn,
+        trappedUsed,
+        dsraOpen,
+        dsraTarget: target,
+        dsraTopUp,
+        dsraRelease,
+        dsraDraw,
+        dsraClose: dsra,
+        reserveContribution,
+        decommissioningPaid,
+        reserveClose: reserve,
+        lockUp: lockUp ? 1 : 0,
+        trappedAdded,
+        trappedReleased,
+        finalRelease,
+        trappedClose: trapped,
+        deficitOut: deficit,
+        distribution,
+      };
+      for (const k of WATERFALL_LINES) W[k].push(w[k]);
+    }
 
     const netIncome = levered.ebt[i]! - taxes;
     cumNetIncome += netIncome;
@@ -1133,6 +1354,24 @@ function assemble(ctx: Context, sizing: Sizing): ModelResult {
     const liabilities = d.close + provisionClosing;
     const bookEquity = cons.equity - cumDistribution + cumNetIncome;
     const balanceDifference = assets - liabilities - bookEquity;
+    if (tracing) {
+      const b = {
+        fixedAssets: cons.capitalized - cumDepreciation,
+        receivables: o.receivables,
+        dsra,
+        reserve,
+        trapped,
+        cashDeficit: deficit,
+        totalAssets: assets,
+        debt: d.close,
+        provision: provisionClosing,
+        cumulativeDistributions: cumDistribution,
+        cumulativeNetIncome: cumNetIncome,
+        bookEquity,
+        difference: balanceDifference,
+      };
+      for (const k of STATEMENT_LINES) B[k].push(b[k]);
+    }
 
     const taxesUnlevered = unlevered.taxes[i]!;
     const projectPre = o.ebitda - deltaWc - (s.isLast ? decomCost : 0);
@@ -1221,9 +1460,31 @@ function assemble(ctx: Context, sizing: Sizing): ModelResult {
     instalments: schedule.instalments,
     workingCapital: ctx.startWorkingCapital,
   };
-  const sizingSummary = sizingInfo(ctx, sizing, lenderCase(ctx, schedule, cons.capitalized));
+  const lender = lenderPasses(ctx, schedule, cons.capitalized);
+  const sizingSummary = sizingInfo(ctx, sizing, lender.summary);
   const checks = runChecks(ctx, cons, annual, kpis, sizing, sizingSummary, schedule, lockUpYears);
   const noticeDay = toDay(inputs.revenue.awardNoticeDate);
+  const trace: EngineTrace | undefined = tracing
+    ? {
+        timing: timingTrace(ctx),
+        construction: constructionTrace(ctx),
+        operations: operationsTrace(ctx, ops),
+        tax: taxTrace(ctx, ops, levered),
+        taxUnlevered: taxTrace(ctx, ops, unlevered),
+        lenderP50: operationsTrace(ctx, lender.ops50),
+        lenderP90: operationsTrace(ctx, lender.ops90),
+        taxLenderP50: taxTrace(ctx, lender.ops50, lender.tax50),
+        taxLenderP90: taxTrace(ctx, lender.ops90, lender.tax90),
+        loanMonths,
+        waterfall: W,
+        statements: { ...B, equityContributed: cons.equity },
+        flows: {
+          equity: equityFlows({ construction: cons.months, annual }).map((x) => ({ date: toIso(x.day), amount: x.amount })),
+          projectPreTax: projectFlows(cons, annual, "pre").map((x) => ({ date: toIso(x.day), amount: x.amount })),
+          projectPostTax: projectFlows(cons, annual, "post").map((x) => ({ date: toIso(x.day), amount: x.amount })),
+        },
+      }
+    : undefined;
 
   return {
     sizing: sizingSummary,
@@ -1253,7 +1514,46 @@ function assemble(ctx: Context, sizing: Sizing): ModelResult {
     lockedDebt,
     iterations: sizing.iterations,
     converged: sizing.converged,
+    ...(trace ? { trace } : {}),
   };
+}
+
+function timingTrace(ctx: Context): EngineTrace["timing"] {
+  const reserveYears = ctx.inputs.opex.decommissioningReserveYears;
+  return {
+    years: ctx.years.map((s) => s.year),
+    start: ctx.years.map((s) => toIso(s.start)),
+    end: ctx.years.map((s) => toIso(s.end)),
+    opDays: ctx.years.map((s) => s.opDays),
+    daysInYear: ctx.years.map((s) => daysInYear(s.year)),
+    opMonths: ctx.years.map((s) => s.opMonths),
+    fraction: ctx.years.map((s) => s.fraction),
+    eegShare: ctx.years.map((s) => s.eegShare),
+    operatingYear: ctx.years.map((s) => s.operatingYear),
+    decade: ctx.years.map((s) => (s.operatingYear < 10 ? 0 : s.operatingYear < 20 ? 1 : 2)),
+    isLast: ctx.years.map((s) => s.isLast),
+    reserveWindow: ctx.years.map((s) => ctx.endDay - (s.cfDay + 1) < reserveYears * 365),
+    index2025: ctx.years.map((s) => ctx.index(s.year, 2025)),
+    index2026: ctx.years.map((s) => ctx.index(s.year, 2026)),
+    awWeights: ctx.years.map((s) => supportWeights(ctx, s)),
+    loanMonths: ctx.years.map((s) => ctx.loan.monthsByYear.get(s.year)?.length ?? 0),
+    instalments: ctx.years.map((s) => ctx.loan.instalmentsByYear.get(s.year) ?? 0),
+  };
+}
+
+function constructionTrace(ctx: Context): EngineTrace["construction"] {
+  const M = ctx.capexMonthly.length;
+  const weights: Record<string, number[]> = {};
+  const capexByItem: Record<string, number[]> = {};
+  const scale = ctx.capacityKw * ctx.adj.capexScale;
+  for (const it of ctx.inputs.capex.items) {
+    weights[it.key] = profileWeights(it.profile, M);
+    capexByItem[it.key] = weights[it.key]!.map((w) => w * it.eurPerKw * scale);
+  }
+  const contingency = ctx.inputs.capex.items.reduce((a, it) => a + it.eurPerKw, 0) * ctx.inputs.capex.contingencyPct;
+  weights.contingency = profileWeights("linear", M);
+  capexByItem.contingency = weights.contingency.map((w) => w * contingency * scale);
+  return { weights, capexByItem };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1267,13 +1567,22 @@ export function equityFlows(result: Pick<ModelResult, "construction" | "annual">
   ];
 }
 
+/** Project view: capex and the start-up liquidity (its release shows in the change in working capital). */
+function projectFlows(cons: ConstructionResult, annual: AnnualRow[], kind: "pre" | "post"): DatedFlow[] {
+  return [
+    ...cons.months.map((m) => ({ day: toDay(m.date), amount: -m.capex - m.workingCapitalFunding })),
+    ...annual.map((a) => ({
+      day: toDay(a.cashFlowDate),
+      amount: kind === "pre" ? a.projectCashFlowPreTax : a.projectCashFlowPostTax,
+    })),
+  ];
+}
+
 function computeKpis(ctx: Context, cons: ConstructionResult, annual: AnnualRow[], debt: number): Kpis {
   const { inputs } = ctx;
   const eq = equityFlows({ construction: cons.months, annual });
-  // Project view: capex and the start-up liquidity (its release shows in the change in working capital).
-  const capexFlows = cons.months.map((m) => ({ day: toDay(m.date), amount: -m.capex - m.workingCapitalFunding }));
-  const pre = [...capexFlows, ...annual.map((a) => ({ day: toDay(a.cashFlowDate), amount: a.projectCashFlowPreTax }))];
-  const post = [...capexFlows, ...annual.map((a) => ({ day: toDay(a.cashFlowDate), amount: a.projectCashFlowPostTax }))];
+  const pre = projectFlows(cons, annual, "pre");
+  const post = projectFlows(cons, annual, "post");
 
   // LCOE in the style of Fraunhofer ISE: capex, opex and decommissioning over electricity sold, discounted.
   const decomCost = annual.reduce((s, a) => s + a.decommissioningPaid, 0);

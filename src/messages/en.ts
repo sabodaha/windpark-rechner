@@ -390,6 +390,7 @@ export const en = {
   footer: {
     author: "A model by Igor Sabodakha",
     sourcesNote: "Every input has a public source or is a documented assumption.",
+    version: (engine: string, hash: string) => `Engine ${engine} · inputs ${hash}`,
   },
   site: {
     name: "Igor Sabodakha",

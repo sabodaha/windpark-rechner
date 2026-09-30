@@ -15,6 +15,8 @@ export { xirr, xnpv, annuityFactor } from "./finance";
 export { TAX, corporateTaxRate, corporateLossShare } from "./tax";
 export { runModel, equityFlows, NEUTRAL_SCENARIO, P90_Z, type RunOptions } from "./model";
 export { validateInputs, InvalidInputsError, DATE_LIMITS, type InputIssue } from "./validate";
+export { buildSnapshot, hashInputs, stableStringify, ENGINE_VERSION, type ModelSnapshot } from "./snapshot";
+export type * from "./trace";
 export {
   runScenarios,
   scenarioAdjustments,
