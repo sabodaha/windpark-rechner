@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { DATA_AS_OF } from "@/engine";
 import { dateLabel } from "@/lib/format";
-import { PATHS } from "@/lib/site";
+import { PATHS, SITE } from "@/lib/site";
 import { en } from "@/messages/en";
 
 const t = en.site;
@@ -45,6 +45,11 @@ export function SiteFooter() {
               <Link href={PATHS.about} className={link}>
                 {t.nav.about}
               </Link>
+            </li>
+            <li>
+              <a href={SITE.repository} className={link}>
+                {t.footer.sourceCode}
+              </a>
             </li>
           </ul>
         </nav>

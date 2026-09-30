@@ -15,6 +15,7 @@ export const SITE = {
     "https://apps.apple.com/app/id6759845142",
     "https://play.google.com/store/apps/details?id=com.dartim_media.storywell",
   ],
+  repository: "https://github.com/sabodaha/windpark-rechner",
   storywell: {
     appStore: "https://apps.apple.com/app/id6759845142",
     googlePlay: "https://play.google.com/store/apps/details?id=com.dartim_media.storywell",

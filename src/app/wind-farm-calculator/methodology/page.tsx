@@ -617,6 +617,9 @@ Solidarity    = 5.5% × corporate tax`}</pre>
               convergence points (uses and loan) on its own. A negative control with a different trade-tax multiplier
               moves exactly the tax-dependent lines.
             </li>
+            <li>
+              The source code, including the tests, is public on <a href={SITE.repository}>GitHub</a>.
+            </li>
           </ul>
 
           <H2 id="limitations">14. Limitations</H2>

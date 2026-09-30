@@ -337,6 +337,7 @@ export const en = {
         "audit, transaction advisory, valuation and financial modelling.",
       more: "More about me",
       site: "Site",
+      sourceCode: "Source code on GitHub",
       legal: "Legal",
       impressum: "Legal notice (Impressum)",
       privacy: "Privacy policy",
