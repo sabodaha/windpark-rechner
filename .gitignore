@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# Next.js build output and caches
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# tooling
+coverage/
+.turbo/
+.wrangler/
+.vercel/
+*.log
+
+# env files (never commit)
+.env*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
