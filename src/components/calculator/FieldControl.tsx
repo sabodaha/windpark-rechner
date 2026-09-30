@@ -122,14 +122,17 @@ export function FieldControl({ field: f, inputs, base, onChange, t }: Props) {
           ))}
         </div>
       )}
-      {f.kind === "month" && (
+      {(f.kind === "month" || f.kind === "date") && (
         <input
           id={id}
-          type="month"
+          type={f.kind}
           value={String(value)}
-          min="2025-01"
-          max="2032-12"
-          onChange={(e) => e.target.value && onChange(f, e.target.value)}
+          min={f.minDate}
+          max={f.maxDate}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v && (!f.minDate || v >= f.minDate) && (!f.maxDate || v <= f.maxDate)) onChange(f, v);
+          }}
           className="mt-1.5 h-8 w-full rounded-md border border-border bg-card px-2 text-sm tabular"
         />
       )}
@@ -172,6 +175,8 @@ function NumberInput({
 
   const [uMin, uMax] = f.usual ?? [NaN, NaN];
   const outside = f.usual !== undefined && (shown < uMin - 1e-9 || shown > uMax + 1e-9);
+  // A long unit ("% of revenue", "€ per turbine") needs a wider box, or the number itself gets cut off.
+  const box = !f.usual ? "w-full" : (f.unit?.length ?? 0) > 8 ? "w-40 shrink-0" : "w-28 shrink-0";
 
   return (
     <div className="mt-1.5 flex items-center gap-2">
@@ -192,7 +197,7 @@ function NumberInput({
         className={cn(
           "flex h-8 items-center rounded-md border bg-card focus-within:ring-2 focus-within:ring-ring",
           changed ? "border-link/50" : "border-border",
-          f.usual ? "w-28 shrink-0" : "w-full",
+          box,
         )}
       >
         <input

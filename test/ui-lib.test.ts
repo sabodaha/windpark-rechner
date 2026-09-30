@@ -1,6 +1,6 @@
 import { unzipSync, strFromU8 } from "fflate";
 import { describe, expect, it } from "vitest";
-import { BASE_CASE, runScenarios } from "../src/engine";
+import { BASE_CASE, runScenarios, validateInputs } from "../src/engine";
 import { buildWorkbook } from "../src/lib/export";
 import { FIELDS, FIELD_BY_ID, sameValue, withField } from "../src/lib/fields";
 import { ct, keur, meur, num, pct, ratio } from "../src/lib/format";
@@ -28,7 +28,9 @@ describe("fields", () => {
             ? !v
             : f.kind === "month"
               ? "2027-02"
-              : (f.options?.find((o) => o !== v) ?? v);
+              : f.kind === "date"
+                ? "2026-10-15"
+                : (f.options?.find((o) => o !== v) ?? v);
       const changed = withField(BASE_CASE, f, next);
       expect(sameValue(f.get(changed), next), f.id).toBe(true);
       expect(sameValue(f.get(BASE_CASE), v), `${f.id} must not mutate the base case`).toBe(true);
@@ -63,6 +65,29 @@ describe("url state", () => {
 
   it("ignores unknown keys and values outside the allowed range", () => {
     expect(decodeInputs("foo=1&award=999&siteQuality=abc", BASE_CASE)).toBeNull();
+  });
+
+  it("ignores dates outside the model's range or not on the calendar", () => {
+    // These links used to crash the calculator ("No price index for 10000/2026").
+    expect(decodeInputs("fc=9999-12", BASE_CASE)).toBeNull();
+    expect(decodeInputs("fc=1900-01", BASE_CASE)).toBeNull();
+    expect(decodeInputs("fc=2027-13", BASE_CASE)).toBeNull();
+    expect(decodeInputs("awardNotice=2026-02-30", BASE_CASE)).toBeNull();
+    expect(decodeInputs("awardNotice=9999-01-01", BASE_CASE)).toBeNull();
+    expect(decodeInputs("fc=2027-07", BASE_CASE)?.project.financialClose).toBe("2027-07-01");
+    expect(decodeInputs("awardNotice=2026-10-01", BASE_CASE)?.revenue.awardNoticeDate).toBe("2026-10-01");
+  });
+
+  it("keeps every interface range inside the engine's limits", () => {
+    // Anything the panel or a link accepts must pass the engine's own validation on its own.
+    for (const f of FIELDS.filter((x) => !x.virtual && x.kind === "number")) {
+      for (const shown of [f.min, f.max]) {
+        if (shown === undefined) continue;
+        const i = withField(BASE_CASE, f, shown / (f.scale ?? 1));
+        const issues = validateInputs(i).filter((x) => !x.message.includes("grace") && !x.message.includes("repayment"));
+        expect(issues, `${f.id} = ${shown}`).toEqual([]);
+      }
+    }
   });
 });
 

@@ -34,6 +34,15 @@ export function meur(v: number | null | undefined, decimals = 1): string {
   return `${sign}€${nf(decimals, decimals).format(Math.abs(v) / 1e6)}m`;
 }
 
+/** Compact € amounts: "€15k" below one million, "€1.2m" above. */
+export function eurCompact(v: number | null | undefined): string {
+  if (v === null || v === undefined || !Number.isFinite(v)) return NA;
+  const sign = v < 0 ? "−" : "";
+  const a = Math.abs(v);
+  if (a < 999_500) return `${sign}€${nf(0, 0).format(Math.round(a / 1000))}k`;
+  return `${sign}€${nf(1, 1).format(a / 1e6)}m`;
+}
+
 /** € thousands for tables. */
 export function keur(v: number | null | undefined): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return NA;

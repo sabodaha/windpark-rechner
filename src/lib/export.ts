@@ -1,5 +1,5 @@
 // Excel export (values): summary, assumptions with sources, annual table, construction months, checks, sources.
-import { DATA_AS_OF, SOURCES, type Inputs, type ModelResult, type ScenarioName } from "@/engine";
+import { DATA_AS_OF, SCENARIOS, SOURCES, type Inputs, type ModelResult, type ScenarioName } from "@/engine";
 import type { Messages } from "@/messages/en";
 import { FIELDS, toDisplay } from "./fields";
 import { buildXlsx, excelDate, type Row, type Sheet } from "./xlsx";
@@ -23,7 +23,9 @@ export function buildWorkbook(
     [`${t.header.dataAsOf}: ${DATA_AS_OF}`],
     [pageUrl],
     [],
-    [b("KPI"), b(t.scenarios.base), b(t.scenarios.p90), b(t.scenarios.downside)],
+    [b("KPI"), ...SCENARIOS.map((sc) => b(t.scenarios[sc]))],
+    ["Status", ...SCENARIOS.map((sc) => statusText(scenarios[sc]))],
+    ["Returns meaningful (company fully funded)", ...SCENARIOS.map((sc) => (scenarios[sc].validity.returnsMeaningful ? "yes" : "no"))],
     ...(
       [
         [t.kpis.equityIrr.label, "equityIrr", "pct"],
@@ -42,8 +44,13 @@ export function buildWorkbook(
       ] as const
     ).map(([label, key, s]) => [
       label,
-      ...(["base", "p90", "downside"] as const).map((sc) => ({ v: scenarios[sc].kpis[key] as number | null, s })),
+      ...SCENARIOS.map((sc) => {
+        const r = scenarios[sc];
+        const returns = key === "equityIrr" || key === "npvEquity" || key === "paybackYears";
+        return returns && !r.validity.returnsMeaningful ? "n.m." : { v: r.kpis[key] as number | null, s };
+      }),
     ]),
+    [t.tables.distributionNote],
     [],
     [b(t.overview.facts)],
     [t.overview.capacity + " (MW)", { v: k.capacityMw, s: "dec2" }],
@@ -55,7 +62,14 @@ export function buildWorkbook(
     [t.overview.eegEnd, { v: excelDate(base.timeline.eegEnd), s: "date" }],
     [t.overview.loanEnd, { v: excelDate(base.timeline.loanMaturity), s: "date" }],
     [t.overview.endOfLife, { v: excelDate(base.timeline.endOfLife), s: "date" }],
-    [t.overview.sizing, t.overview.binding[base.sizing.binding] ?? base.sizing.binding],
+    [t.overview.firstInstalment, base.timeline.firstInstalment ? { v: excelDate(base.timeline.firstInstalment), s: "date" } : "—"],
+    [t.overview.awardLapse, { v: excelDate(base.timeline.awardLapse), s: "date" }],
+    [
+      t.overview.sizing,
+      `${t.overview.binding[base.sizing.binding] ?? base.sizing.binding} ${base.sizing.binding.startsWith("dscr") ? (t.overview.basis[base.sizing.bankPriceBasis] ?? "") : ""}`.trim(),
+    ],
+    ["Lowest lender DSCR, P50", { v: base.sizing.minBankDscrP50, s: "dec3" }],
+    ["Lowest lender DSCR, P90 1-yr", { v: base.sizing.minBankDscrP90, s: "dec3" }],
     [],
     [b(t.overview.sourcesUses), b("€")],
     ...Object.entries(base.sourcesUses).map(([key, v]) => [t.overview.uses[key] ?? key, { v, s: "int" as const }]),
@@ -86,8 +100,9 @@ export function buildWorkbook(
         "revenueMarket", "revenuePremium", "revenuePostEeg", "revenue", "maintenance", "management", "insurance", "otherOpex",
         "lease", "directMarketing", "municipal", "guaranteeFee", "gridFee", "opex", "municipalRefund", "ebitda",
         "depreciation", "interest", "provisionChange", "ebt", "tradeTax", "corporateTax", "soli", "taxes", "netIncome",
-        "deltaWorkingCapital", "cfads", "principal", "debtService", "debtOpening", "debtClosing", "dsraBalance",
-        "decommissioningReserve", "trappedCash", "decommissioningPaid", "distribution",
+        "receivables", "deltaWorkingCapital", "premiumAdvance", "siteQualitySettlement", "cfads", "principal", "debtService",
+        "debtOpening", "debtClosing", "dsraBalance", "decommissioningReserve", "trappedCash", "cashDeficit",
+        "decommissioningPaid", "distribution", "bookEquity",
       ] as const
     ).map((key) => [`${t.tables.rows[key] ?? key} (€)`, (a: ModelResult["annual"][number]) => a[key], "int"] as [string, (a: ModelResult["annual"][number]) => number, "int"]),
     ["DSCR", (a) => a.dscr, "dec2"],
@@ -99,17 +114,18 @@ export function buildWorkbook(
 
   const construction: Row[] = [
     [b("Month end"), b("Capex"), b("VAT paid"), b("VAT refund"), b("VAT bridge balance"), b("VAT interest"), b("Upfront fee"),
-      b("Commitment fee"), b("Interest during construction"), b("DSRA funding"), b("Total need"), b("Loan draw"), b("Equity draw")],
+      b("Commitment fee"), b("Interest during construction"), b("DSRA funding"), b("Start-up liquidity"), b("Total need"), b("Loan draw"),
+    b("Equity draw")],
     ...base.construction.map((m) => [
       { v: excelDate(m.date), s: "date" as const },
       ...[m.capex, m.vat, m.vatRefund, m.vatFacilityBalance, m.vatInterest, m.upfrontFee, m.commitmentFee,
-        m.interestDuringConstruction, m.dsraFunding, m.need, m.debtDraw, m.equityDraw].map((v) => ({ v, s: "int" as const })),
+        m.interestDuringConstruction, m.dsraFunding, m.workingCapitalFunding, m.need, m.debtDraw, m.equityDraw].map((v) => ({ v, s: "int" as const })),
     ]),
   ];
 
   const checks: Row[] = [
-    [b("Check"), b("Status"), b("Severity"), b("Value")],
-    ...base.checks.map((c) => [t.checks.ids[c.id] ?? c.id, c.ok ? "OK" : "FAILED", c.severity, c.value]),
+    [b("Check"), b("Group"), b("Status"), b("Severity"), b("Value")],
+    ...base.checks.map((c) => [t.checks.ids[c.id] ?? c.id, t.checks.groups[c.group] ?? c.group, c.ok ? "OK" : "FAILED", c.severity, c.value]),
   ];
 
   const sources: Row[] = [
@@ -118,12 +134,22 @@ export function buildWorkbook(
   ];
 
   const sheets: Sheet[] = [
-    { name: "Summary", rows: summary, widths: [44, 18, 18, 18] },
+    { name: "Summary", rows: summary, widths: [44, 18, 18, 18, 18] },
     { name: "Assumptions", rows: assumptions, widths: [24, 40, 14, 16, 90] },
     { name: "Annual (base)", rows: annual, widths: [40, ...years.map(() => 13)] },
-    { name: "Construction", rows: construction, widths: [12, ...Array(12).fill(15)] },
-    { name: "Checks", rows: checks, widths: [52, 10, 10, 20] },
+    { name: "Construction", rows: construction, widths: [12, ...Array(13).fill(15)] },
+    { name: "Checks", rows: checks, widths: [60, 14, 10, 10, 20] },
     { name: "Sources", rows: sources, widths: [26, 80, 90, 12] },
   ];
   return buildXlsx(sheets);
+}
+
+/** The validity line of a scenario for the Summary sheet. */
+function statusText(r: ModelResult): string {
+  const v = r.validity;
+  if (v.integrity === "error") return "Calculation check failed";
+  if (v.shortfall) return `Not funded: shortfall in ${v.shortfall.year}`;
+  if (v.covenantBreach) return `Covenant breached in ${v.covenantBreach.year}`;
+  if (v.scope === "error") return "Outside the model scope";
+  return v.lockUpYears.length ? `Valid; lock-up in ${v.lockUpYears.length} year(s)` : "Valid";
 }

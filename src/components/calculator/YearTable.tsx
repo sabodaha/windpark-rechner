@@ -13,8 +13,9 @@ export interface TableRow {
 }
 
 /** Years as columns, the label column stays in place while the table scrolls sideways. */
-export function YearTable({ years, rows, caption }: { years: number[]; rows: TableRow[]; caption: string }) {
+export function YearTable({ years, rows, caption, note }: { years: number[]; rows: TableRow[]; caption: string; note?: string }) {
   return (
+    <div>
     <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-max min-w-full border-collapse text-xs tabular">
         <caption className="sr-only">{caption}</caption>
@@ -46,6 +47,8 @@ export function YearTable({ years, rows, caption }: { years: number[]; rows: Tab
         </tbody>
       </table>
     </div>
+    {note && <p className="mt-2 text-xs text-muted-foreground">{note}</p>}
+    </div>
   );
 }
 
@@ -58,12 +61,17 @@ export function cashFlowRows(a: AnnualRow[], L: Record<string, string>): TableRo
     { label: L.marketValue!, values: a.map((r) => r.marketValueEurKwh * 1000), format: (v) => num(v, 1) },
     { label: L.revenueMarket!, values: col(a, "revenueMarket"), indent: true },
     { label: L.revenuePremium!, values: col(a, "revenuePremium"), indent: true },
+    ...(a.some((r) => r.siteQualitySettlement !== 0)
+      ? [{ label: L.siteQualitySettlement!, values: col(a, "siteQualitySettlement"), indent: true }]
+      : []),
     { label: L.revenuePostEeg!, values: col(a, "revenuePostEeg"), indent: true },
     { label: L.revenue!, values: col(a, "revenue"), bold: true },
     { label: L.opex!, values: col(a, "opex", -1) },
     { label: L.municipalRefund!, values: col(a, "municipalRefund") },
     { label: L.ebitda!, values: col(a, "ebitda"), bold: true },
     { label: L.deltaWorkingCapital!, values: col(a, "deltaWorkingCapital", -1) },
+    { label: L.receivables!, values: col(a, "receivables"), indent: true },
+    ...(a.some((r) => r.premiumAdvance !== 0) ? [{ label: L.premiumAdvance!, values: col(a, "premiumAdvance"), indent: true }] : []),
     { label: L.taxes!, values: col(a, "taxes", -1) },
     { label: L.cfads!, values: col(a, "cfads"), bold: true },
     { label: L.interest!, values: col(a, "interest", -1), indent: true },
@@ -75,6 +83,7 @@ export function cashFlowRows(a: AnnualRow[], L: Record<string, string>): TableRo
     { label: L.trappedCash!, values: col(a, "trappedCash") },
     { label: L.decommissioningPaid!, values: col(a, "decommissioningPaid", -1) },
     { label: L.distribution!, values: col(a, "distribution"), bold: true },
+    { label: L.bookEquity!, values: col(a, "bookEquity") },
   ];
 }
 

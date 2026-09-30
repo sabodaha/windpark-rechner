@@ -1,4 +1,5 @@
 // Inputs <-> URL query: only fields that differ from the base case are written, in engine units.
+import { isIsoDate } from "@/engine/dates";
 import type { Inputs } from "@/engine";
 import { FIELDS, type FieldDef, type FieldValue, sameValue, withField } from "./fields";
 
@@ -10,6 +11,11 @@ function encodeValue(v: FieldValue): string {
   return v;
 }
 
+/** Rejects values outside a field's date range; ISO strings compare correctly as text. */
+function withinDates(f: FieldDef, raw: string): boolean {
+  return (f.minDate === undefined || raw >= f.minDate) && (f.maxDate === undefined || raw <= f.maxDate);
+}
+
 function decodeValue(f: FieldDef, raw: string): FieldValue | undefined {
   switch (f.kind) {
     case "switch":
@@ -17,7 +23,9 @@ function decodeValue(f: FieldDef, raw: string): FieldValue | undefined {
     case "select":
       return f.options?.includes(raw) ? raw : undefined;
     case "month":
-      return /^\d{4}-(0[1-9]|1[0-2])$/.test(raw) ? raw : undefined;
+      return /^\d{4}-(0[1-9]|1[0-2])$/.test(raw) && withinDates(f, raw) ? raw : undefined;
+    case "date":
+      return isIsoDate(raw) && withinDates(f, raw) ? raw : undefined;
     default: {
       const x = Number(raw);
       if (!Number.isFinite(x)) return undefined;

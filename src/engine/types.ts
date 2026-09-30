@@ -68,10 +68,17 @@ export interface Inputs {
     directMarketingCtKwh2026: number;
     postEeg: PostEegMode;
     ppaEurMwh2026: number;
-    /** EEG 2027 draft: premium becomes two-sided (payback when the market value exceeds the AW). */
+    /**
+     * Simplified two-sided premium stress: the plant pays back AW − JW when the market value exceeds the AW.
+     * Inspired by the EEG 2027 draft, not its calculation.
+     */
     twoSidedPremium: boolean;
     receivableDays: number;
-    /** § 6 EEG payment to municipalities, ct/kWh. */
+    /** Public announcement of the award (§ 36e, § 55 EEG deadlines run from it). */
+    awardNoticeDate: IsoDate;
+    /** Months after the year end until the premium true-up (final settlement) is paid. */
+    premiumTrueUpLagMonths: number;
+    /** Payment to municipalities, ct/kWh; the § 6 EEG refund covers at most 0.2 ct/kWh. */
     municipalCtKwh: number;
     municipalAfterEeg: boolean;
     bankPriceBasis: BankPriceBasis;
@@ -135,18 +142,26 @@ export interface Inputs {
   };
 }
 
-/** Multipliers used by the P90 and downside scenarios. 1 = no change. */
+/** Multipliers used by the stress scenarios. 1 = no change. */
 export interface ScenarioAdjustments {
   energyScale: number;
   priceScale: number;
   opexScale: number;
   capexScale: number;
+  /**
+   * Apply the § 36h (2) EEG site-quality reviews to the stressed yield: the AW is re-determined from year 6,
+   * 11 and 16, and the first five years are settled retroactively. Only for multi-year stresses.
+   */
+  siteQualityReview: boolean;
 }
 
-/** A loan fixed at its base-case size — the lender's view after financial close. */
+/** The funding plan fixed at financial close: the loan and its instalments, and the start-up liquidity. */
 export interface LockedDebt {
   amount: number;
-  principalByYear: Record<number, number>;
+  /** Principal of each scheduled instalment, in date order. */
+  instalments: number[];
+  /** Start-up liquidity funded at COD. */
+  workingCapital: number;
 }
 
 export interface ConstructionMonth {
@@ -161,6 +176,7 @@ export interface ConstructionMonth {
   commitmentFee: number;
   interestDuringConstruction: number;
   dsraFunding: number;
+  workingCapitalFunding: number;
   need: number;
   debtDraw: number;
   equityDraw: number;
@@ -177,10 +193,16 @@ export interface AnnualRow {
   energySoldKwh: number;
   baseEurMwh: number;
   marketValueEurKwh: number;
+  /** AW in force during the year's support days (a day-weighted average when a § 36h review falls in the year). */
   awEurKwh: number;
   premiumEurKwh: number;
   revenueMarket: number;
+  /** Market premium accrued for the year, incl. any § 36h review settlement. */
   revenuePremium: number;
+  /** Retroactive § 36h (2) settlement for the previous five years, included in revenuePremium. */
+  siteQualitySettlement: number;
+  /** Monthly advances on the premium for the year, based on the previous year's market value (§ 26 EEG). */
+  premiumAdvance: number;
   revenuePostEeg: number;
   revenue: number;
   maintenance: number;
@@ -204,7 +226,10 @@ export interface AnnualRow {
   soli: number;
   taxes: number;
   netIncome: number;
+  /** Year-end receivables: market sales (receivable days) plus premium and § 6 refund not yet paid. */
   receivables: number;
+  receivablesMarket: number;
+  receivablesPremium: number;
   deltaWorkingCapital: number;
   cfads: number;
   principal: number;
@@ -217,11 +242,14 @@ export interface AnnualRow {
   trappedCash: number;
   cashDeficit: number;
   decommissioningPaid: number;
+  /** Cash available to equity, before legal limits on distributions (§ 30 GmbHG, § 172 (4) HGB). */
   distribution: number;
   taxesUnlevered: number;
   projectCashFlowPreTax: number;
   projectCashFlowPostTax: number;
   provision: number;
+  /** Equity in the model balance sheet (contributions − distributions + net income); not an HGB test. */
+  bookEquity: number;
   balanceDifference: number;
 }
 
@@ -234,6 +262,8 @@ export interface Kpis {
   lcoeRealCt: number;
   lcoeNominalCt: number;
   minDscr: number | null;
+  minDscrYear: number | null;
+  /** Average DSCR over the years with a repayment (interest-only years excluded). */
   avgDscr: number | null;
   llcr: number | null;
   paybackYears: number | null;
@@ -251,12 +281,38 @@ export interface Kpis {
 
 export type CheckSeverity = "error" | "warning" | "info";
 
+/**
+ * What a check is about. Integrity: the calculation itself (convergence, accounting identities). Funding: can
+ * the company pay its obligations. Covenant: the loan terms. Scope: cases the model does not cover fully.
+ */
+export type CheckGroup = "inputs" | "integrity" | "funding" | "covenant" | "scope";
+
 export interface Check {
   id: string;
+  group: CheckGroup;
   ok: boolean;
   severity: CheckSeverity;
   value: number | string | null;
   detail: string;
+}
+
+export type ValidityLevel = "ok" | "warning" | "error";
+
+/** One status per check group, and whether the returns mean anything. */
+export interface Validity {
+  inputs: ValidityLevel;
+  integrity: ValidityLevel;
+  funding: ValidityLevel;
+  covenant: ValidityLevel;
+  scope: ValidityLevel;
+  /** False when the company runs out of cash or the calculation fails: returns are then not meaningful. */
+  returnsMeaningful: boolean;
+  /** First year with unfunded cash and the largest unfunded amount. */
+  shortfall: { year: number; amount: number } | null;
+  /** Year and value of the lowest DSCR, if it is below the covenant. */
+  covenantBreach: { year: number; dscr: number } | null;
+  /** Years in which distributions were held back (DSCR below the lock-up level). */
+  lockUpYears: number[];
 }
 
 export interface SourcesUses {
@@ -266,10 +322,22 @@ export interface SourcesUses {
   interestDuringConstruction: number;
   vatInterest: number;
   dsraInitial: number;
+  /** Start-up liquidity: cash for the receivables of the first operating year (Liquiditätsreserve). */
+  workingCapitalInitial: number;
   totalUses: number;
   debt: number;
   equity: number;
   totalSources: number;
+}
+
+/** The lender's case year by year: CFADS on the sizing prices at P50 and P90 (1-year) output. */
+export interface LenderCase {
+  years: number[];
+  cfadsP50: number[];
+  cfadsP90: number[];
+  debtService: number[];
+  dscrP50: (number | null)[];
+  dscrP90: (number | null)[];
 }
 
 /** What limited the loan, and the DSCRs in the lender's case (floor or base prices). */
@@ -278,6 +346,7 @@ export interface SizingInfo {
   minBankDscrP50: number | null;
   minBankDscrP90: number | null;
   binding: "dscrP50" | "dscrP90" | "gearing" | "locked" | "none";
+  lenderCase: LenderCase;
 }
 
 export interface ModelResult {
@@ -288,12 +357,20 @@ export interface ModelResult {
     endOfLife: IsoDate;
     eegEnd: IsoDate;
     loanMaturity: IsoDate;
+    graceEnd: IsoDate;
+    firstInstalment: IsoDate | null;
+    awardNotice: IsoDate;
+    /** § 36e EEG: the award lapses if the farm is not commissioned by this date. */
+    awardLapse: IsoDate;
   };
+  /** AW periods: one for the whole support period, or several after § 36h (2) reviews. */
+  awPeriods: { start: IsoDate; end: IsoDate; awCt: number; siteQuality: number }[];
   construction: ConstructionMonth[];
   annual: AnnualRow[];
   sourcesUses: SourcesUses;
   kpis: Kpis;
   checks: Check[];
+  validity: Validity;
   lockedDebt: LockedDebt;
   iterations: number;
   converged: boolean;

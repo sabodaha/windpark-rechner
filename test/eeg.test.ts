@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { anzulegenderWert, correctionFactor, marketPremium } from "../src/engine/eeg";
+import { anzulegenderWert, correctionFactor, marketPremium, roundHalfUp } from "../src/engine/eeg";
 
 describe("§ 36h correction factor", () => {
   it("hits every support point of the table", () => {
@@ -26,8 +26,17 @@ describe("§ 36h correction factor", () => {
     expect(correctionFactor(1.7, false)).toBe(0.79);
   });
 
-  it("derives the anzulegender Wert from the award price", () => {
-    expect(anzulegenderWert(4.79, 1.316)).toBeCloseTo(0.0630364, 7);
+  it("derives the anzulegender Wert from the award price, rounded to two decimals in ct (§ 36h (5))", () => {
+    // 4.79 × 1.316 = 6.30364 ct → 6.30 ct
+    expect(anzulegenderWert(4.79, 1.316)).toBe(0.063);
+  });
+
+  it("rounds half up, ignoring binary noise", () => {
+    expect(anzulegenderWert(6.305, 1)).toBeCloseTo(0.0631, 12); // exactly half → up
+    expect(anzulegenderWert(4.5, 1.29)).toBeCloseTo(0.0581, 12); // 5.805 is stored as 5.80499…
+    expect(anzulegenderWert(6.304, 1)).toBeCloseTo(0.063, 12);
+    expect(roundHalfUp(-2.345, 2)).toBe(-2.35);
+    expect(roundHalfUp(0.0000001, 2)).toBe(0);
   });
 });
 
@@ -37,7 +46,7 @@ describe("market premium", () => {
     expect(marketPremium(0.063, 0.08, false)).toBe(0);
   });
 
-  it("is two-sided under the EEG 2027 draft", () => {
+  it("is two-sided in the simplified stress", () => {
     expect(marketPremium(0.063, 0.08, true)).toBeCloseTo(-0.017, 12);
   });
 });

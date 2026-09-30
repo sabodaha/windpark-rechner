@@ -4,9 +4,11 @@ import type { Inputs } from "./types";
 
 export const DATA_AS_OF = "2026-09-30";
 
-/** Published tender facts the bid calculator compares against (independent of the user's inputs). */
+/** Published tender facts, shown as reference points next to the user's inputs. */
 export const TENDER_FACTS = {
   lastRoundDate: "2026-08-01",
+  /** Date of the BNetzA announcement of the awards; § 36e and § 55 deadlines run from it. */
+  lastRoundNoticeDate: "2026-09-17",
   lastRoundAverageCt: 4.79,
   ceiling2026Ct: 7.25,
 } as const;
@@ -48,6 +50,8 @@ export const BASE_CASE: Inputs = {
     ppaEurMwh2026: 60,
     twoSidedPremium: false,
     receivableDays: 30,
+    awardNoticeDate: "2026-09-17",
+    premiumTrueUpLagMonths: 3,
     municipalCtKwh: 0.2,
     municipalAfterEeg: true,
     bankPriceBasis: "floor",
@@ -138,6 +142,16 @@ export const SOURCES: Record<string, Source> = {
     url: "https://www.gesetze-im-internet.de/eeg_2014/",
     date: "2025-12-18",
   },
+  eegAwardDeadlines: {
+    title: "EEG §§ 36e, 36i, 55: award lapses 36 months after its announcement; penalty after 30 months",
+    url: "https://www.gesetze-im-internet.de/eeg_2014/__36e.html",
+    date: "2025-12-18",
+  },
+  eegSettlement: {
+    title: "EEG § 26: monthly advances, may use the previous year's market value; final settlement next year",
+    url: "https://www.gesetze-im-internet.de/eeg_2014/__26.html",
+    date: "2025-12-18",
+  },
   windguardCost2025: {
     title: "Deutsche WindGuard: Kostensituation der Windenergie an Land – Stand 2025",
     url: "https://www.windguard.de/files/cto_layout/img/unternehmen/veroeffentlichungen/2025/Kostensituation%20der%20Windenergie%20an%20Land%20%E2%80%93%20Stand%202025.pdf",
@@ -154,9 +168,14 @@ export const SOURCES: Record<string, Source> = {
     date: "2026-07-23",
   },
   kfw270: {
-    title: "KfW programme 270 – rate sheet and Merkblatt",
+    title: "KfW programme 270 – rate sheet (price class A, 20 years, 3 grace years)",
     url: "https://www.kfw-formularsammlung.de/KonditionenanzeigerINet/KonditionenAnzeiger?ProgrammNameNr=270",
     date: "2026-09-29",
+  },
+  kfw270Merkblatt: {
+    title: "KfW Merkblatt 270 (05/2025): quarterly equal instalments, grace years, drawdown period, commitment fee",
+    url: "https://www.kfw.de/PDF/Download-Center/F%C3%B6rderprogramme-%28Inlandsf%C3%B6rderung%29/PDF-Dokumente/6000000178_M_270_EE-Standard.pdf",
+    date: "2025-05-01",
   },
   netztransparenzMarketValues: {
     title: "Netztransparenz: annual market values (JW) Wind an Land",
@@ -259,7 +278,8 @@ export const SOURCES: Record<string, Source> = {
     date: "2025-10-08",
   },
   directMarketing: {
-    title: "Netztransparenz: marketing cost deduction 2026 (0.228 ct/kWh)",
+    title:
+      "Netztransparenz: statutory marketing deduction 2026 for plants after support (0.228 ct/kWh) — a reference point, not a market offer",
     url: "https://www.netztransparenz.de/de-de/Erneuerbare-Energien-und-Umlagen/EEG/EEG-Abrechnungen/Ausgef%C3%B6rderte-Anlagen/Abzugsbetrag-2026",
     date: "2026-01-01",
   },

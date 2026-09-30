@@ -2,8 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { JsonLd } from "@/components/site/JsonLd";
 import { BASE, BASE_CASE, BID_AT_COST_OF_EQUITY, premiumYears, TENDER_FACTS } from "@/content/baseCase";
-import { CORRECTION_FACTOR_TABLE, DATA_AS_OF, P90_Z, TORNADO_DRIVERS } from "@/engine";
-import { ct, dateLabel, meur, num, pct, ratio } from "@/lib/format";
+import { CORRECTION_FACTOR_TABLE, DATA_AS_OF, P90_Z, SCENARIOS, TORNADO_DRIVERS } from "@/engine";
+import { ct, dateLabel, eurCompact, meur, num, pct, ratio } from "@/lib/format";
 import { pageMetadata } from "@/lib/metadata";
 import { absoluteUrl, breadcrumbJsonLd, CALCULATOR_ID, graph, PATHS, PERSON_ID, SITE } from "@/lib/site";
 import { en } from "@/messages/en";
@@ -27,7 +27,7 @@ const SECTIONS = [
   ["waterfall", "Cash waterfall"],
   ["results", "Results"],
   ["scenarios", "Scenarios, sensitivity and bid calculator"],
-  ["checks", "Checks"],
+  ["checks", "Checks and validity"],
   ["verification", "Verification"],
   ["limitations", "Limitations"],
 ] as const;
@@ -65,24 +65,41 @@ function Table({ head, rows, num: numeric = [] }: { head: string[]; rows: ReactN
   );
 }
 
+/** "2043–2050" for a run of years, "2044" for one. */
+function yearSpan(years: number[]): string {
+  if (years.length === 0) return "";
+  return years.length === 1 ? String(years[0]) : `${years[0]}–${years.at(-1)}`;
+}
+
 export default function MethodologyPage() {
   const b = BASE.base;
   const k = b.kpis;
   const tl = b.timeline;
   const i = BASE_CASE;
+  const f = i.financing;
   const su = b.sourcesUses;
   const p90share = 1 - P90_Z * i.energy.sigma1y;
   const p90share10 = 1 - P90_Z * i.energy.sigma10y;
   const siteYield = i.energy.siteQuality * i.energy.referenceYieldHours;
   const mv = (year: number) => (b.annual.find((a) => a.year === year)?.marketValueEurKwh ?? NaN) * 1000;
-  const firstRepayment = b.annual.find((a) => a.principal > 0)?.year;
-  const lastRepayment = [...b.annual].reverse().find((a) => a.principal > 0)?.year;
+  const instalments = 4 * (f.tenorYearsFromClose - f.graceYears);
+  const firstRepaymentYear = b.annual.find((a) => a.principal > 0)?.year;
   const financing = su.upfrontFee + su.commitmentFee + su.interestDuringConstruction + su.vatInterest;
   const bid = BID_AT_COST_OF_EQUITY;
   const basePremium = premiumYears("base");
   const downsidePremium = premiumYears("downside");
+  const reviewed = BASE.resource.awPeriods[1];
+  const negativeBook = b.annual.filter((a) => a.bookEquity < -1).map((a) => a.year);
+  const codMonths = Math.round(
+    (Date.parse(tl.cod) - Date.parse(i.revenue.awardNoticeDate)) / (1000 * 60 * 60 * 24 * 30.4375),
+  );
+  const unrounded = i.revenue.awardPriceCt * k.correctionFactor;
+  const basis = en.overview.basis[b.sizing.bankPriceBasis] ?? "";
   const capexItems = i.capex.items;
   const itemsTotal = capexItems.reduce((s, it) => s + it.eurPerKw, 0);
+  const checkGroups = (["integrity", "funding", "covenant", "inputs", "scope"] as const).map(
+    (g) => [g, b.checks.filter((c) => c.group === g)] as const,
+  );
   const capexLabel: Record<string, string> = {
     turbine: "Turbine incl. transport and installation",
     foundation: "Foundation",
@@ -97,6 +114,12 @@ export default function MethodologyPage() {
     thirds: "40 / 40 / 20% over the thirds of construction",
     atStart: "at financial close",
     linear: "evenly over construction",
+  };
+  const scenarioText: Record<(typeof SCENARIOS)[number], string> = {
+    base: "P50 output, base prices and costs; sizes the loan",
+    p90: `Lender’s stress: one-year P90 output in every year (${pct(p90share, 1)} of P50)`,
+    resource: `Ten-year P90 output in every year (${pct(p90share10, 1)}), with the § 36h review`,
+    downside: `Ten-year P90 output, market prices −20%, fixed opex and grid fee +10%, capex +5% paid by the owners, with the § 36h review`,
   };
 
   return (
@@ -133,8 +156,9 @@ export default function MethodologyPage() {
           <h1 className="!mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{TITLE}</h1>
           <p className="text-lg">
             This page documents what the calculator computes, in which order and with which formulas. The wind farm is
-            fictional; every input comes from a public source listed on the <Link href={PATHS.sources}>sources page</Link>,
-            checked on {dateLabel(DATA_AS_OF)}. The numbers below come from the same engine that runs in the calculator.
+            fictional; every input comes from a public source or is a documented assumption — both are listed on the{" "}
+            <Link href={PATHS.sources}>sources page</Link>, checked on {dateLabel(DATA_AS_OF)}. The numbers below come
+            from the same engine that runs in the calculator.
           </p>
           <p className="text-sm text-muted-foreground">{en.header.disclaimer}</p>
 
@@ -153,7 +177,8 @@ export default function MethodologyPage() {
             <dt>Tender</dt>
             <dd>
               Award price (Zuschlagswert) {ct(i.revenue.awardPriceCt)}, average of the round of{" "}
-              {dateLabel(TENDER_FACTS.lastRoundDate)} → reference value (anzulegender Wert) {ct(k.awCt)}
+              {dateLabel(TENDER_FACTS.lastRoundDate)}, announced on {dateLabel(i.revenue.awardNoticeDate)} → applicable
+              value (anzulegender Wert, AW) {ct(k.awCt)}
             </dd>
             <dt>Timeline</dt>
             <dd>
@@ -163,13 +188,14 @@ export default function MethodologyPage() {
             </dd>
             <dt>Investment</dt>
             <dd>
-              {num(k.capexPerKw, 0)} €/kW net of VAT, {meur(k.capex)}; total uses including financing costs{" "}
-              {meur(k.totalUses)}
+              {num(k.capexPerKw, 0)} €/kW net of VAT, {meur(k.capex)}; total uses including financing costs, reserves and
+              start-up liquidity {meur(k.totalUses)}
             </dd>
             <dt>Debt</dt>
             <dd>
-              KfW programme 270, {pct(i.financing.interestRate, 2)} fixed, {i.financing.tenorYearsFromClose} years from
-              close with {i.financing.graceYears} grace years, linear repayment {firstRepayment}–{lastRepayment};{" "}
+              KfW programme 270, {pct(f.interestRate, 2)} fixed, {f.tenorYearsFromClose} years from close with{" "}
+              {f.graceYears} grace years, {instalments} equal quarterly instalments from{" "}
+              {tl.firstInstalment ? dateLabel(tl.firstInstalment) : "—"} to {dateLabel(tl.loanMaturity)};{" "}
               {meur(k.debt)} ({pct(k.gearing, 0)} of uses)
             </dd>
             <dt>Tax</dt>
@@ -195,13 +221,13 @@ export default function MethodologyPage() {
           <ul>
             <li>
               <strong>Deterministic and nominal.</strong> The same inputs always give the same result. Amounts are
-              nominal euros; unit prices are entered in 2025 or 2026 money and indexed with inflation. Two exceptions
-              are nominal by nature: the reference value (fixed by law for 20 years) and power futures.
+              nominal euros; unit prices are entered in 2025 or 2026 money and indexed with inflation. Two items are
+              nominal by nature: power futures, and the AW, which is not indexed (see section 4 for its reviews).
             </li>
             <li>
-              <strong>Dated cash flows.</strong> Construction runs monthly with cash flows at month end; operations run
-              by calendar year with cash flows at 31 December. The first and the last year count only the days in
-              operation.
+              <strong>Dated cash flows.</strong> Construction runs monthly with cash flows at month end; operations run by
+              calendar year with cash flows at 31 December. The first and the last year count only the days in operation.
+              The loan runs on a monthly grid with quarterly instalments, added up by calendar year.
             </li>
             <li>
               <strong>Returns from dates.</strong> IRR and NPV use the exact dates with an Actual/365 day count, like
@@ -210,6 +236,11 @@ export default function MethodologyPage() {
             <li>
               <strong>Two views.</strong> The project view (unlevered) shows what the wind farm earns; the owners’ view
               (levered) shows what reaches the equity after debt service and reserves.
+            </li>
+            <li>
+              <strong>Checked inputs.</strong> Before any calculation — from the input panel, a shared link or a stored
+              session — every input is checked for range and consistency. Inputs that cannot be calculated produce a
+              message instead of a result.
             </li>
           </ul>
 
@@ -221,9 +252,16 @@ export default function MethodologyPage() {
               first operating year has six months.
             </li>
             <li>
+              The award was announced on {dateLabel(tl.awardNotice)}. It lapses if the farm is not running 36 months
+              later, on {dateLabel(tl.awardLapse)} (§ 36e EEG), and commissioning more than 30 months after the
+              announcement triggers a penalty (§ 55 EEG). The base case commissions after about {codMonths} months; later
+              dates are flagged by the checks.
+            </li>
+            <li>
               EEG support lasts 20 years from commissioning (§ 25 EEG; for tendered plants it is not extended to the end
-              of the year). It is extended by the time with negative prices (§ 51a EEG):{" "}
-              {pct(i.energy.negativePriceTimeShare, 1)} of the hours in the base case, so support ends on{" "}
+              of the year). It is extended by the negative-price periods counted in the commissioning year and the 19
+              calendar years after it, rounded up to whole days (§ 51a EEG). With{" "}
+              {pct(i.energy.negativePriceTimeShare, 1)} of the time at negative prices, support ends on{" "}
               {dateLabel(tl.eegEnd)}.
             </li>
             <li>
@@ -231,10 +269,15 @@ export default function MethodologyPage() {
               on {dateLabel(tl.endOfLife)}.
             </li>
             <li>
-              The KfW loan runs {i.financing.tenorYearsFromClose} years from the commitment, which the model sets at
-              financial close. The first {i.financing.graceYears} years are interest-only, then the loan is repaid in
-              equal instalments ({firstRepayment}–{lastRepayment}). KfW collects quarterly; the model uses annual
-              payments.
+              The KfW loan runs {f.tenorYearsFromClose} years from the commitment, which the model sets at financial
+              close. For {f.graceYears} years it pays interest only; then it is repaid in {instalments} equal quarterly
+              instalments, the first on {tl.firstInstalment ? dateLabel(tl.firstInstalment) : "—"} and the last on{" "}
+              {dateLabel(tl.loanMaturity)} (KfW Merkblatt 270). The grace years must last at least until commissioning:
+              the model does not cover instalments during construction.
+            </li>
+            <li>
+              KfW disburses a loan within 12 months of the commitment, extendable by up to 24 months. An{" "}
+              {i.project.constructionMonths}-month construction needs such an extension, which the model assumes.
             </li>
           </ul>
 
@@ -253,7 +296,7 @@ P90               E_P90   = E_P50 × (1 − ${P90_Z} × σ)`}</pre>
             </li>
             <li>
               Site quality is an input, not a result: it sets both the output and the correction factor, as the law
-              does. A better site produces more energy but receives a lower reference value.
+              does. A better site produces more energy but receives a lower AW.
             </li>
             <li>
               By law the site yield already excludes wake losses, up to 2% unavailability, electrical losses and
@@ -269,34 +312,33 @@ P90               E_P90   = E_P50 × (1 − ${P90_Z} × σ)`}</pre>
               In periods with negative prices the direct marketer curtails the farm and no premium is paid (§ 51 EEG).{" "}
               {pct(i.energy.negativePriceOutputShare, 0)} of the output falls into such periods in the base case.
             </li>
-            <li>
-              Grid curtailment under Redispatch 2.0 is compensated (§ 13a EnWG) and is not deducted.
-            </li>
+            <li>Grid curtailment under Redispatch 2.0 is compensated (§ 13a EnWG) and is not deducted.</li>
             <li>
               P90 uses the standard deviation of the yield: σ = {pct(i.energy.sigma1y, 1)} for a single year (P90 ={" "}
-              {pct(p90share, 1)} of P50) and {pct(i.energy.sigma10y, 1)} for a ten-year average (
-              {pct(p90share10, 1)}).
+              {pct(p90share, 1)} of P50) and {pct(i.energy.sigma10y, 1)} for a ten-year average ({pct(p90share10, 1)}).
+              The one-year value tests debt service in a bad year; the ten-year value describes a weaker wind resource.
             </li>
           </ul>
 
           <H2 id="revenue">4. Revenue</H2>
           <pre>{`Correction factor  KF      = table of § 36h EEG, linear in between
-Reference value    AW      = award price × KF                  (fixed in nominal terms)
+Applicable value   AW      = award price × KF, rounded to 2 decimals in ct/kWh    (§ 36h (5))
 Base price         B_y     = power futures 2027–2029, then the long-term price (2026 money) × price index
 Market value       JW_y    = B_y × wind capture factor         (annual market value of onshore wind)
 Market premium     MP_y    = max(0, AW − JW_y)                 (Anlage 1 Nr. 4 EEG)
 Market revenue             = E_y × JW_y × support share of the year
 Premium revenue            = E_sold × MP_y × support share of the year
-After support              = E_y × (JW_y or PPA price) × rest of the year`}</pre>
+After support              = E_y × JW_y, or E_sold × PPA price, × rest of the year`}</pre>
           <Table
             head={["Site quality", "Correction factor"]}
             num={[0, 1]}
-            rows={CORRECTION_FACTOR_TABLE.map(([g, f]) => [`${g}%${g === 50 ? " *" : ""}`, num(f, 2)])}
+            rows={CORRECTION_FACTOR_TABLE.map(([g, x]) => [`${g}%${g === 50 ? " *" : ""}`, num(x, 2)])}
           />
           <p className="text-sm text-muted-foreground">
             * 50% applies only in the Südregion; elsewhere the factor stays at 1.42 below 60%. At{" "}
-            {pct(i.energy.siteQuality, 0)} the factor is {num(k.correctionFactor, 3)}, so the reference value is{" "}
-            {num(i.revenue.awardPriceCt, 2)} × {num(k.correctionFactor, 3)} = {ct(k.awCt)}.
+            {pct(i.energy.siteQuality, 0)} the factor is {num(k.correctionFactor, 3)}, so the AW is{" "}
+            {num(i.revenue.awardPriceCt, 2)} × {num(k.correctionFactor, 3)} = {num(unrounded, 5)}, rounded to{" "}
+            {ct(k.awCt)}.
           </p>
           <ul>
             <li>
@@ -312,7 +354,7 @@ After support              = E_y × (JW_y or PPA price) × rest of the year`}</p
             </li>
             <li>
               <strong>Base-case prices.</strong> Futures of{" "}
-              {i.revenue.futuresEurMwh.map((f) => `${num(f.value, 2)}`).join(" / ")} €/MWh for{" "}
+              {i.revenue.futuresEurMwh.map((x) => `${num(x.value, 2)}`).join(" / ")} €/MWh for{" "}
               {i.revenue.futuresEurMwh[0]!.year}–{i.revenue.futuresEurMwh.at(-1)!.year}, then{" "}
               {num(i.revenue.longTermBaseEurMwh2026, 0)} €/MWh in 2026 money plus inflation, times a capture factor of{" "}
               {num(i.revenue.captureFactor, 2)}: a market value of {num(mv(2029), 1)} €/MWh in 2029 and{" "}
@@ -323,31 +365,55 @@ After support              = E_y × (JW_y or PPA price) × rest of the year`}</p
               <strong>The EEG as a floor.</strong>{" "}
               {basePremium === 0 ? (
                 <>
-                  The reference value ({num(k.awCt * 10, 1)} €/MWh) stays below the expected market value in every
-                  year, so the base case receives no premium.
+                  The AW ({num(k.awCt * 10, 1)} €/MWh) stays below the expected market value in every year, so the base
+                  case receives no premium.
                 </>
               ) : (
                 <>
-                  The reference value ({num(k.awCt * 10, 1)} €/MWh) is above the expected market value in{" "}
-                  {basePremium} years, when the premium is paid.
+                  The AW ({num(k.awCt * 10, 1)} €/MWh) is above the expected market value in {basePremium} years, when
+                  the premium is paid.
                 </>
               )}{" "}
               In the downside case, with prices 20% lower, the premium is paid in {downsidePremium} years — the floor
               then works as insurance.
             </li>
             <li>
-              <strong>Two-sided premium (switch).</strong> Under the EEG 2027 draft the premium can turn negative: when
-              the market value exceeds the reference value, the farm pays the difference back. It is off by default —
-              a 2026 award falls under EEG 2023, and whether the draft will apply to it is not settled.
+              <strong>Site-quality reviews.</strong> The AW is fixed in nominal terms, but § 36h (2) EEG re-determines it
+              from the start of years 6, 11 and 16 from the site yield of the five years before, and settles the payments
+              of those years if the site quality moved by more than 2 percentage points. The base case assumes that the
+              assessed site quality of {pct(i.energy.siteQuality, 0)} holds for the whole period, so the AW stays at{" "}
+              {ct(k.awCt)}. The multi-year stresses apply the review:{" "}
+              {reviewed ? (
+                <>
+                  with the ten-year P90 yield the site quality is {pct(reviewed.siteQuality, 1)}, the AW becomes{" "}
+                  {ct(reviewed.awCt)} from {dateLabel(reviewed.start)}, and the first five years are settled at that
+                  value.
+                </>
+              ) : (
+                "the reviewed AW then follows the stressed yield."
+              )}{" "}
+              Interest on paybacks to the grid operator is not modelled.
             </li>
             <li>
-              <strong>Payment timing.</strong> The grid operator pays monthly advances based on the previous year’s
-              market value and settles in the following year (§ 26 EEG): the model receives the advance in the year and
-              the rest a year later. Market sales are collected after {i.revenue.receivableDays} days.
+              <strong>Payment timing.</strong> The grid operator pays monthly advances, due on the 15th of the following
+              month. § 26 EEG allows them to be based on the previous year’s market value, which the model assumes. The
+              rest of the premium and the § 6 refund come with the final settlement, assumed on 31 March of the next year
+              (the settlement lag is an input, for a delay stress). So in the first year the market value falls below
+              the AW, the advances are still zero and the whole premium arrives the year after; the lender’s case
+              contains the same lag. Market sales are collected after {i.revenue.receivableDays} days of revenue,
+              counted on the actual operating days of a part year.
+            </li>
+            <li>
+              <strong>Two-sided premium (switch).</strong> A simplified stress, not the calculation of the EEG 2027 draft,
+              which adds further rules such as quarter-hour adjustments and a minimum amount the operator keeps: the
+              premium turns negative when the market value exceeds the AW. It is off by default — a 2026 award falls
+              under EEG 2023, and whether the draft will apply to it is not settled. Advances are never negative; a
+              payback is settled with the final settlement.
             </li>
             <li>
               <strong>After support</strong> the farm sells at the market value or, as a switch, under a PPA at a fixed
-              price in 2026 money.
+              price in 2026 money. The PPA is assumed to have a negative-price clause: the farm is curtailed in
+              negative-price periods and paid only for the output sold.
             </li>
           </ul>
 
@@ -372,9 +438,14 @@ Generator grid fee = €/kW a year                              (${num(i.opex.gr
           />
           <ul>
             <li>
-              The municipal payment is voluntary under § 6 EEG and is refunded by the grid operator in the next year’s
-              settlement for quantities that received support — in the model, in years with a positive premium. After
-              support it continues as a plain cost (switch).
+              The direct-marketing fee of {num(i.revenue.directMarketingCtKwh2026, 2)} ct/kWh is an assumption. The
+              statutory deduction of 0.228 ct/kWh for plants after support (Netztransparenz, 2026) is a reference point,
+              not a market offer for a new farm.
+            </li>
+            <li>
+              The municipal payment is voluntary under § 6 EEG. The grid operator refunds up to 0.2 ct/kWh in the next
+              year’s final settlement for quantities that received a premium — in the model, in years with a positive
+              premium; any payment above 0.2 ct/kWh is a plain cost. After support it continues as a plain cost (switch).
             </li>
             <li>
               The decommissioning security follows the Hessian rule — hub height × €
@@ -408,57 +479,68 @@ Generator grid fee = €/kW a year                              (${num(i.opex.gr
             </li>
             <li>
               VAT of {pct(i.capex.vatRate, 0)} is paid with each invoice and refunded {i.capex.vatRefundLagMonths} months
-              later. A VAT bridge loan at the senior rate plus {num(i.financing.vatFacilitySpread * 100, 2)} percentage
-              points funds the gap; its interest, including the months after commissioning, is part of the uses.
+              later. A VAT bridge loan at the senior rate plus {num(f.vatFacilitySpread * 100, 2)} percentage points funds
+              the gap; its interest, including the months after commissioning, is part of the uses.
             </li>
             <li>
-              Financing costs during construction: an upfront fee of {pct(i.financing.upfrontFeePct, 0)} of the loan at
-              close; a commitment fee of {pct(i.financing.commitmentFeePerMonth, 2)} a month on the undrawn amount from
-              month {i.financing.commitmentFeeStartMonth} (the KfW rule); interest on drawn debt. KfW charges only
-              interest in the grace years, so this interest is paid in cash and funded like capex rather than added to
-              the loan.
+              Financing costs during construction: an upfront fee of {pct(f.upfrontFeePct, 0)} of the loan at close; a
+              commitment fee of {pct(f.commitmentFeePerMonth, 2)} a month on the undrawn amount from month{" "}
+              {f.commitmentFeeStartMonth} (the KfW rule); interest on drawn debt. KfW charges only interest in the grace
+              years, so this interest is paid in cash and funded like capex rather than added to the loan.
             </li>
             <li>
-              The debt service reserve account (DSRA) is funded at commissioning with {i.financing.dsraMonths} months of
-              the next year’s debt service.
+              The debt service reserve account (DSRA) is funded at commissioning with {f.dsraMonths} months of the debt
+              service of the first repayment year ({firstRepaymentYear}): {eurCompact(su.dsraInitial)}.
+            </li>
+            <li>
+              Start-up liquidity of {eurCompact(su.workingCapitalInitial)} funds the receivables of the first operating
+              year, so the first months’ sales need no extra cash.
             </li>
             <li>Debt and equity are drawn pro rata each month (equity first as a switch).</li>
           </ul>
           <pre>{`Uses    = capex + upfront fee + commitment fee + interest during construction
-          + VAT-loan interest + initial DSRA
+          + VAT-loan interest + initial DSRA + start-up liquidity
 Sources = senior debt + equity                                   check: sources − uses = 0`}</pre>
           <p>
             In the base case the uses of {meur(su.totalUses)} are capex {meur(su.capex)}, financing costs{" "}
-            {meur(financing)} and the initial DSRA {meur(su.dsraInitial)}; they are funded by debt of {meur(su.debt)} and
-            equity of {meur(su.equity)}.
+            {meur(financing)}, the initial DSRA {meur(su.dsraInitial)} and start-up liquidity{" "}
+            {meur(su.workingCapitalInitial)}; they are funded by debt of {meur(su.debt)} and equity of {meur(su.equity)}.
           </p>
 
           <H2 id="debt">7. Debt sizing</H2>
           <p>
-            German lenders size a wind-farm loan on the revenue they can plan with. In the <strong>bank case</strong>{" "}
-            only the guaranteed floor counts during support — output sold × reference value — and base prices after it
-            (a switch sizes on base prices throughout). Cash flow available for debt service (CFADS) is after tax.
+            The model’s <strong>lender’s case</strong> counts only the guaranteed floor during support: at most the AW
+            per kWh sold. This is a conservative convention of the model, not a statement of what every lender does. The
+            premium and the § 6 refund arrive with the same timing as in the operating case, including the lag of § 26;
+            after support the case uses base prices (a switch sizes on base prices throughout). Cash flow available for
+            debt service has one definition for sizing, covenant and lock-up:
           </p>
-          <pre>{`Debt service per euro of loan   a_y   (known in advance for linear or annuity repayment)
-Loan from the DSCR targets      D_DSCR = min over y of  min( CFADS_y[bank, P50] / (${num(i.financing.targetDscrP50, 2)} × a_y),
-                                                           CFADS_y[bank, P90 1-year] / (${num(i.financing.targetDscrP90, 2)} × a_y) )
-Loan                            D      = min( D_DSCR, ${pct(i.financing.maxGearing, 0)} × uses )`}</pre>
+          <pre>{`CFADS_y   = EBITDA_y − change in working capital_y − taxes_y
+Debt service per euro of loan   a_y   (quarterly instalments and monthly interest, summed by year)
+Loan from the DSCR targets      D_DSCR = min over y of  min( CFADS_y[lender, P50] / (${num(f.targetDscrP50, 2)} × a_y),
+                                                           CFADS_y[lender, P90 1-year] / (${num(f.targetDscrP90, 2)} × a_y) )
+Loan                            D      = min( D_DSCR, ${pct(f.maxGearing, 0)} × uses )`}</pre>
           <ul>
             <li>
               <strong>Circularity.</strong> Taxes depend on the interest, and the uses depend on the loan through fees,
-              interest during construction and the DSRA. The model iterates until the loan changes by less than €0.50.
+              interest during construction and the DSRA. The model iterates until the loan changes by less than €0.50,
+              then recalculates both lender cases with the final loan and checks both targets again.
             </li>
             <li>
-              <strong>Variants.</strong> Annuity repayment uses the same formula with annuity instalments. Sculpted
-              repayment sets each year’s debt service to the lower of CFADS / target DSCR for P50 and P90 and sizes the
-              loan as its present value at the loan rate.
+              <strong>Variants.</strong> Annuity and sculpted repayment are generic commercial profiles, not KfW 270.
+              Annuity: equal quarterly payments. Sculpted: each year’s debt service is the lower of CFADS ÷ target for
+              P50 and P90; the loan is the amount those payments repay exactly by maturity — found in closed form, since
+              balances are linear in the loan — and smaller if a weak year would otherwise need a negative instalment.
             </li>
             <li>
-              <strong>Base case.</strong> The binding constraint is the {en.overview.binding[b.sizing.binding]}: debt of{" "}
-              {meur(k.debt)}, {pct(k.gearing, 0)} of uses. Community wind farms financed at lower rates and higher award
-              prices show 79–90% debt in their prospectuses; at {pct(i.financing.interestRate, 2)} and a floor of{" "}
-              {ct(k.awCt)} the debt capacity is far lower. In September 2026 a group of 18 banks warned of rising equity
-              requirements for wind projects.
+              <strong>Base case.</strong> The binding constraint is the{" "}
+              {en.overview.binding[b.sizing.binding]}
+              {b.sizing.binding.startsWith("dscr") ? ` ${basis}` : ""}: debt of {meur(k.debt)}, {pct(k.gearing, 0)} of
+              uses; the lowest lender DSCRs are {ratio(b.sizing.minBankDscrP50)} at P50 and{" "}
+              {ratio(b.sizing.minBankDscrP90)} at P90. Community wind farms financed at lower rates and higher award prices
+              show 79–90% debt in their prospectuses; at {pct(f.interestRate, 2)} and a floor of {ct(k.awCt)} the debt
+              capacity is far lower. In September 2026 a group of 18 banks warned of rising equity requirements for wind
+              projects.
             </li>
           </ul>
 
@@ -477,13 +559,14 @@ Solidarity    = 5.5% × corporate tax`}</pre>
               <strong>Depreciation.</strong> The base is capex plus the capitalised financing costs. All wind-farm assets
               are depreciated straight-line over {i.tax.depreciationYears} years (the German depreciation table; BFH IV R
               46/09); the first year counts from the month of commissioning. Declining-balance depreciation (3 ×
-              straight-line, at most 30%: 18.75%) is a switch that applies only to assets commissioned between 1 July
-              2025 and 31 December 2027 — not to the base case — and changes to straight-line once that is higher.
+              straight-line, at most 30%: 18.75%) is a switch that applies only to assets completed between 1 July 2025
+              and 31 December 2027 — not to the base case — and changes to straight-line once that is higher. Any book
+              value left when the farm is dismantled is written off in the final year.
             </li>
             <li>
               <strong>Decommissioning provision.</strong> For tax, the obligation is accrued pro rata over the operating
-              life at today’s prices and discounted at 5.5% (§ 6 EStG); its increase reduces taxable profit. The cash
-              reserve is separate.
+              life at the prices of each balance-sheet date and discounted at 5.5% — except when less than twelve months
+              remain (§ 6 (1) Nr. 3a e) EStG). Its increase reduces taxable profit. The cash reserve is separate.
             </li>
             <li>
               Taxes are not deductible (§ 4 (5b) EStG), so the tax calculation itself has no circularity. Taxes are paid
@@ -495,25 +578,44 @@ Solidarity    = 5.5% × corporate tax`}</pre>
               comparable with the GmbH, which also pays corporate tax and the solidarity surcharge.
             </li>
             <li>
-              Trade tax goes to the municipality where the turbines stand (§ 29 GewStG), so one multiplier applies. The
-              checks flag a multiplier below the legal minimum of 280% from 2027 and interest above the €3m threshold of
-              the interest barrier (§ 4h EStG).
+              Trade tax goes to the municipality of the turbines: for a wind farm, § 29 (1) Nr. 2 GewStG splits the tax
+              base 9/10 by installed capacity and 1/10 by payroll, so with one site and no staff of its own the whole base
+              goes there and one multiplier applies. The checks flag a multiplier below the legal minimum of 280% from
+              2027, and interest above the €3m threshold of the interest barrier (§ 4h EStG), which the model does not
+              calculate.
             </li>
           </ul>
 
           <H2 id="waterfall">9. Cash waterfall</H2>
           <pre>{`CFADS           = EBITDA − change in working capital − taxes
 − interest − principal
-± DSRA          top up to ${i.financing.dsraMonths} months of next year’s debt service, release the excess, draw on a shortfall
+  shortfall     covered first by cash held back under the lock-up, then by the DSRA
+± DSRA          top up to ${f.dsraMonths} months of next year’s debt service, release the excess, draw on a shortfall
 − reserve       equal instalments for decommissioning in the last ${i.opex.decommissioningReserveYears} years
-  lock-up       if DSCR < ${num(i.financing.lockupDscr, 2)} during the loan term, the year’s cash stays in the company
+  lock-up       if DSCR < ${num(f.lockupDscr, 2)} during the loan term, the year’s cash stays in the company
                 until the DSCR is back above the threshold
-= distribution to the owners`}</pre>
-          <p>
-            In the final year the DSRA, any trapped cash and the reserve are released and decommissioning is paid. If
-            cash falls short, the owners fund the gap (a negative distribution). The cash balance may never be negative —
-            one of the checks.
-          </p>
+= cash available to equity`}</pre>
+          <ul>
+            <li>
+              In the final year the DSRA, any cash held back and the reserve are released and decommissioning is paid. If
+              the final year’s cash falls short, the owners pay the gap (a negative last line), and a check flags it.
+            </li>
+            <li>
+              <strong>Funding.</strong> If cash still falls short during the life, the model carries the shortfall as
+              negative cash and marks the case as not funded: the equity IRR and NPV are then shown as “n.m.” (not
+              meaningful). Payments by the owners to cure a shortfall are not modelled.
+            </li>
+            <li>
+              <strong>Limits on distributions.</strong> The last line is cash available to equity before legal limits on
+              distributions. A GmbH may not pay out assets needed to keep its registered capital (§ 30 GmbHG); a limited
+              partner of a KG whose withdrawals push its capital account below the registered contribution is liable to
+              creditors again up to that amount (§ 172 (4) HGB).{" "}
+              {negativeBook.length > 0
+                ? `In the base case the model’s balance sheet shows negative book equity in ${yearSpan(negativeBook)} — a sign that such limits could bite, not a legal test.`
+                : "In the base case the model’s book equity stays positive."}{" "}
+              Shareholder loans, the usual remedy, are not modelled.
+            </li>
+          </ul>
 
           <H2 id="results">10. Results</H2>
           <Table
@@ -522,12 +624,12 @@ Solidarity    = 5.5% × corporate tax`}</pre>
             rows={[
               [
                 "Equity IRR",
-                "XIRR of the owners’ monthly contributions during construction and their annual distributions",
+                "XIRR of the owners’ monthly contributions during construction and the annual cash available to equity; n.m. when the company runs out of cash",
                 pct(k.equityIrr, 2),
               ],
               [
                 "Project IRR",
-                "XIRR of capex (net of VAT and financing costs) and EBITDA − change in working capital − decommissioning; after tax, taxes are recomputed without interest",
+                "XIRR of capex (net of VAT and financing costs), start-up liquidity and EBITDA − change in working capital − decommissioning; after tax, taxes are recomputed without interest",
                 `${pct(k.projectIrrPreTax, 2)} pre-tax, ${pct(k.projectIrrPostTax, 2)} after tax`,
               ],
               [
@@ -537,11 +639,15 @@ Solidarity    = 5.5% × corporate tax`}</pre>
               ],
               [
                 "LCOE",
-                `Fraunhofer ISE method: (PV capex + PV opex net of the § 6 refund + PV decommissioning) ÷ PV output sold; real 2026 money at a real WACC of ${pct(i.macro.waccReal, 1)} (nominal: ${pct(i.macro.waccNominal, 1)}), without taxes and financing costs`,
+                `In the style of Fraunhofer ISE: (PV capex + PV opex net of the § 6 refund + PV decommissioning) ÷ PV output sold; real 2026 money at a real WACC of ${pct(i.macro.waccReal, 1)} (nominal: ${pct(i.macro.waccNominal, 1)}), without taxes and financing costs. Unlike ISE it uses output sold and a lease tied to revenue, so it moves with the power price`,
                 `${ct(k.lcoeRealCt)} (nominal ${num(k.lcoeNominalCt, 2)})`,
               ],
-              ["DSCR", "CFADS ÷ (interest + principal) in each year of the loan", `${ratio(k.minDscr)} min, ${ratio(k.avgDscr)} average`],
-              ["LLCR", "PV of CFADS over the loan term at the loan rate ÷ loan", ratio(k.llcr)],
+              [
+                "DSCR",
+                "CFADS ÷ (interest + principal) in each year of the loan; the minimum over all years with debt service, the average over the repayment years",
+                `${ratio(k.minDscr)} min (${k.minDscrYear}), ${ratio(k.avgDscr)} average`,
+              ],
+              ["LLCR", "PV of CFADS over the loan term at the loan rate ÷ loan, at COD; reserves not counted", ratio(k.llcr)],
               ["Payback", "Years from commissioning until the owners’ cumulative cash flow turns positive", `${num(k.paybackYears, 1)} years`],
               ["Gearing", "Loan ÷ total uses", pct(k.gearing, 1)],
             ]}
@@ -549,33 +655,30 @@ Solidarity    = 5.5% × corporate tax`}</pre>
 
           <H2 id="scenarios">11. Scenarios, sensitivity and bid calculator</H2>
           <p>
-            The base case sizes the loan. P90 and Downside keep that loan and its repayment schedule — the lender’s view
-            after financial close.
+            The base case sizes the loan. The stress scenarios keep that loan and every instalment — the lender’s view
+            after financial close. Applying a P90 output to every year is a stress, not a 90% probability for the whole
+            life: the one-year value tests debt service, the ten-year value is the better guide for returns.
           </p>
           <Table
             head={["Scenario", "Changes against the base case", "Equity IRR", "Min DSCR", "Equity NPV"]}
             num={[2, 3, 4]}
-            rows={[
-              ["Base", "P50 output, base prices and costs", pct(k.equityIrr, 2), ratio(k.minDscr), meur(k.npvEquity)],
-              [
-                "P90",
-                `One-year P90 output in every year (${pct(p90share, 1)} of P50)`,
-                pct(BASE.p90.kpis.equityIrr, 2),
-                ratio(BASE.p90.kpis.minDscr),
-                meur(BASE.p90.kpis.npvEquity),
-              ],
-              [
-                "Downside",
-                `Ten-year P90 output (${pct(p90share10, 1)}), market prices −20%, opex +10%, capex +5% paid by the owners`,
-                pct(BASE.downside.kpis.equityIrr, 2),
-                ratio(BASE.downside.kpis.minDscr),
-                meur(BASE.downside.kpis.npvEquity),
-              ],
-            ]}
+            rows={SCENARIOS.map((name) => {
+              const r = BASE[name];
+              const meaningful = r.validity.returnsMeaningful;
+              return [
+                en.scenarios[name],
+                scenarioText[name],
+                meaningful ? pct(r.kpis.equityIrr, 2) : en.kpis.notMeaningful,
+                ratio(r.kpis.minDscr),
+                meaningful ? meur(r.kpis.npvEquity) : en.kpis.notMeaningful,
+              ];
+            })}
           />
           <p>
             <strong>Tornado.</strong> Each driver is moved to its low and high value with the loan re-sized — the view
-            before financial close — and the drivers are sorted by the swing of the chosen measure.
+            before financial close — and the drivers are sorted by the swing of the chosen measure. The negative-price
+            driver also moves the capture factor with (1 − share): output that moves into negative-price periods earns
+            about nothing, so the market value of wind falls with it.
           </p>
           <Table
             head={["Driver", "Low", "High"]}
@@ -583,39 +686,58 @@ Solidarity    = 5.5% × corporate tax`}</pre>
           />
           <p>
             <strong>Bid calculator.</strong> It finds the lowest award price at which the equity IRR reaches a target,
-            re-sizing the loan at every step. The IRR is not monotonic in the award price: a higher floor allows more
-            debt at {pct(i.financing.interestRate, 2)}, which can lower the equity return. So the search scans a 0.25 ct
-            grid for the first crossing and then bisects within that step.
-            {bid.awardPriceCt !== null && (
+            re-sizing the loan at every step, and reports three things: the price for the return alone; the lowest price
+            that is also financeable — fully funded and within the covenant; and whether that price is within the tender
+            ceiling of the inputs. The IRR is not monotonic in the award price: a higher floor allows more debt at{" "}
+            {pct(f.interestRate, 2)}, which can lower the equity return. So the search scans a 0.25 ct grid for the first
+            qualifying price and then bisects within that step to 0.0005 ct.
+            {bid.feasible && (
               <>
                 {" "}
-                In the base case, an equity IRR of {pct(i.macro.costOfEquity, 0)} needs {ct(bid.awardPriceCt)} (reference
-                value {ct(bid.awCt)}) — above the 2026 ceiling of {ct(TENDER_FACTS.ceiling2026Ct)}.
+                In the base case, an equity IRR of {pct(i.macro.costOfEquity, 0)} needs {ct(bid.feasible.awardPriceCt)}{" "}
+                (AW {ct(bid.feasible.awCt)}) —{" "}
+                {bid.admissible ? "within" : "above"} the ceiling of {ct(bid.ceilingCt)}.
               </>
             )}
           </p>
 
-          <H2 id="checks">12. Checks</H2>
-          <p>Every recalculation runs {Object.keys(en.checks.ids).length} checks; the calculator shows their status.</p>
-          <ul className="columns-1 sm:columns-2">
-            {Object.values(en.checks.ids).map((label) => (
-              <li key={label} className="break-inside-avoid">
-                {label}
-              </li>
-            ))}
-          </ul>
+          <H2 id="checks">12. Checks and validity</H2>
+          <p>
+            Every recalculation runs {b.checks.length} checks in five groups. The calculator summarises them in one line
+            under the key figures: whether the case is fully funded, meets its covenant and stays within the model’s
+            scope.
+          </p>
+          {checkGroups.map(([group, checks]) => (
+            <div key={group}>
+              <h3>{en.checks.groups[group]}</h3>
+              <ul className="columns-1 sm:columns-2">
+                {checks.map((c) => (
+                  <li key={c.id} className="break-inside-avoid">
+                    {en.checks.ids[c.id] ?? c.id}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
 
           <H2 id="verification">13. Verification</H2>
           <ul>
             <li>
               Automated tests cover the financial maths (against Microsoft’s published XIRR and XNPV examples), the § 36h
-              table, taxes and depreciation, the model and its scenarios, the bid calculator and the Excel export.
+              table and rounding, the loan calendar, the premium timing, taxes and depreciation, the model and its
+              scenarios, the bid calculator and the Excel export.
             </li>
             <li>
-              A spreadsheet built from the written specification — not from the code — recomputes the base case in
-              Microsoft Excel. All 20 key figures and twelve annual lines agree to the cent, and the workbook finds both
-              convergence points (uses and loan) on its own. A negative control with a different trade-tax multiplier
-              moves exactly the tax-dependent lines.
+              A seeded sweep of 500 random input sets within the usual ranges runs as a test: with the one-sided premium,
+              the base scenario never breaches its covenant, never runs out of cash and passes every calculation check.
+            </li>
+            <li>
+              On 30 September 2026 a spreadsheet built from the written specification — not from the code — recomputed
+              the base case of the engine as it then stood in Microsoft Excel. It took the engine’s loan and total uses as
+              inputs and confirmed that they satisfy the spreadsheet’s own equations; all 20 key figures and twelve
+              annual lines agreed to the cent. That check covered the base switches only (KG, equal instalments, the EEG
+              floor, one-sided premium, market sales after support). Two external reviews followed, and the engine was
+              corrected; a formula workbook that recalculates every switch is the next step.
             </li>
             <li>
               The source code, including the tests, is public on <a href={SITE.repository}>GitHub</a>.
@@ -627,7 +749,14 @@ Solidarity    = 5.5% × corporate tax`}</pre>
             <li>Operations are annual; output is spread evenly over the year (winter is in fact windier).</li>
             <li>The farm’s capture price equals the market value of all onshore wind.</li>
             <li>The partners’ income tax of a KG is not modelled; taxes are paid in the year they arise.</li>
-            <li>One senior loan: no tranches, shareholder loans, refinancing or cash sweep.</li>
+            <li>
+              One senior loan: no tranches, shareholder loans, refinancing or cash sweep; instalments during construction
+              are not supported.
+            </li>
+            <li>
+              Not modelled: the § 55 penalty for late commissioning, interest on § 36h paybacks, the interest barrier,
+              and payments by the owners to cure a shortfall.
+            </li>
             <li>
               Uncompensated grid curtailment (a draft of the grid package) and generator grid fees (the regulator’s
               AgNes process) are not in the base case; the fee is available as an input.

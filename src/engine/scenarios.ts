@@ -1,31 +1,44 @@
 // Scenarios, tornado sensitivity and the bid calculator (Gebotsrechner).
 import { P90_Z, runModel } from "./model";
-import type { Inputs, Kpis, ModelResult } from "./types";
+import type { Inputs, Kpis, ModelResult, ScenarioAdjustments } from "./types";
 
-export type ScenarioName = "base" | "p90" | "downside";
+/**
+ * base: sizes the loan. p90: the lender's stress — one-year P90 output in every year. resource: ten-year P90
+ * output, the investor's view of a weaker wind resource. downside: ten-year P90 output plus price, cost and capex
+ * stresses. The multi-year stresses apply the § 36h (2) site-quality review.
+ */
+export type ScenarioName = "base" | "p90" | "resource" | "downside";
+export const SCENARIOS: ScenarioName[] = ["base", "p90", "resource", "downside"];
 
-/** Downside after financial close: P90 (10-year) yield, prices −20 %, opex +10 %, capex overrun +5 %. */
+/** Downside after financial close: power prices −20 %, fixed opex and grid fee +10 %, capex overrun +5 %. */
 export const DOWNSIDE = { priceScale: 0.8, opexScale: 1.1, capexScale: 1.05 } as const;
 
 export function p90Factor(sigma: number): number {
   return 1 - P90_Z * sigma;
 }
 
+export function scenarioAdjustments(inputs: Inputs, name: ScenarioName): Partial<ScenarioAdjustments> {
+  switch (name) {
+    case "base":
+      return {};
+    case "p90":
+      return { energyScale: p90Factor(inputs.energy.sigma1y) };
+    case "resource":
+      return { energyScale: p90Factor(inputs.energy.sigma10y), siteQualityReview: true };
+    case "downside":
+      return { energyScale: p90Factor(inputs.energy.sigma10y), ...DOWNSIDE, siteQualityReview: true };
+  }
+}
+
 /**
- * Base sizes the loan. P90 and Downside keep that loan (amount and repayment schedule) — the
- * lender's view after financial close — so their DSCRs show how much headroom the base case has.
+ * Base sizes the loan. The stress scenarios keep that loan (amount and every instalment) — the lender's view
+ * after financial close — so their DSCRs show how much headroom the base case has.
  */
 export function runScenarios(inputs: Inputs): Record<ScenarioName, ModelResult> {
   const base = runModel(inputs);
-  const p90 = runModel(inputs, {
-    scenario: { energyScale: p90Factor(inputs.energy.sigma1y) },
-    lockedDebt: base.lockedDebt,
-  });
-  const downside = runModel(inputs, {
-    scenario: { energyScale: p90Factor(inputs.energy.sigma10y), ...DOWNSIDE },
-    lockedDebt: base.lockedDebt,
-  });
-  return { base, p90, downside };
+  const locked = (name: ScenarioName) =>
+    runModel(inputs, { scenario: scenarioAdjustments(inputs, name), lockedDebt: base.lockedDebt });
+  return { base, p90: locked("p90"), resource: locked("resource"), downside: locked("downside") };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -116,10 +129,18 @@ export const TORNADO_DRIVERS: TornadoDriver[] = [
       }),
   },
   {
+    // More output in negative-price periods also lowers the market value of wind: output that would have earned
+    // the average price now earns about nothing, so the capture factor moves with (1 − share).
     id: "negativePrices",
     lowLabel: "3%",
     highLabel: "9%",
-    apply: (i, s) => edit(i, (c) => void (c.energy.negativePriceOutputShare = s === "low" ? 0.03 : 0.09)),
+    apply: (i, s) =>
+      edit(i, (c) => {
+        const share = s === "low" ? 0.03 : 0.09;
+        const k = (1 - share) / (1 - c.energy.negativePriceOutputShare);
+        c.revenue.captureFactor = Math.min(2, Math.max(0.1, c.revenue.captureFactor * k));
+        c.energy.negativePriceOutputShare = share;
+      }),
   },
   {
     id: "lease",
@@ -156,13 +177,26 @@ function metricOf(k: Kpis, metric: TornadoMetric): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
+/** A run that cannot be calculated (e.g. a driver pushes an input out of range) gives no value. */
+function tryRun(inputs: Inputs): ModelResult | null {
+  try {
+    return runModel(inputs);
+  } catch {
+    return null;
+  }
+}
+
 /** Each bar is a full re-run with the loan re-sized — the view before financial close. */
 export function tornado(inputs: Inputs, metric: TornadoMetric, drivers = TORNADO_DRIVERS): TornadoBar[] {
-  const base = metricOf(runModel(inputs).kpis, metric);
+  const at = (i: Inputs) => {
+    const r = tryRun(i);
+    return r ? metricOf(r.kpis, metric) : null;
+  };
+  const base = at(inputs);
   return drivers
     .map((d) => {
-      const low = metricOf(runModel(d.apply(inputs, "low")).kpis, metric);
-      const high = metricOf(runModel(d.apply(inputs, "high")).kpis, metric);
+      const low = at(d.apply(inputs, "low"));
+      const high = at(d.apply(inputs, "high"));
       const range = Math.abs((high ?? base ?? 0) - (low ?? base ?? 0));
       return { id: d.id, lowLabel: d.lowLabel, highLabel: d.highLabel, low, high, base, range };
     })
@@ -173,43 +207,80 @@ export function tornado(inputs: Inputs, metric: TornadoMetric, drivers = TORNADO
 // Bid calculator
 // ---------------------------------------------------------------------------------------------
 
-export interface BidResult {
-  /** Lowest award price (ct/kWh at the reference site) reaching the target, or null if none does. */
-  awardPriceCt: number | null;
-  awCt: number | null;
+export interface BidPoint {
+  awardPriceCt: number;
+  awCt: number;
   equityIrr: number | null;
+}
+
+export interface BidResult {
+  /** Lowest award price at which the equity IRR reaches the target, whether or not the case is financeable. */
+  target: BidPoint | null;
+  /** Lowest award price that reaches the target with a financeable case: fully funded and the covenant met. */
+  feasible: BidPoint | null;
+  /** The feasible price is at or below the tender ceiling of the inputs. */
+  admissible: boolean | null;
+  ceilingCt: number;
   searchedUpToCt: number;
+  stepCt: number;
+  toleranceCt: number;
 }
 
 /**
- * Lowest Zuschlagswert at which the equity IRR reaches the target, with the loan re-sized at every
- * step. The IRR is not monotonic in the award price (a higher floor raises the loan, and with an
- * expensive loan more debt can lower the equity return), so the search scans a grid for the first
- * crossing and then bisects inside that step.
+ * Lowest Zuschlagswert at which the equity IRR reaches the target, with the loan re-sized at every step. The IRR
+ * is not monotonic in the award price (a higher floor raises the loan, and with an expensive loan more debt can
+ * lower the equity return), so the search scans a grid for the first price that qualifies and then bisects
+ * inside that step. Two answers: the price for the return alone, and the price that also keeps the case funded
+ * and within its covenant.
  */
 export function solveAwardPrice(inputs: Inputs, targetEquityIrr: number, maxCt = 15, stepCt = 0.25): BidResult {
-  const irrAt = (ct: number) => {
-    const r = runModel(edit(inputs, (c) => void (c.revenue.awardPriceCt = ct))).kpis;
-    return { irr: r.equityIrr, awCt: r.awCt };
+  const toleranceCt = 0.0005;
+  const cache = new Map<number, { point: BidPoint; reaches: boolean; financeable: boolean }>();
+  const at = (ct: number) => {
+    const hit = cache.get(ct);
+    if (hit) return hit;
+    const r = tryRun(edit(inputs, (c) => void (c.revenue.awardPriceCt = ct)));
+    const irr = r?.kpis.equityIrr ?? null;
+    const v = r?.validity;
+    const entry = {
+      point: { awardPriceCt: ct, awCt: r?.kpis.awCt ?? NaN, equityIrr: irr },
+      reaches: irr !== null && irr >= targetEquityIrr,
+      financeable:
+        !!v && v.integrity !== "error" && v.funding !== "error" && v.covenant !== "error" && v.returnsMeaningful,
+    };
+    cache.set(ct, entry);
+    return entry;
   };
-  let prev = 0.5;
-  for (let ct = 0.5; ct <= maxCt + 1e-9; ct += stepCt) {
-    const at = irrAt(ct);
-    if (at.irr !== null && at.irr >= targetEquityIrr) {
-      if (ct === 0.5) return { awardPriceCt: ct, awCt: at.awCt, equityIrr: at.irr, searchedUpToCt: maxCt };
-      let lo = prev;
-      let hi = ct;
-      for (let k = 0; k < 30; k++) {
-        const mid = (lo + hi) / 2;
-        const m = irrAt(mid);
-        if (m.irr !== null && m.irr >= targetEquityIrr) hi = mid;
-        else lo = mid;
-        if (hi - lo < 0.0005) break;
+  const search = (ok: (e: ReturnType<typeof at>) => boolean): BidPoint | null => {
+    let prev = 0.5;
+    for (let ct = 0.5; ct <= maxCt + 1e-9; ct += stepCt) {
+      const c = Math.round(ct * 1e6) / 1e6;
+      if (!ok(at(c))) {
+        prev = c;
+        continue;
       }
-      const res = irrAt(hi);
-      return { awardPriceCt: hi, awCt: res.awCt, equityIrr: res.irr, searchedUpToCt: maxCt };
+      if (c === 0.5) return at(c).point;
+      let lo = prev;
+      let hi = c;
+      while (hi - lo >= toleranceCt) {
+        const mid = (lo + hi) / 2;
+        if (ok(at(mid))) hi = mid;
+        else lo = mid;
+      }
+      return at(hi).point;
     }
-    prev = ct;
-  }
-  return { awardPriceCt: null, awCt: null, equityIrr: null, searchedUpToCt: maxCt };
+    return null;
+  };
+  const target = search((e) => e.reaches);
+  const feasible = search((e) => e.reaches && e.financeable);
+  const ceilingCt = inputs.revenue.ceilingPriceCt;
+  return {
+    target,
+    feasible,
+    admissible: feasible ? feasible.awardPriceCt <= ceilingCt + 1e-9 : null,
+    ceilingCt,
+    searchedUpToCt: maxCt,
+    stepCt,
+    toleranceCt,
+  };
 }

@@ -21,9 +21,10 @@ export const TAX = {
   provisionDiscountRate: 0.055,
   /** § 4h (2) a) EStG */
   interestBarrierThreshold: 3_000_000,
-  /** § 7 (2) EStG as amended in 2025: at most 3× straight-line, at most 30 % */
+  /** § 7 (2) EStG as amended in 2025: at most 3× straight-line, at most 30 %, for assets completed 1 Jul 2025 – 31 Dec 2027 */
   degressiveMultiple: 3,
   degressiveCap: 0.3,
+  degressiveWindowStart: "2025-07-01",
   degressiveWindowEnd: "2027-12-31",
 } as const;
 

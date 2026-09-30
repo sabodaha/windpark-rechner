@@ -3,9 +3,20 @@
 const MS_PER_DAY = 86_400_000;
 
 export function toDay(iso: string): number {
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m || !d) throw new Error(`Invalid date: ${iso}`);
+  if (!isIsoDate(iso)) throw new Error(`Invalid date: ${iso}`);
+  const [y, m, d] = iso.split("-").map(Number) as [number, number, number];
   return Math.round(Date.UTC(y, m - 1, d) / MS_PER_DAY);
+}
+
+/** True for a real calendar date written as YYYY-MM-DD. */
+export function isIsoDate(iso: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return false;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  if (mo < 1 || mo > 12 || d < 1) return false;
+  return d <= new Date(Date.UTC(y, mo, 0)).getUTCDate();
 }
 
 export function toIso(day: number): string {

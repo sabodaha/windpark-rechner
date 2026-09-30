@@ -16,7 +16,10 @@ const DESCRIPTION =
 export const metadata = pageMetadata({ title: "Wind farm model sources", description: DESCRIPTION, path: PATHS.sources });
 
 const GROUPS: { title: string; keys: string[] }[] = [
-  { title: "Tenders and the EEG", keys: ["bnetza2608", "bnetzaCeiling2026", "eeg", "eeg2027Draft"] },
+  {
+    title: "Tenders and the EEG",
+    keys: ["bnetza2608", "bnetzaCeiling2026", "eeg", "eegSettlement", "eegAwardDeadlines", "eeg2027Draft"],
+  },
   {
     title: "Power prices and market values",
     keys: ["futures", "priceScenarios", "netztransparenzMarketValues", "smard", "directMarketing", "ppa"],
@@ -36,7 +39,7 @@ const GROUPS: { title: string; keys: string[] }[] = [
       "agnes",
     ],
   },
-  { title: "Financing", keys: ["kfw270", "prospectuses", "gearing", "bankLetter"] },
+  { title: "Financing", keys: ["kfw270", "kfw270Merkblatt", "prospectuses", "gearing", "bankLetter"] },
   { title: "Tax and VAT", keys: ["gewstg", "kstg", "estg", "bfhWindPark", "ustg"] },
   { title: "Inflation and valuation", keys: ["bundesbank", "ecb", "ise2024"] },
 ];

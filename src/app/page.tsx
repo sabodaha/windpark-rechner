@@ -19,13 +19,14 @@ const FEATURES: { title: string; text: string }[] = [
     title: "Revenue under EEG 2023",
     text:
       "Sliding market premium on the annual market value, the § 36h correction factor, no premium at negative prices, " +
-      "market sales or a PPA after support ends — and the two-sided premium of the EEG 2027 draft as a switch.",
+      "advances and final settlement under § 26, market sales or a PPA after support ends — and a simplified two-sided " +
+      "premium stress as a switch.",
   },
   {
-    title: "Debt the way German lenders size it",
+    title: "Debt sized like a KfW project loan",
     text:
-      "KfW programme 270 at the current rate, linear repayment after grace years, DSCR targets for P50 and P90 on the " +
-      "EEG floor, a gearing cap, a debt service reserve and a distribution lock-up.",
+      "KfW programme 270 at the current rate, quarterly instalments after the grace years, DSCR targets for P50 and " +
+      "one-year P90 on the EEG floor — a conservative lender view — a gearing cap, a debt service reserve and a lock-up.",
   },
   {
     title: "German taxes",
@@ -36,26 +37,26 @@ const FEATURES: { title: string; text: string }[] = [
   {
     title: "Construction and funding",
     text:
-      "Monthly capex with payment profiles, a VAT bridge loan, upfront and commitment fees and interest during " +
-      "construction. Sources equal uses to the cent.",
+      "Monthly capex with payment profiles, a VAT bridge loan, upfront and commitment fees, interest during " +
+      "construction and start-up liquidity. Sources equal uses to the cent.",
   },
   {
     title: "Risk views",
     text:
-      "P90 and downside cases with the loan held fixed, a tornado of twelve drivers and a bid calculator that finds the " +
-      "award price for a target return.",
+      "The lender’s one-year P90 stress, a ten-year P90 and a downside case with the loan held fixed, a tornado of " +
+      "twelve drivers and a bid calculator that checks whether a price is financeable and within the ceiling.",
   },
   {
     title: "Open and checked",
     text:
-      "Every input has a unit, a hint and a dated public source. Fifteen integrity checks run on every recalculation, " +
-      "and the results export to Excel.",
+      "Every input has a unit, a hint and a dated public source or a documented assumption. Checks on the calculation, " +
+      "funding, covenant and model scope run on every recalculation, and the results export to Excel.",
   },
 ];
 
 export default function Home() {
   const base = BASE.base.kpis;
-  const bid = BID_AT_COST_OF_EQUITY.awardPriceCt;
+  const bid = BID_AT_COST_OF_EQUITY.feasible?.awardPriceCt ?? null;
   const kpis: { label: string; value: string }[] = [
     { label: "Equity IRR", value: pct(base.equityIrr, 2) },
     { label: "Project IRR after tax", value: pct(base.projectIrrPostTax, 2) },
@@ -87,7 +88,8 @@ export default function Home() {
         </p>
         <p className="mt-3 max-w-2xl leading-relaxed text-muted-foreground">
           This site publishes an open project-finance model of a German onshore wind farm. Every input has a public
-          source, every formula is documented, and the whole calculation runs in your browser.
+          source or a documented assumption, every formula is documented, and the whole calculation runs in your
+          browser.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Button asChild>
@@ -124,8 +126,8 @@ export default function Home() {
             <p className="mt-1.5 leading-relaxed text-foreground/85">
               At the average award of the August 2026 tender, {ct(TENDER_FACTS.lastRoundAverageCt)}, a site of average
               Hessian quality earns {pct(base.equityIrr, 1)} a year on equity — well below a typical{" "}
-              {pct(BASE_CASE.macro.costOfEquity, 0)} cost of equity. Lenders size the loan on the guaranteed EEG floor, so
-              debt covers only {pct(base.gearing, 0)} of the investment.{" "}
+              {pct(BASE_CASE.macro.costOfEquity, 0)} cost of equity. The model’s lender sizes the loan on the guaranteed
+              EEG floor — a conservative view — so debt covers only {pct(base.gearing, 0)} of the investment.{" "}
               {bid !== null && (
                 <>
                   An equity return of {pct(BASE_CASE.macro.costOfEquity, 0)} would need an award of about {ct(bid)} —

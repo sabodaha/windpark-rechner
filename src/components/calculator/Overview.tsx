@@ -20,6 +20,7 @@ interface Props {
 const m = (v: number) => v / 1e6;
 const fmtM = (v: number) => num(v, 2);
 const fmtAxisM = (v: number) => num(v, Math.abs(v) < 10 && v % 1 !== 0 ? 1 : 0);
+const fmtRatio = (v: number | null) => (v === null ? "—" : ratio(v));
 
 export function Overview({ inputs, results, scenario, t }: Props) {
   const r = results[scenario];
@@ -28,6 +29,16 @@ export function Overview({ inputs, results, scenario, t }: Props) {
   const C = t.charts;
   const k = r.kpis;
   const eegYears = a.map((x, i) => (x.eegShare > 0 ? i : -1)).filter((i) => i >= 0);
+  const [dscrView, setDscrView] = useState<"operating" | "lender">("operating");
+  const lender = results.base.sizing.lenderCase;
+  const basis = t.overview.basis[results.base.sizing.bankPriceBasis] ?? "";
+  const f = inputs.financing;
+  const perKwh = (value: number, sold: number) => (sold > 0 ? (value / sold) * 100 : null);
+  const binding = r.sizing.binding;
+  const bindingLabel =
+    binding === "dscrP50" || binding === "dscrP90"
+      ? `${t.overview.binding[binding]} ${t.overview.basis[r.sizing.bankPriceBasis] ?? ""}`
+      : (t.overview.binding[binding] ?? binding);
 
   return (
     <div className="flex flex-col gap-4">
@@ -64,31 +75,78 @@ export function Overview({ inputs, results, scenario, t }: Props) {
 
         <ChartCard
           title={C.dscr.title}
-          subtitle={C.dscr.subtitle}
-          table={{
-            years,
-            rows: [
-              { label: C.dscr.base, values: results.base.annual.map((x) => x.dscr), format: (v) => (v === null ? "—" : ratio(v)) },
-              { label: C.dscr.p90, values: results.p90.annual.map((x) => x.dscr), format: (v) => (v === null ? "—" : ratio(v)) },
-            ],
-          }}
+          subtitle={dscrView === "operating" ? C.dscr.subtitle : C.dscr.lenderNote(basis)}
+          controls={
+            <div role="radiogroup" aria-label={C.dscr.title} className="inline-flex rounded-md border border-border p-0.5">
+              {(["operating", "lender"] as const).map((view) => (
+                <button
+                  key={view}
+                  type="button"
+                  role="radio"
+                  aria-checked={dscrView === view}
+                  onClick={() => setDscrView(view)}
+                  className={cn(
+                    "whitespace-nowrap rounded px-2 py-0.5 text-[11px]",
+                    dscrView === view ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {C.dscr[view]}
+                </button>
+              ))}
+            </div>
+          }
+          table={
+            dscrView === "operating"
+              ? {
+                  years,
+                  rows: [
+                    { label: C.dscr.base, values: results.base.annual.map((x) => x.dscr), format: fmtRatio },
+                    { label: C.dscr.p90, values: results.p90.annual.map((x) => x.dscr), format: fmtRatio },
+                  ],
+                }
+              : {
+                  years: lender.years,
+                  rows: [
+                    { label: C.dscr.lenderP50, values: lender.dscrP50, format: fmtRatio },
+                    { label: C.dscr.lenderP90, values: lender.dscrP90, format: fmtRatio },
+                  ],
+                }
+          }
           t={t}
         >
-          <YearChart
-            years={years}
-            lines={[
-              { id: "base", label: C.dscr.base, color: SERIES[0]!, values: results.base.annual.map((x) => x.dscr) },
-              { id: "p90", label: C.dscr.p90, color: SERIES[1]!, values: results.p90.annual.map((x) => x.dscr) },
-            ]}
-            refLines={[
-              { label: `${C.dscr.target} ${ratio(inputs.financing.targetDscrP50)}`, value: inputs.financing.targetDscrP50, labelAt: "right-above" },
-              { label: `${C.dscr.covenant} ${ratio(inputs.financing.covenantDscr)}`, value: inputs.financing.covenantDscr, labelAt: "right-below" },
-            ]}
-            yMin={0}
-            format={(v) => ratio(v)}
-            axisFormat={(v) => num(v, 1)}
-            ariaLabel={`${C.dscr.title}, ${C.dscr.subtitle}`}
-          />
+          {dscrView === "operating" ? (
+            <YearChart
+              years={years}
+              lines={[
+                { id: "base", label: C.dscr.base, color: SERIES[0]!, values: results.base.annual.map((x) => x.dscr) },
+                { id: "p90", label: C.dscr.p90, color: SERIES[1]!, values: results.p90.annual.map((x) => x.dscr) },
+              ]}
+              refLines={[
+                { label: `${C.dscr.lockup} ${ratio(f.lockupDscr)}`, value: f.lockupDscr, labelAt: "right-above" },
+                { label: `${C.dscr.covenant} ${ratio(f.covenantDscr)}`, value: f.covenantDscr, labelAt: "right-below" },
+              ]}
+              yMin={0}
+              format={(v) => ratio(v)}
+              axisFormat={(v) => num(v, 1)}
+              ariaLabel={`${C.dscr.title} — ${C.dscr.operating}, ${C.dscr.subtitle}`}
+            />
+          ) : (
+            <YearChart
+              years={lender.years}
+              lines={[
+                { id: "l50", label: C.dscr.lenderP50, color: SERIES[0]!, values: lender.dscrP50 },
+                { id: "l90", label: C.dscr.lenderP90, color: SERIES[1]!, values: lender.dscrP90 },
+              ]}
+              refLines={[
+                { label: `${C.dscr.targetP50} ${ratio(f.targetDscrP50)}`, value: f.targetDscrP50, labelAt: "right-above" },
+                { label: `${C.dscr.targetP90} ${ratio(f.targetDscrP90)}`, value: f.targetDscrP90, labelAt: "right-below" },
+              ]}
+              yMin={0}
+              format={(v) => ratio(v)}
+              axisFormat={(v) => num(v, 1)}
+              ariaLabel={`${C.dscr.title} — ${C.dscr.lender}, ${C.dscr.lenderNote(basis)}`}
+            />
+          )}
         </ChartCard>
 
         <ChartCard
@@ -97,8 +155,8 @@ export function Overview({ inputs, results, scenario, t }: Props) {
           table={{
             years,
             rows: [
-              { label: C.revenue.market, values: a.map((x) => (x.energySoldKwh > 0 ? ((x.revenueMarket + x.revenuePostEeg) / x.energySoldKwh) * 100 : null)), format: (v) => num(v, 2) },
-              { label: C.revenue.premium, values: a.map((x) => (x.energySoldKwh > 0 ? (x.revenuePremium / x.energySoldKwh) * 100 : null)), format: (v) => num(v, 2) },
+              { label: C.revenue.market, values: a.map((x) => perKwh(x.revenueMarket + x.revenuePostEeg, x.energySoldKwh)), format: (v) => num(v, 2) },
+              { label: C.revenue.premium, values: a.map((x) => perKwh(x.revenuePremium, x.energySoldKwh)), format: (v) => num(v, 2) },
             ],
           }}
           t={t}
@@ -106,8 +164,8 @@ export function Overview({ inputs, results, scenario, t }: Props) {
           <YearChart
             years={years}
             bars={[
-              { id: "mv", label: C.revenue.market, color: SERIES[0]!, values: a.map((x) => (x.energySoldKwh > 0 ? ((x.revenueMarket + x.revenuePostEeg) / x.energySoldKwh) * 100 : 0)) },
-              { id: "mp", label: C.revenue.premium, color: SERIES[1]!, values: a.map((x) => (x.energySoldKwh > 0 ? (x.revenuePremium / x.energySoldKwh) * 100 : 0)) },
+              { id: "mv", label: C.revenue.market, color: SERIES[0]!, values: a.map((x) => perKwh(x.revenueMarket + x.revenuePostEeg, x.energySoldKwh) ?? 0) },
+              { id: "mp", label: C.revenue.premium, color: SERIES[1]!, values: a.map((x) => perKwh(x.revenuePremium, x.energySoldKwh) ?? 0) },
             ]}
             refLines={
               eegYears.length
@@ -156,15 +214,20 @@ export function Overview({ inputs, results, scenario, t }: Props) {
               <Fact label={t.overview.capacity} value={`${num(k.capacityMw, 1)} MW`} />
               <Fact label={t.overview.p50} value={`${num(k.fullLoadHoursP50, 0)} h`} />
               <Fact label={t.overview.kf} value={num(k.correctionFactor, 3)} />
-              <Fact label={t.overview.aw} value={`${num(k.awCt, 2)} ct/kWh`} />
+              <Fact
+                label={t.overview.aw}
+                value={r.awPeriods.map((p) => `${num(p.awCt, 2)}`).filter((v, i, all) => all.indexOf(v) === i).join(" → ") + " ct/kWh"}
+              />
               <Fact label={t.overview.cod} value={dateLabel(r.timeline.cod)} />
-              <Fact label={t.overview.eegEnd} value={dateLabel(r.timeline.eegEnd)} />
+              <Fact label={t.overview.firstInstalment} value={r.timeline.firstInstalment ? dateLabel(r.timeline.firstInstalment) : "—"} />
               <Fact label={t.overview.loanEnd} value={dateLabel(r.timeline.loanMaturity)} />
+              <Fact label={t.overview.eegEnd} value={dateLabel(r.timeline.eegEnd)} />
               <Fact label={t.overview.endOfLife} value={dateLabel(r.timeline.endOfLife)} />
-              <Fact label={t.overview.sizing} value={t.overview.binding[r.sizing.binding] ?? r.sizing.binding} />
+              <Fact label={t.overview.awardLapse} value={dateLabel(r.timeline.awardLapse)} />
+              <Fact label={t.overview.sizing} value={bindingLabel} />
               <Fact
                 label={t.tables.lenderCase}
-                value={t.tables.lenderDscr(ratio(r.sizing.minBankDscrP50), ratio(r.sizing.minBankDscrP90))}
+                value={t.tables.lenderDscr(basis, ratio(results.base.sizing.minBankDscrP50), ratio(results.base.sizing.minBankDscrP90))}
               />
             </dl>
           </CardContent>
@@ -172,12 +235,25 @@ export function Overview({ inputs, results, scenario, t }: Props) {
         <Card>
           <CardHeader>
             <CardTitle>{t.overview.sourcesUses}</CardTitle>
-            <CardDescription>€ thousand · {pct(k.gearing, 1)} {t.kpis.gearing}</CardDescription>
+            <CardDescription>
+              € thousand · {pct(k.gearing, 1)} {t.kpis.gearing}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <table className="w-full text-sm tabular">
               <tbody>
-                {(["capex", "upfrontFee", "commitmentFee", "interestDuringConstruction", "vatInterest", "dsraInitial", "totalUses"] as const).map((key) => (
+                {(
+                  [
+                    "capex",
+                    "upfrontFee",
+                    "commitmentFee",
+                    "interestDuringConstruction",
+                    "vatInterest",
+                    "dsraInitial",
+                    "workingCapitalInitial",
+                    "totalUses",
+                  ] as const
+                ).map((key) => (
                   <tr key={key} className={cn("border-b border-border last:border-0", key === "totalUses" && "font-semibold")}>
                     <td className="py-1">{t.overview.uses[key]}</td>
                     <td className="py-1 text-right">{keur(r.sourcesUses[key])}</td>
@@ -215,30 +291,35 @@ function ChartCard({
   subtitle,
   children,
   table,
+  controls,
   t,
 }: {
   title: string;
   subtitle: string;
   children: ReactNode;
   table: { years: number[]; rows: TableRow[] };
+  controls?: ReactNode;
   t: Messages;
 }) {
   const [showTable, setShowTable] = useState(false);
   return (
     <Card>
       <CardHeader className="flex-row items-start justify-between gap-2">
-        <div>
+        <div className="min-w-0">
           <CardTitle>{title}</CardTitle>
           <CardDescription>{subtitle}</CardDescription>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowTable((s) => !s)}
-          aria-pressed={showTable}
-          className="shrink-0 text-xs font-medium text-link hover:underline"
-        >
-          {showTable ? title : t.charts.tableView}
-        </button>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          {controls}
+          <button
+            type="button"
+            onClick={() => setShowTable((s) => !s)}
+            aria-pressed={showTable}
+            className="text-xs font-medium text-link hover:underline"
+          >
+            {showTable ? title : t.charts.tableView}
+          </button>
+        </div>
       </CardHeader>
       <CardContent>{showTable ? <YearTable years={table.years} rows={table.rows} caption={title} /> : children}</CardContent>
     </Card>

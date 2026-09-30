@@ -1,9 +1,34 @@
 "use client";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { BASE_CASE, runScenarios, type Inputs } from "@/engine";
+import {
+  BASE_CASE,
+  InvalidInputsError,
+  runScenarios,
+  type InputIssue,
+  type Inputs,
+  type ModelResult,
+  type ScenarioName,
+} from "@/engine";
 import { type FieldDef, type FieldValue, withField } from "@/lib/fields";
 import { decodeInputs, encodeInputs, loadFromStorage, saveToStorage } from "@/lib/url-state";
+
+/**
+ * One completed calculation: the inputs and the results that belong to them. Everything shown or exported —
+ * KPIs, charts, tables, the Excel file — comes from the same snapshot, never from newer inputs.
+ */
+export type Snapshot =
+  | { inputs: Inputs; results: Record<ScenarioName, ModelResult>; issues: null }
+  | { inputs: Inputs; results: null; issues: InputIssue[] };
+
+function calculate(inputs: Inputs): Snapshot {
+  try {
+    return { inputs, results: runScenarios(inputs), issues: null };
+  } catch (e) {
+    if (e instanceof InvalidInputsError) return { inputs, results: null, issues: e.issues };
+    return { inputs, results: null, issues: [{ path: "", message: e instanceof Error ? e.message : String(e) }] };
+  }
+}
 
 /**
  * Calculator state. The first render uses the base case on server and client alike (the static HTML
@@ -13,7 +38,7 @@ export function useCalculator() {
   const [inputs, setInputs] = useState<Inputs>(BASE_CASE);
   const [restored, setRestored] = useState(false);
   const deferred = useDeferredValue(inputs);
-  const results = useMemo(() => runScenarios(deferred), [deferred]);
+  const snapshot = useMemo(() => calculate(deferred), [deferred]);
   const pending = deferred !== inputs;
 
   useEffect(() => {
@@ -55,5 +80,5 @@ export function useCalculator() {
 
   const isCustom = useMemo(() => encodeInputs(inputs, BASE_CASE) !== "", [inputs]);
 
-  return { inputs, results, pending, setField, reset, isCustom, restored };
+  return { inputs, snapshot, pending, setField, reset, isCustom, restored };
 }

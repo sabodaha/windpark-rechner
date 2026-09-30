@@ -1,9 +1,9 @@
 "use client";
 
-import { SlidersHorizontal } from "lucide-react";
+import { CircleAlert, RotateCcw, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { BASE_CASE, DATA_AS_OF, type ScenarioName } from "@/engine";
+import { BASE_CASE, DATA_AS_OF, type InputIssue, type ScenarioName } from "@/engine";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { dateLabel } from "@/lib/format";
 import { PATHS } from "@/lib/site";
-import { en } from "@/messages/en";
+import { en, type Messages } from "@/messages/en";
 import { Actions } from "./Actions";
 import { BidCalculator } from "./BidCalculator";
 import { ChecksList } from "./ChecksList";
@@ -27,11 +27,9 @@ const t = en;
 type Tab = keyof typeof en.tabs;
 
 export function Calculator() {
-  const { inputs, results, pending, setField, reset, isCustom, restored } = useCalculator();
+  const { inputs, snapshot, pending, setField, reset, isCustom, restored } = useCalculator();
   const [scenario, setScenario] = useState<ScenarioName>("base");
   const [tab, setTab] = useState<Tab>("overview");
-  const r = results[scenario];
-  const years = r.annual.map((a) => a.year);
   const L = t.tables.rows;
 
   const panel = <InputsPanel inputs={inputs} base={BASE_CASE} onChange={setField} t={t} />;
@@ -58,12 +56,14 @@ export function Calculator() {
         </p>
       </header>
 
-      <div className="z-20 -mx-4 bg-background/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 lg:sticky lg:top-0">
-        <KpiBar results={results} scenario={scenario} t={t} pending={pending} onChecks={() => setTab("checks")} />
-      </div>
+      {snapshot.results && (
+        <div className="z-20 -mx-4 bg-background/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 lg:sticky lg:top-0">
+          <KpiBar results={snapshot.results} inputs={snapshot.inputs} scenario={scenario} t={t} pending={pending} onChecks={() => setTab("checks")} />
+        </div>
+      )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <ScenarioSwitch value={scenario} onChange={setScenario} t={t} />
+        {snapshot.results ? <ScenarioSwitch value={scenario} onChange={setScenario} t={t} /> : <span />}
         <div className="flex flex-wrap items-center gap-2">
           <Sheet>
             <SheetTrigger asChild>
@@ -76,7 +76,7 @@ export function Calculator() {
               <div className="overflow-y-auto px-4 pb-6">{panel}</div>
             </SheetContent>
           </Sheet>
-          <Actions inputs={inputs} results={results} t={t} isCustom={isCustom} onReset={reset} />
+          <Actions snapshot={snapshot} pending={pending} t={t} isCustom={isCustom} onReset={reset} />
         </div>
       </div>
 
@@ -88,39 +88,60 @@ export function Calculator() {
         </aside>
 
         <section className="min-w-0" aria-label={t.site.resultsLabel}>
-          <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
-            <TabsList>
-              {(Object.keys(t.tabs) as Tab[]).map((key) => (
-                <TabsTrigger key={key} value={key}>
-                  {t.tabs[key]}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            <TabsContent value="overview">
-              <Overview inputs={inputs} results={results} scenario={scenario} t={t} />
-            </TabsContent>
-            <TabsContent value="cashflow">
-              <YearTable years={years} rows={cashFlowRows(r.annual, L)} caption={`${t.tabs.cashflow} · ${t.tables.unit}`} />
-            </TabsContent>
-            <TabsContent value="pnl">
-              <YearTable years={years} rows={pnlRows(r.annual, L)} caption={`${t.tabs.pnl} · ${t.tables.unit}`} />
-            </TabsContent>
-            <TabsContent value="debt">
-              <YearTable years={years} rows={debtRows(r.annual, L)} caption={`${t.tabs.debt} · ${t.tables.unit}`} />
-            </TabsContent>
-            <TabsContent value="tax">
-              <YearTable years={years} rows={taxRows(r.annual, L)} caption={`${t.tabs.tax} · ${t.tables.unit}`} />
-            </TabsContent>
-            <TabsContent value="sensitivity">
-              <Sensitivity inputs={inputs} t={t} />
-            </TabsContent>
-            <TabsContent value="bid">
-              <BidCalculator inputs={inputs} t={t} />
-            </TabsContent>
-            <TabsContent value="checks">
-              <ChecksList result={r} t={t} />
-            </TabsContent>
-          </Tabs>
+          {snapshot.results === null ? (
+            <InvalidInputs issues={snapshot.issues} onReset={reset} t={t} />
+          ) : (
+            <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
+              <TabsList>
+                {(Object.keys(t.tabs) as Tab[]).map((key) => (
+                  <TabsTrigger key={key} value={key}>
+                    {t.tabs[key]}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              <TabsContent value="overview">
+                <Overview inputs={snapshot.inputs} results={snapshot.results} scenario={scenario} t={t} />
+              </TabsContent>
+              <TabsContent value="cashflow">
+                <YearTable
+                  years={snapshot.results[scenario].annual.map((a) => a.year)}
+                  rows={cashFlowRows(snapshot.results[scenario].annual, L)}
+                  caption={`${t.tabs.cashflow} · ${t.tables.unit}`}
+                  note={t.tables.distributionNote}
+                />
+              </TabsContent>
+              <TabsContent value="pnl">
+                <YearTable
+                  years={snapshot.results[scenario].annual.map((a) => a.year)}
+                  rows={pnlRows(snapshot.results[scenario].annual, L)}
+                  caption={`${t.tabs.pnl} · ${t.tables.unit}`}
+                />
+              </TabsContent>
+              <TabsContent value="debt">
+                <YearTable
+                  years={snapshot.results[scenario].annual.map((a) => a.year)}
+                  rows={debtRows(snapshot.results[scenario].annual, L)}
+                  caption={`${t.tabs.debt} · ${t.tables.unit}`}
+                />
+              </TabsContent>
+              <TabsContent value="tax">
+                <YearTable
+                  years={snapshot.results[scenario].annual.map((a) => a.year)}
+                  rows={taxRows(snapshot.results[scenario].annual, L)}
+                  caption={`${t.tabs.tax} · ${t.tables.unit}`}
+                />
+              </TabsContent>
+              <TabsContent value="sensitivity">
+                <Sensitivity inputs={snapshot.inputs} t={t} />
+              </TabsContent>
+              <TabsContent value="bid">
+                <BidCalculator inputs={snapshot.inputs} t={t} />
+              </TabsContent>
+              <TabsContent value="checks">
+                <ChecksList result={snapshot.results[scenario]} t={t} />
+              </TabsContent>
+            </Tabs>
+          )}
         </section>
       </div>
 
@@ -128,5 +149,43 @@ export function Calculator() {
         {t.footer.author} · {t.footer.sourcesNote}
       </p>
     </div>
+  );
+}
+
+/** Engine paths of the inputs that cross-field rules refer to, and the fields that edit them. */
+const PATH_FIELD: Record<string, string> = {
+  "project.financialClose": "fc",
+  "project.constructionMonths": "construction",
+  "financing.graceYears": "grace",
+  "financing.tenorYearsFromClose": "tenor",
+  "revenue.awardNoticeDate": "awardNotice",
+};
+
+/** Shown instead of the results when the inputs cannot be calculated (e.g. from an edited link). */
+function InvalidInputs({ issues, onReset, t }: { issues: InputIssue[]; onReset: () => void; t: Messages }) {
+  return (
+    <Card role="alert">
+      <CardContent className="flex flex-col gap-3 py-5">
+        <div className="flex items-center gap-2 font-semibold text-critical">
+          <CircleAlert className="size-5" aria-hidden />
+          {t.invalid.title}
+        </div>
+        <p className="text-sm text-muted-foreground">{t.invalid.intro}</p>
+        <ul className="list-disc space-y-1 pl-5 text-sm">
+          {issues.map((i) => (
+            <li key={`${i.path}:${i.message}`}>
+              {i.path && <span className="font-medium">{t.fields[PATH_FIELD[i.path] ?? ""]?.label ?? i.path}:</span>}{" "}
+              {i.message}
+            </li>
+          ))}
+        </ul>
+        <div>
+          <Button size="sm" variant="outline" onClick={onReset}>
+            <RotateCcw aria-hidden />
+            {t.invalid.reset}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

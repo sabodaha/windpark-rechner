@@ -3,7 +3,7 @@
 import type { Inputs } from "@/engine";
 
 export type GroupId = "project" | "energy" | "revenue" | "capex" | "opex" | "financing" | "tax" | "valuation";
-export type FieldKind = "number" | "select" | "switch" | "month";
+export type FieldKind = "number" | "select" | "switch" | "month" | "date";
 export type FieldValue = number | string | boolean;
 
 export interface FieldDef {
@@ -16,6 +16,9 @@ export interface FieldDef {
   decimals?: number;
   min?: number;
   max?: number;
+  /** Earliest and latest value of a month (YYYY-MM) or date (YYYY-MM-DD) field. */
+  minDate?: string;
+  maxDate?: string;
   usual?: [number, number];
   step?: number;
   options?: string[];
@@ -97,7 +100,7 @@ export const FIELDS: FieldDef[] = [
     get: (i) => i.project.turbineMw, set: (i, v) => void (i.project.turbineMw = n(v)) },
   { id: "lifetime", group: "project", kind: "number", quick: true, unit: "years", decimals: 0, min: 15, max: 35, usual: [20, 30], step: 1, sources: ["ise2024", "windguardCost2025"],
     get: (i) => i.project.lifetimeYears, set: (i, v) => void (i.project.lifetimeYears = Math.round(n(v))) },
-  { id: "fc", group: "project", kind: "month", sources: ["assumption"],
+  { id: "fc", group: "project", kind: "month", minDate: "2025-01", maxDate: "2032-12", sources: ["assumption"],
     get: (i) => i.project.financialClose.slice(0, 7), set: (i, v) => void (i.project.financialClose = `${String(v)}-01`) },
   { id: "construction", group: "project", kind: "number", unit: "months", decimals: 0, min: 6, max: 36, usual: [12, 24], step: 1, sources: ["fawsStatusH1"],
     get: (i) => i.project.constructionMonths, set: (i, v) => void (i.project.constructionMonths = Math.round(n(v))) },
@@ -143,6 +146,10 @@ export const FIELDS: FieldDef[] = [
   { id: "ppa", group: "revenue", kind: "number", unit: "€/MWh", decimals: 0, min: 0, max: 250, usual: [40, 80], step: 1, sources: ["ppa"],
     hidden: (i) => i.revenue.postEeg !== "ppa",
     get: (i) => i.revenue.ppaEurMwh2026, set: (i, v) => void (i.revenue.ppaEurMwh2026 = n(v)) },
+  { id: "awardNotice", group: "revenue", kind: "date", minDate: "2023-01-01", maxDate: "2032-12-31", sources: ["bnetza2608", "eegAwardDeadlines"],
+    get: (i) => i.revenue.awardNoticeDate, set: (i, v) => void (i.revenue.awardNoticeDate = String(v)) },
+  { id: "trueUpLag", group: "revenue", kind: "number", unit: "months", decimals: 0, min: 0, max: 24, usual: [3, 12], step: 1, sources: ["eegSettlement", "assumption"],
+    get: (i) => i.revenue.premiumTrueUpLagMonths, set: (i, v) => void (i.revenue.premiumTrueUpLagMonths = Math.round(n(v))) },
   { id: "twoSided", group: "revenue", kind: "switch", sources: ["eeg2027Draft"],
     get: (i) => i.revenue.twoSidedPremium, set: (i, v) => void (i.revenue.twoSidedPremium = Boolean(v)) },
   { id: "receivableDays", group: "revenue", kind: "number", unit: "days", decimals: 0, min: 0, max: 180, usual: [15, 60], step: 1, sources: ["eeg", "assumption"],
@@ -209,11 +216,11 @@ export const FIELDS: FieldDef[] = [
     get: (i) => i.financing.targetDscrP50, set: (i, v) => void (i.financing.targetDscrP50 = n(v)) },
   { id: "dscrP90", group: "financing", kind: "number", unit: "x", decimals: 2, min: 0.5, max: 3, usual: [0.95, 1.25], step: 0.01, sources: ["assumption"],
     get: (i) => i.financing.targetDscrP90, set: (i, v) => void (i.financing.targetDscrP90 = n(v)) },
-  { id: "tenor", group: "financing", kind: "number", unit: "years", decimals: 0, min: 3, max: 30, usual: [15, 20], step: 1, sources: ["kfw270", "windguardCost2025"],
+  { id: "tenor", group: "financing", kind: "number", unit: "years", decimals: 0, min: 3, max: 30, usual: [15, 20], step: 1, sources: ["kfw270", "kfw270Merkblatt", "windguardCost2025"],
     get: (i) => i.financing.tenorYearsFromClose, set: (i, v) => void (i.financing.tenorYearsFromClose = Math.round(n(v))) },
-  { id: "grace", group: "financing", kind: "number", unit: "years", decimals: 0, min: 0, max: 10, usual: [1, 3], step: 1, sources: ["kfw270"],
+  { id: "grace", group: "financing", kind: "number", unit: "years", decimals: 0, min: 0, max: 10, usual: [2, 3], step: 1, sources: ["kfw270", "kfw270Merkblatt"],
     get: (i) => i.financing.graceYears, set: (i, v) => void (i.financing.graceYears = Math.round(n(v))) },
-  { id: "repayment", group: "financing", kind: "select", options: ["linear", "annuity", "sculpted"], optionsKey: "repayment", sources: ["kfw270"],
+  { id: "repayment", group: "financing", kind: "select", options: ["linear", "annuity", "sculpted"], optionsKey: "repayment", sources: ["kfw270Merkblatt"],
     get: (i) => i.financing.repayment,
     set: (i, v) => void (i.financing.repayment = v === "annuity" ? "annuity" : v === "sculpted" ? "sculpted" : "linear") },
   { id: "maxGearing", group: "financing", kind: "number", unit: "%", scale: 100, decimals: 0, min: 0, max: 100, usual: [60, 90], step: 1, sources: ["gearing", "windguardCost2025"],
@@ -224,11 +231,11 @@ export const FIELDS: FieldDef[] = [
     get: (i) => i.financing.lockupDscr, set: (i, v) => void (i.financing.lockupDscr = n(v)) },
   { id: "covenant", group: "financing", kind: "number", unit: "x", decimals: 2, min: 0.5, max: 3, usual: [1.0, 1.15], step: 0.01, sources: ["assumption"],
     get: (i) => i.financing.covenantDscr, set: (i, v) => void (i.financing.covenantDscr = n(v)) },
-  { id: "dsra", group: "financing", kind: "number", unit: "months", decimals: 0, min: 0, max: 12, usual: [3, 6], step: 1, sources: ["prospectuses"],
+  { id: "dsra", group: "financing", kind: "number", unit: "months", decimals: 0, min: 0, max: 12, usual: [3, 6], step: 1, sources: ["prospectuses", "assumption"],
     get: (i) => i.financing.dsraMonths, set: (i, v) => void (i.financing.dsraMonths = n(v)) },
   { id: "upfront", group: "financing", kind: "number", unit: "%", scale: 100, decimals: 2, min: 0, max: 5, usual: [0.5, 1.5], step: 0.05, sources: ["prospectuses", "assumption"],
     get: (i) => i.financing.upfrontFeePct, set: (i, v) => void (i.financing.upfrontFeePct = n(v)) },
-  { id: "commitment", group: "financing", kind: "number", unit: "% / month", scale: 100, decimals: 2, min: 0, max: 1, step: 0.01, sources: ["kfw270"],
+  { id: "commitment", group: "financing", kind: "number", unit: "% / month", scale: 100, decimals: 2, min: 0, max: 1, step: 0.01, sources: ["kfw270Merkblatt"],
     get: (i) => i.financing.commitmentFeePerMonth, set: (i, v) => void (i.financing.commitmentFeePerMonth = n(v)) },
   { id: "equityFirst", group: "financing", kind: "switch", sources: ["assumption"],
     get: (i) => i.financing.equityFirst, set: (i, v) => void (i.financing.equityFirst = Boolean(v)) },
