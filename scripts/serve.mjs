@@ -39,6 +39,8 @@ const TYPES = {
   ".png": "image/png",
   ".woff2": "font/woff2",
   ".json": "application/json",
+  ".pdf": "application/pdf",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 };
 
 createServer((req, res) => {

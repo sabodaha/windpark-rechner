@@ -1,0 +1,13 @@
+{
+  "file": "/wind-farm-calculator/wind-farm-report.pdf",
+  "bytes": 1516102,
+  "sha256": "3b27d1836f3b5e8f14c6336618cd280077b76667dd6304ec2625091cd6e699fe",
+  "pages": 18,
+  "tagged": true,
+  "outline": true,
+  "engineVersion": "2.0.0",
+  "dataAsOf": "2026-09-30",
+  "inputHash": "388d9b67b9e5fe67",
+  "dependencyHash": "80219f14702550940c65a9e1fe26dc9e9148452693ed02be3ac76c27f88a2775",
+  "dependencies": 31
+}

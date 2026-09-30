@@ -315,5 +315,6 @@ export function buildWorkbookXlsx(book: WorkbookSpec): Uint8Array {
   };
   sheetFiles.forEach((xml, i) => (files[`xl/worksheets/sheet${i + 1}.xml`] = strToU8(xml)));
   files["xl/styles.xml"] = strToU8(styles.xml());
-  return zipSync(files, { level: 6, mtime: new Date(Date.UTC(2026, 0, 1)) });
+  // Local midnight: ZIP stores local time, so this gives the same bytes in every time zone.
+  return zipSync(files, { level: 6, mtime: new Date(2026, 0, 1) });
 }

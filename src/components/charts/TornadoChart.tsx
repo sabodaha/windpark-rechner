@@ -18,6 +18,8 @@ interface Props {
   lowName: string;
   highName: string;
   ariaLabel: string;
+  /** Fixed width in px instead of the container's. */
+  width?: number;
 }
 
 const ROW = 30;
@@ -27,10 +29,14 @@ const BAR = 12;
  * Horizontal bars from the base value: one bar for the low setting of each driver, one for the high
  * setting. Colour marks the side of the input (low / high), not whether the result is better or worse.
  */
-export function TornadoChart({ rows, base, format, lowName, highName, ariaLabel }: Props) {
-  const { ref, width } = useChartWidth();
+export function TornadoChart({ rows, base, format, lowName, highName, ariaLabel, width: fixedWidth }: Props) {
+  const { ref, width } = useChartWidth(640, fixedWidth);
   const [hover, setHover] = useState<number | null>(null);
-  const labelW = Math.min(170, Math.max(110, width * 0.3));
+  // About 6 px a character at 11 px; at most 40 % of the width, long labels are shortened.
+  const longest = Math.max(0, ...rows.map((r) => r.label.length));
+  const labelW = Math.min(width * 0.4, Math.max(110, longest * 6 + 16));
+  const fit = Math.floor((labelW - 16) / 6);
+  const short = (s: string) => (s.length > fit ? `${s.slice(0, Math.max(1, fit - 1)).trimEnd()}…` : s);
   const M = { top: 8, right: 56, bottom: 22, left: labelW };
   const plotW = Math.max(40, width - M.left - M.right);
   const height = rows.length * ROW;
@@ -76,7 +82,8 @@ export function TornadoChart({ rows, base, format, lowName, highName, ariaLabel 
               <g key={r.label} onPointerEnter={() => setHover(i)} onPointerLeave={() => setHover(null)}>
                 {hover === i && <rect x={0} y={cy - ROW / 2} width={width} height={ROW} fill="var(--secondary)" opacity={0.7} />}
                 <text x={M.left - 8} y={cy} dy="0.32em" textAnchor="end" fill="var(--chart-ink)">
-                  {r.label}
+                  <title>{r.label}</title>
+                  {short(r.label)}
                 </text>
                 {seg(lo, SERIES[0]!, -BAR / 2 - 1)}
                 {seg(hi, SERIES[1]!, 1)}

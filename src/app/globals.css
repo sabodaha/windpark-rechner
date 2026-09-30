@@ -102,6 +102,54 @@ input[type="range"] {
   }
 }
 
+/* PDF report: 16:9 slides of 1280 × 720 px, one per printed page (a named page, so other pages print as usual). */
+@page slide {
+  size: 1280px 720px;
+  margin: 0;
+}
+.report-deck {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.report-slide {
+  page: slide;
+  position: relative;
+  width: 1280px;
+  height: 720px;
+  overflow: hidden;
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgb(22 24 29 / 0.08);
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+.report-slide * {
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+@media print {
+  html,
+  body {
+    background: var(--card) !important;
+  }
+  .report-frame {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  .report-deck {
+    zoom: 1 !important;
+    gap: 0;
+  }
+  .report-slide {
+    border: 0;
+    box-shadow: none;
+  }
+  .report-slide:not(:last-child) {
+    break-after: page;
+  }
+}
+
 /* Long-form pages (methodology, legal texts). In the components layer, so utilities can still override. */
 @layer components {
   .prose-page {

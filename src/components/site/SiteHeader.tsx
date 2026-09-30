@@ -7,7 +7,7 @@ const t = en.site;
 
 export function SiteHeader() {
   return (
-    <header className="border-b border-border bg-card/60">
+    <header className="no-print border-b border-border bg-card/60">
       <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-1 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
         <Link
           href={PATHS.home}

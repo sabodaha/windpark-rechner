@@ -39,6 +39,10 @@ export const PATHS = {
   home: "/",
   calculator: "/wind-farm-calculator/",
   workbook: "/wind-farm-calculator/wind-farm-model.xlsx",
+  /** Print view of the report; the calculator's query gives it the user's inputs. Not in the sitemap. */
+  report: "/wind-farm-calculator/report/",
+  /** The base case as a PDF, printed from the report page and committed to public/ (npm run report:pdf). */
+  reportPdf: "/wind-farm-calculator/wind-farm-report.pdf",
   methodology: "/wind-farm-calculator/methodology/",
   sources: "/wind-farm-calculator/sources/",
   about: "/about/",

@@ -752,6 +752,10 @@ Solidarity    = 5.5% × corporate tax`}</pre>
               annual lines agreed to the cent.
             </li>
             <li>
+              The <a href={PATHS.reportPdf}>PDF report</a> of the base case is printed from the calculator’s own charts
+              and numbers. A test fails when the published PDF is older than the code it was made from.
+            </li>
+            <li>
               The source code, including the tests, is public on <a href={SITE.repository}>GitHub</a>.
             </li>
           </ul>

@@ -28,6 +28,10 @@ DSCR, German taxes — that runs entirely in the browser.
 - **Excel:** the model rebuilt with live formulas (14 sheets), generated in the browser from the current inputs; the
   loan and the total uses are solved on the website and pasted, with check rows. Base case:
   https://igorsabodakha.com/wind-farm-calculator/wind-farm-model.xlsx
+- **Report:** 18 slides (16:9) from the site's own charts — summary and status, timeline, assumptions with sources,
+  energy, EEG premium, prices, construction, costs, financing, cover ratios, cash waterfall, returns, scenarios,
+  tornado, bid price, risks and sources. Base case as a tagged PDF with an outline:
+  https://igorsabodakha.com/wind-farm-calculator/wind-farm-report.pdf; other inputs print from the report page.
 - **Validity:** every run is checked for input ranges, calculation integrity, funding, covenant and model scope;
   returns of a case that runs out of cash are shown as not meaningful.
 
@@ -45,6 +49,7 @@ npm run typecheck
 npm run build         # static export to out/
 npm run serve         # serve out/ with the production headers from public/_headers
 npm run check:launch  # fails if a page shows a placeholder or lacks the disclaimer
+npm run report:pdf    # after a build: print the base-case report to public/ (Microsoft Edge, or $BROWSER)
 ```
 
 ## Structure
@@ -53,11 +58,11 @@ npm run check:launch  # fails if a page shows a placeholder or lacks the disclai
 |---|---|
 | `src/engine/` | The model: pure, deterministic TypeScript without UI — `runModel`, `runScenarios`, `tornado`, `solveAwardPrice` |
 | `src/app/` | Pages (Next.js app router, static export) |
-| `src/components/` | Calculator, SVG charts, site header and footer |
+| `src/components/` | Calculator, SVG charts, report slides, site header and footer |
 | `src/lib/` | Input definitions, number formats, URL state, XLSX writer, site metadata |
 | `src/messages/en.ts` | All interface texts |
 | `test/` | Vitest suites |
-| `scripts/` | Build helpers: RSC payload names, local server with headers, image rendering, launch gate |
+| `scripts/` | Build helpers: RSC payload names, local server with headers, image rendering, launch gate, Excel check, PDF printing |
 
 ## Verification
 
@@ -71,7 +76,9 @@ npm run check:launch  # fails if a page shows a placeholder or lacks the disclai
 - On 30 September 2026 a spreadsheet built from the written specification — not from the code — recomputed the base
   case of the first engine in Microsoft Excel from the engine's loan and total uses (base switches only); all 20 key
   figures and twelve annual lines agreed to the cent. The engine has since been corrected after two external
-  reviews; a formula workbook covering every switch is the next step.
+  reviews; the formula workbook above now covers every switch.
+- The published PDF comes with a manifest (`scripts/pdf/manifest.json`): engine version, input hash, and a hash of
+  every source file the report is made from. A test fails when the PDF is older than the code.
 
 ## Hosting
 

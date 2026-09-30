@@ -1,8 +1,11 @@
 "use client";
 
-import { Check, Download, Link2, RotateCcw } from "lucide-react";
+import { Check, Download, FileText, Link2, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { BASE_CASE } from "@/engine";
+import { PATHS } from "@/lib/site";
+import { encodeInputs } from "@/lib/url-state";
 import type { Messages } from "@/messages/en";
 import type { Snapshot } from "./useCalculator";
 
@@ -51,12 +54,36 @@ export function Actions({ snapshot, pending, t, isCustom, onReset }: Props) {
     }
   };
 
+  // The base case has a published PDF; other inputs open the report page, which the browser prints to PDF.
+  const query = encodeInputs(snapshot.inputs, BASE_CASE);
   return (
     <div className="no-print flex flex-wrap gap-2">
       <Button variant="outline" size="sm" onClick={download} disabled={busy || pending || !snapshot.results}>
         <Download aria-hidden />
         {busy ? t.actions.preparing : pending ? t.actions.calculating : t.actions.excel}
       </Button>
+      {query === "" ? (
+        <Button asChild variant="outline" size="sm">
+          <a href={PATHS.reportPdf} download>
+            <FileText aria-hidden />
+            {t.actions.reportPdf}
+          </a>
+        </Button>
+      ) : (
+        <Button asChild variant="outline" size="sm">
+          <a
+            href={`${PATHS.report}?${query}`}
+            target="_blank"
+            rel="noopener"
+            title={t.actions.reportPrintHint}
+            aria-disabled={pending || !snapshot.results}
+            className={pending || !snapshot.results ? "pointer-events-none opacity-50" : undefined}
+          >
+            <FileText aria-hidden />
+            {t.actions.reportPrint}
+          </a>
+        </Button>
+      )}
       <Button variant="outline" size="sm" onClick={copy}>
         {copied ? <Check aria-hidden /> : <Link2 aria-hidden />}
         {copied ? t.actions.copied : t.actions.copyLink}

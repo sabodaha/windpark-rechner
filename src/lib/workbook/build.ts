@@ -1,17 +1,8 @@
 // The formula workbook: the model rebuilt with live spreadsheet formulas from one snapshot. The website solves the
 // loan, the total uses and — for a sculpted loan — the principal per year; the workbook takes them as pasted values
 // and calculates everything else. Check rows show whether the pasted solution still fits after a change.
-import {
-  buildSnapshot,
-  runModel,
-  solveAwardPrice,
-  tornadoAll,
-  type BidResult,
-  type Inputs,
-  type ModelSnapshot,
-  type TornadoBar,
-  type TornadoMetric,
-} from "@/engine";
+import { buildSnapshot, type Inputs, type ModelSnapshot } from "@/engine";
+import { modelExtras, type ModelExtras } from "@/lib/extras";
 import { FIELDS, withField } from "@/lib/fields";
 import type { Messages } from "@/messages/en";
 import { makeEnv } from "./common";
@@ -22,12 +13,7 @@ import { debtSheet, operationsSheet, taxSheet } from "./sheets-calc";
 import { checksSheet, readmeSheet, scenariosSheet, sensitivitiesSheet, sourcesSheet } from "./sheets-report";
 import { resultsSheet, statementsSheet, waterfallSheet } from "./sheets-results";
 
-export interface WorkbookExtras {
-  tornado: Record<TornadoMetric, TornadoBar[]>;
-  bid: BidResult;
-  bidTarget: number;
-  curve: { x: number; y: number | null }[];
-}
+export type WorkbookExtras = ModelExtras;
 
 /**
  * Inputs rounded as the workbook stores them: to 0.001 of the unit shown (0.001 %-points for percentages). The
@@ -48,21 +34,7 @@ export function canonicalInputs(inputs: Inputs): Inputs {
 }
 
 /** The website's tornado, bid calculator and IRR curve for the Sensitivities sheet. */
-export function workbookExtras(inputs: Inputs): WorkbookExtras {
-  const target = inputs.macro.costOfEquity;
-  const curve: WorkbookExtras["curve"] = [];
-  for (let c = 3; c <= 10.0001; c += 0.25) {
-    const copy = structuredClone(inputs);
-    copy.revenue.awardPriceCt = Math.round(c * 100) / 100;
-    try {
-      const r = runModel(copy);
-      curve.push({ x: copy.revenue.awardPriceCt, y: r.validity.returnsMeaningful ? r.kpis.equityIrr : null });
-    } catch {
-      curve.push({ x: copy.revenue.awardPriceCt, y: null });
-    }
-  }
-  return { tornado: tornadoAll(inputs), bid: solveAwardPrice(inputs, target), bidTarget: target, curve };
-}
+export const workbookExtras = modelExtras;
 
 const TITLES: Record<string, { title: string; subtitle: string }> = {
   Readme: { title: "Wind Farm Investment Calculator — formula workbook", subtitle: "Fictional wind farm “Musterhöhe” · 5 × 6.3 MW · Hesse, Germany" },

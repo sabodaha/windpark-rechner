@@ -9,21 +9,24 @@ export const INK_2 = "var(--chart-ink-2)";
 export const MUTED = "var(--chart-muted)";
 export const SERIES = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)", "var(--series-5)"];
 
-/** Measures the container; renders at a default width on the server and before the first measurement. */
-export function useChartWidth(defaultWidth = 640) {
+/**
+ * Measures the container; renders at a default width on the server and before the first measurement. A fixed
+ * width (the PDF report's slides) skips the measurement, so the static HTML is already final.
+ */
+export function useChartWidth(defaultWidth = 640, fixed?: number) {
   const ref = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(defaultWidth);
+  const [width, setWidth] = useState(fixed ?? defaultWidth);
   useEffect(() => {
     const el = ref.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
+    if (fixed !== undefined || !el || typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver((entries) => {
       const w = entries[0]?.contentRect.width;
       if (w) setWidth(Math.max(260, Math.round(w)));
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
-  return { ref, width };
+  }, [fixed]);
+  return { ref, width: fixed ?? width };
 }
 
 /** "Nice" axis ticks covering [min, max]. */

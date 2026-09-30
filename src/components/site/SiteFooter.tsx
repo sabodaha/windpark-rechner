@@ -10,7 +10,7 @@ const t = en.site;
 export function SiteFooter() {
   const link = "rounded-sm hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
   return (
-    <footer className="mt-12 border-t border-border bg-card/60 text-sm">
+    <footer className="no-print mt-12 border-t border-border bg-card/60 text-sm">
       <div className="mx-auto grid w-full max-w-[1400px] gap-8 px-4 py-8 sm:px-6 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <section aria-labelledby="footer-author">
           <h2 id="footer-author" className="font-semibold">

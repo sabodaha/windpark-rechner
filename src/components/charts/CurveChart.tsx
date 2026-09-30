@@ -13,13 +13,15 @@ interface Props {
   seriesLabel: string;
   ariaLabel: string;
   height?: number;
+  /** Fixed width in px instead of the container's. */
+  width?: number;
 }
 
-const M = { top: 14, right: 16, bottom: 26, left: 46 };
+const M = { top: 14, right: 24, bottom: 26, left: 46 };
 
 /** One series over a numeric x-axis (award price), with reference lines and a crosshair. */
-export function CurveChart({ points, xFormat, yFormat, hLines = [], vLines = [], marker, seriesLabel, ariaLabel, height = 220 }: Props) {
-  const { ref, width } = useChartWidth();
+export function CurveChart({ points, xFormat, yFormat, hLines = [], vLines = [], marker, seriesLabel, ariaLabel, height = 220, width: fixedWidth }: Props) {
+  const { ref, width } = useChartWidth(640, fixedWidth);
   const [hover, setHover] = useState<number | null>(null);
   const plotW = Math.max(40, width - M.left - M.right);
   const xs = points.map((p) => p.x);

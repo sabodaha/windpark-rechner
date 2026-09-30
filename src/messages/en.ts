@@ -377,6 +377,9 @@ export const en = {
     calculate: "Calculate",
   },
   actions: {
+    reportPdf: "Report (PDF)",
+    reportPrint: "Report (print)",
+    reportPrintHint: "Opens the report with your inputs; save it as a PDF from the print dialog.",
     excel: "Download Excel",
     excelNote: "A formula workbook: change an input and every result follows. The loan is solved on the website.",
     preparing: "Preparing…",
@@ -386,6 +389,22 @@ export const en = {
     reset: "Reset",
     editInputs: "Edit assumptions",
     close: "Show results",
+  },
+  report: {
+    title: "Wind farm model report",
+    description:
+      "18-slide report of the Wind Farm Investment Calculator: summary, timeline, assumptions, energy, EEG premium, " +
+      "costs, financing, cash waterfall, returns, scenarios, sensitivity and bid price.",
+    name: "Report",
+    heading: "Report",
+    base: "base case",
+    custom: "your inputs",
+    print: "Print / save as PDF",
+    download: "Download the PDF",
+    back: "Back to the calculator",
+    hint: "In the print dialog choose “Save as PDF”: the page size is set to 16:9 slides, one per page.",
+    calculating: "Calculating the report for your inputs…",
+    invalidLink: "The inputs in this link could not be read, so the report shows the base case.",
   },
   footer: {
     author: "A model by Igor Sabodakha",

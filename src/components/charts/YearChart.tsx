@@ -35,6 +35,8 @@ interface Props {
   yMin?: number;
   yMax?: number;
   height?: number;
+  /** Fixed width in px instead of the container's. */
+  width?: number;
   ariaLabel: string;
 }
 
@@ -45,8 +47,8 @@ const GAP = 2;
  * Chart over calendar years: stacked bars (positive stack up, negative stack down from one baseline),
  * lines and horizontal reference lines. One y-axis. Crosshair + tooltip on hover.
  */
-export function YearChart({ years, bars = [], lines = [], refLines = [], format, axisFormat = format, yMin, yMax, height = 220, ariaLabel }: Props) {
-  const { ref, width } = useChartWidth();
+export function YearChart({ years, bars = [], lines = [], refLines = [], format, axisFormat = format, yMin, yMax, height = 220, width: fixedWidth, ariaLabel }: Props) {
+  const { ref, width } = useChartWidth(640, fixedWidth);
   const [hover, setHover] = useState<number | null>(null);
   const n = years.length;
   const plotW = Math.max(10, width - M.left - M.right);
@@ -123,7 +125,7 @@ export function YearChart({ years, bars = [], lines = [], refLines = [], format,
           ))}
           {/* x labels */}
           {years.map((yr, i) =>
-            i % labelEvery === 0 || i === n - 1 ? (
+            i % labelEvery === 0 || (i === n - 1 && i % labelEvery >= Math.ceil(labelEvery / 2)) ? (
               <text key={yr} x={xCenter(i)} y={M.top + plotH + 16} textAnchor="middle" fill={MUTED} className="tabular">
                 {yr}
               </text>
