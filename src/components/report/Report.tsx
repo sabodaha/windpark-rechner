@@ -1031,6 +1031,11 @@ function SensitivitySlide({ d, meta }: SlideProps) {
       <div className="grid grid-cols-[720px_1fr] gap-10">
         <div>
           <p className="mb-1 text-[13px] font-semibold">Equity IRR, each driver at its low and high value</p>
+          {bars[0]?.base === null ? (
+            <Panel>
+              <p className="text-[14px]">{S.notMeaningful}</p>
+            </Panel>
+          ) : (
           <TornadoChart
             width={720}
             rows={bars.map((x) => ({ label: S.drivers[x.id] ?? x.id, lowLabel: x.lowLabel, highLabel: x.highLabel, low: x.low, high: x.high }))}
@@ -1040,6 +1045,7 @@ function SensitivitySlide({ d, meta }: SlideProps) {
             highName={S.high}
             ariaLabel="Tornado: equity IRR for the low and high value of each driver"
           />
+          )}
           <p className="mt-1 text-[11.5px] text-muted-foreground">Base: {pct(base, 2)}. Colour marks the side of the input (low / high), not better or worse.</p>
         </div>
         <div className="flex flex-col gap-3">

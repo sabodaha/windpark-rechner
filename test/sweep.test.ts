@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { BASE_CASE, runScenarios } from "../src/engine";
 import type { Inputs } from "../src/engine";
-import { FIELDS } from "../src/lib/fields";
+import { FIELD_BY_ID, FIELDS } from "../src/lib/fields";
 
 function sampler(seed: number) {
   let s = seed;
@@ -59,9 +59,49 @@ describe("seeded sweep of 500 input sets", () => {
         expect(s[k].validity.integrity, `case ${n} ${k}`).not.toBe("error");
         if (s[k].validity.covenant === "error") stressBreaches++;
       }
+      for (const k of ["base", "p90", "resource", "downside"] as const) {
+        const dust = s[k].annual.find((a) => a.debtService > 0 && a.debtService < 1);
+        expect(dust, `case ${n} ${k}: debt service of ${dust?.debtService} in ${dust?.year}`).toBeUndefined();
+      }
     }
     expect(failures).toEqual([]);
     // The stresses are meant to bite: some of them breach the covenant of the base-case loan.
     expect(stressBreaches).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Wider than the acceptance sweep (second review, 1 Oct 2026): it also moves total capex and opex, the futures,
+ * the inflation of 2026–2028 and the two-sided switch, which the usual-range sweep never touches. Stress outcomes
+ * — a shortfall, a covenant breach — are allowed here; a failed calculation check or debt-service dust is not.
+ */
+describe("wide sweep of 1,000 input sets", () => {
+  it("every scenario passes the calculation checks; returns are n.m. exactly when cash runs short", { timeout: 300_000 }, () => {
+    const rnd = sampler(20261001);
+    const set = (id: string, v: number | string | boolean, inp: Inputs) => FIELD_BY_ID.get(id)!.set(inp, v);
+    const failures: string[] = [];
+    for (let n = 0; n < 1000; n++) {
+      const inp = randomInputs(rnd);
+      const pick = (lo: number, hi: number) => lo + rnd() * (hi - lo);
+      if (rnd() < 0.5) set("capexTotal", pick(1400, 2300), inp);
+      if (rnd() < 0.5) set("opexTotal", pick(15, 40), inp);
+      for (const id of ["f2027", "f2028", "f2029"]) if (rnd() < 0.4) set(id, pick(50, 160), inp);
+      for (const id of ["inf2026", "inf2027", "inf2028"]) if (rnd() < 0.4) set(id, pick(0, 0.05), inp);
+      if (rnd() < 0.3) inp.revenue.twoSidedPremium = true;
+      if (rnd() < 0.3) inp.financing.repayment = "sculpted";
+      const s = runScenarios(inp);
+      for (const k of ["base", "p90", "resource", "downside"] as const) {
+        const r = s[k];
+        if (r.validity.integrity === "error") {
+          const failed = r.checks.filter((c) => c.group === "integrity" && !c.ok && c.severity === "error").map((c) => `${c.id}=${c.value}`);
+          failures.push(`case ${n} ${k}: ${failed.join(", ")}`);
+        }
+        const dust = r.annual.find((a) => a.debtService > 0 && a.debtService < 1);
+        if (dust) failures.push(`case ${n} ${k}: debt service of ${dust.debtService} in ${dust.year}`);
+        if (r.validity.returnsMeaningful !== (r.validity.shortfall === null && r.validity.integrity !== "error"))
+          failures.push(`case ${n} ${k}: returnsMeaningful ${r.validity.returnsMeaningful} with shortfall ${JSON.stringify(r.validity.shortfall)}`);
+      }
+    }
+    expect(failures).toEqual([]);
   });
 });

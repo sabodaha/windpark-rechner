@@ -56,8 +56,10 @@ export function Sensitivity({ inputs, t }: { inputs: Inputs; t: Messages }) {
         </div>
       </CardHeader>
       <CardContent className={cn("transition-opacity", busy && "opacity-50")}>
-        {!bars || base === null ? (
+        {!bars ? (
           <p className="py-10 text-center text-sm text-muted-foreground">{S.calculating}</p>
+        ) : base === null ? (
+          <p className="py-10 text-center text-sm text-muted-foreground">{S.notMeaningful}</p>
         ) : (
           <>
             <TornadoChart

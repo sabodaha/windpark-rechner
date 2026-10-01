@@ -7,8 +7,11 @@ import type { Inputs, ModelResult } from "./types";
 /**
  * Version of the engine's economics. Any change to a result bumps it, together with the golden values.
  * 1.0.0 — first engine (30 Sep 2026). 2.0.0 — corrected after two external reviews (phase 1 of the joint plan).
+ * 2.1.0 — second review (1 Oct 2026): no loan dust, no owners' payment at the end of life, LLCR to the maturity date,
+ * DSRA on the first full repayment year, December advance only during support, bids in 0.01 ct. The base case is
+ * unchanged.
  */
-export const ENGINE_VERSION = "2.0.0";
+export const ENGINE_VERSION = "2.1.0";
 
 export interface ModelSnapshot {
   engineVersion: string;

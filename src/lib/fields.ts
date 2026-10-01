@@ -148,7 +148,7 @@ export const FIELDS: FieldDef[] = [
     get: (i) => i.revenue.ppaEurMwh2026, set: (i, v) => void (i.revenue.ppaEurMwh2026 = n(v)) },
   { id: "awardNotice", group: "revenue", kind: "date", minDate: "2023-01-01", maxDate: "2032-12-31", sources: ["bnetza2608", "eegAwardDeadlines"],
     get: (i) => i.revenue.awardNoticeDate, set: (i, v) => void (i.revenue.awardNoticeDate = String(v)) },
-  { id: "trueUpLag", group: "revenue", kind: "number", unit: "months", decimals: 0, min: 0, max: 24, usual: [3, 12], step: 1, sources: ["eegSettlement", "assumption"],
+  { id: "trueUpLag", group: "revenue", kind: "number", unit: "months", decimals: 0, min: 0, max: 24, usual: [3, 15], step: 1, sources: ["eegSettlement", "assumption"],
     get: (i) => i.revenue.premiumTrueUpLagMonths, set: (i, v) => void (i.revenue.premiumTrueUpLagMonths = Math.round(n(v))) },
   { id: "twoSided", group: "revenue", kind: "switch", sources: ["eeg2027Draft"],
     get: (i) => i.revenue.twoSidedPremium, set: (i, v) => void (i.revenue.twoSidedPremium = Boolean(v)) },

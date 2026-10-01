@@ -347,7 +347,8 @@ export interface SizingInfo {
   bankPriceBasis: BankPriceBasis;
   minBankDscrP50: number | null;
   minBankDscrP90: number | null;
-  binding: "dscrP50" | "dscrP90" | "gearing" | "locked" | "none";
+  /** cashflow: no loan, because a year of the lender's case has no cash for debt service. */
+  binding: "dscrP50" | "dscrP90" | "gearing" | "cashflow" | "locked" | "none";
   lenderCase: LenderCase;
 }
 

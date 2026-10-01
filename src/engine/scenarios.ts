@@ -173,8 +173,11 @@ export interface TornadoBar {
   range: number;
 }
 
-function metricOf(k: Kpis, metric: TornadoMetric): number | null {
-  const v = k[metric];
+/** A run's metric: none when a calculation check failed, and no equity IRR when the company runs out of cash. */
+function metricOf(r: ModelResult, metric: TornadoMetric): number | null {
+  if (r.validity.integrity === "error") return null;
+  if (metric === "equityIrr" && !r.validity.returnsMeaningful) return null;
+  const v = r.kpis[metric];
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
@@ -194,11 +197,11 @@ export function tornadoAll(inputs: Inputs, drivers = TORNADO_DRIVERS): Record<To
   const runs = drivers.map((d) => ({ d, low: tryRun(d.apply(inputs, "low")), high: tryRun(d.apply(inputs, "high")) }));
   const out = {} as Record<TornadoMetric, TornadoBar[]>;
   for (const metric of metrics) {
-    const base = baseRun ? metricOf(baseRun.kpis, metric) : null;
+    const base = baseRun ? metricOf(baseRun, metric) : null;
     out[metric] = runs
       .map(({ d, low, high }) => {
-        const lo = low ? metricOf(low.kpis, metric) : null;
-        const hi = high ? metricOf(high.kpis, metric) : null;
+        const lo = low ? metricOf(low, metric) : null;
+        const hi = high ? metricOf(high, metric) : null;
         const range = Math.abs((hi ?? base ?? 0) - (lo ?? base ?? 0));
         return { id: d.id, lowLabel: d.lowLabel, highLabel: d.highLabel, low: lo, high: hi, base, range };
       })
@@ -211,7 +214,7 @@ export function tornadoAll(inputs: Inputs, drivers = TORNADO_DRIVERS): Record<To
 export function tornado(inputs: Inputs, metric: TornadoMetric, drivers = TORNADO_DRIVERS): TornadoBar[] {
   const at = (i: Inputs) => {
     const r = tryRun(i);
-    return r ? metricOf(r.kpis, metric) : null;
+    return r ? metricOf(r, metric) : null;
   };
   const base = at(inputs);
   return drivers
@@ -237,7 +240,7 @@ export interface BidPoint {
 export interface BidResult {
   /** Lowest award price at which the equity IRR reaches the target, whether or not the case is financeable. */
   target: BidPoint | null;
-  /** Lowest award price that reaches the target with a financeable case: fully funded and the covenant met. */
+  /** Lowest award price that reaches the target with a financeable case: fully funded, the covenant met, within scope. */
   feasible: BidPoint | null;
   /** The feasible price is at or below the tender ceiling of the inputs. */
   admissible: boolean | null;
@@ -251,8 +254,9 @@ export interface BidResult {
  * Lowest Zuschlagswert at which the equity IRR reaches the target, with the loan re-sized at every step. The IRR
  * is not monotonic in the award price (a higher floor raises the loan, and with an expensive loan more debt can
  * lower the equity return), so the search scans a grid for the first price that qualifies and then bisects
- * inside that step. Two answers: the price for the return alone, and the price that also keeps the case funded
- * and within its covenant.
+ * inside that step. Bids carry two decimals (§ 30 EEG), so each answer is the lowest such price that qualifies,
+ * re-run at that price. Two answers: the price for the return alone, and the price that also keeps the case
+ * funded, within its covenant and within the model's scope (e.g. the award has not lapsed under § 36e).
  */
 export function solveAwardPrice(inputs: Inputs, targetEquityIrr: number, maxCt = 15, stepCt = 0.25): BidResult {
   const toleranceCt = 0.0005;
@@ -267,7 +271,7 @@ export function solveAwardPrice(inputs: Inputs, targetEquityIrr: number, maxCt =
       point: { awardPriceCt: ct, awCt: r?.kpis.awCt ?? NaN, equityIrr: irr },
       reaches: irr !== null && irr >= targetEquityIrr,
       financeable:
-        !!v && v.integrity !== "error" && v.funding !== "error" && v.covenant !== "error" && v.returnsMeaningful,
+        !!v && v.integrity !== "error" && v.funding !== "error" && v.covenant !== "error" && v.scope !== "error" && v.returnsMeaningful,
     };
     cache.set(ct, entry);
     return entry;
@@ -288,7 +292,11 @@ export function solveAwardPrice(inputs: Inputs, targetEquityIrr: number, maxCt =
         if (ok(at(mid))) hi = mid;
         else lo = mid;
       }
-      return at(hi).point;
+      // The lowest two-decimal price at or above the threshold that qualifies; the grid point c always does.
+      const cent = (x: number) => Math.round(x * 100) / 100;
+      let price = cent(Math.ceil(hi * 100 - 1e-9) / 100);
+      while (price < c && !ok(at(price))) price = cent(price + 0.01);
+      return at(Math.min(price, c)).point;
     }
     return null;
   };

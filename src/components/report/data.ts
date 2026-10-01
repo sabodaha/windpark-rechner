@@ -258,9 +258,12 @@ export function buildReportData(inputs: Inputs, results: Record<ScenarioName, Mo
     scenarios: down.validity.returnsMeaningful
       ? `In the downside the equity IRR falls to ${pct(down.kpis.equityIrr, 1)}; the lowest DSCR is ${ratio(down.kpis.minDscr)}`
       : "In the downside the company runs out of cash",
-    sensitivity: tornadoTop
-      ? `${en.sensitivity.drivers[tornadoTop.id] ?? tornadoTop.id} moves the equity IRR most: from ${pct(tornadoTop.low, 1)} to ${pct(tornadoTop.high, 1)}`
-      : "What moves the equity IRR",
+    sensitivity:
+      tornadoTop && tornadoTop.base !== null && tornadoTop.low !== null && tornadoTop.high !== null
+        ? `${en.sensitivity.drivers[tornadoTop.id] ?? tornadoTop.id} moves the equity IRR most: from ${pct(tornadoTop.low, 1)} to ${pct(tornadoTop.high, 1)}`
+        : tornadoTop && tornadoTop.base === null
+          ? "The equity IRR is not meaningful in this case, so the tornado has no bars"
+          : "What moves the equity IRR",
     bid: bidText.charAt(0).toUpperCase() + bidText.slice(1),
     risks: "What could change the answer — and what the model leaves out",
     methodology: "How the numbers are made, checked and sourced",

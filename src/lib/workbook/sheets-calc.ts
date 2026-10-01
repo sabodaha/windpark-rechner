@@ -1,6 +1,7 @@
 // Workbook sheets: Operations, Tax and Debt.
 import { correctionFactor, marketPremium, SITE_REVIEW_THRESHOLD, SITE_REVIEW_YEARS } from "@/engine/eeg";
 import { toDay } from "@/engine/dates";
+import { MIN_DEBT_SERVICE } from "@/engine/model";
 import { DOWNSIDE, TAX, type ModelResult, type OperationsTrace, type TaxTrace } from "@/engine";
 import { addYearsDay, COLS_PERIOD, MONEY, SC_LABEL, sum, xd, type Env, type Ops } from "./common";
 import { blank, period, scalar, text, type Ctx, type Row, type SheetDef } from "./grid";
@@ -274,7 +275,7 @@ export function operationsSheet(e: Env): SheetDef {
     P(
       "decAdvance",
       "Receivables: December advance (paid on 15 January)",
-      (c) => `IF(OR(${c.r("t.isLast")}=1,${c.k("t.lagYears")}=0),0,${R(c, "advance")}/${c.r("t.opMonths")})`,
+      (c) => `IF(OR(${c.r("t.isLast")}=1,${c.k("t.lagYears")}=0,${c.k("t.eegEnd")}<=DATE(${c.r("t.year")},12,1)),0,${R(c, "advance")}/${c.r("t.opMonths")})`,
       o.decemberAdvance,
       { unit: "€", fmt: MONEY },
     );
@@ -558,27 +559,38 @@ export function debtSheet(e: Env): SheetDef {
       { unit: "€", fmt: MONEY },
     ),
   );
-  rows.push(scalar("d.dsra0", "DSRA funded at COD", (c) => c.r("d.dsraTarget"), b.sourcesUses.dsraInitial, { unit: "€", fmt: MONEY }));
+  rows.push(
+    scalar(
+      "d.dsra0",
+      "DSRA funded at COD: months of the debt service of the first full year with repayment",
+      (c) => {
+        const basis = `MAX(${c.k("t.firstRepYear")},${c.k("t.firstFullYear")})`;
+        return `IF(${basis}>${c.k("t.maturityYear")},0,${c.k("in.dsraMonths")}/12*IFERROR(INDEX(${c.range("d.ds")},MATCH(${basis},${c.range("t.year")},0)),0))`;
+      },
+      b.sourcesUses.dsraInitial,
+      { unit: "€", fmt: MONEY },
+    ),
+  );
 
   rows.push(blank(), text("Lender's case: does the pasted loan still fit? (sizing on the base run)", "section"));
   const L = b.sizing.lenderCase;
-  const ratio = (cf: number, ds: number) => (ds > 1e-6 ? cf / ds : "");
+  const ratio = (cf: number, ds: number) => (ds >= MIN_DEBT_SERVICE ? cf / ds : "");
   rows.push(
     period("d.cf50", "CFADS, lender's case P50", N, (c) => c.r("tx.lender50.cfads"), L.cfadsP50, { unit: "€", fmt: MONEY, role: "link" }),
     period("d.cf90", "CFADS, lender's case P90 1-yr", N, (c) => c.r("tx.lender90.cfads"), L.cfadsP90, { unit: "€", fmt: MONEY, role: "link" }),
-    period("d.dscr50", "DSCR, lender's case P50", N, (c) => `IF(${c.r("d.ds")}>${c.k("k.tiny")},${c.r("d.cf50")}/${c.r("d.ds")},"")`, L.cfadsP50.map((cf, y) => ratio(cf, L.debtService[y]!)), { fmt: "ratio" }),
-    period("d.dscr90", "DSCR, lender's case P90 1-yr", N, (c) => `IF(${c.r("d.ds")}>${c.k("k.tiny")},${c.r("d.cf90")}/${c.r("d.ds")},"")`, L.cfadsP90.map((cf, y) => ratio(cf, L.debtService[y]!)), { fmt: "ratio" }),
+    period("d.dscr50", "DSCR, lender's case P50", N, (c) => `IF(${c.r("d.ds")}>=${c.k("k.dsMin")},${c.r("d.cf50")}/${c.r("d.ds")},"")`, L.cfadsP50.map((cf, y) => ratio(cf, L.debtService[y]!)), { fmt: "ratio" }),
+    period("d.dscr90", "DSCR, lender's case P90 1-yr", N, (c) => `IF(${c.r("d.ds")}>=${c.k("k.dsMin")},${c.r("d.cf90")}/${c.r("d.ds")},"")`, L.cfadsP90.map((cf, y) => ratio(cf, L.debtService[y]!)), { fmt: "ratio" }),
     period(
       "d.headroom",
       "Lower of DSCR ÷ target, P50 and P90",
       N,
-      (c) => `IF(${c.r("d.ds")}>${c.k("k.tiny")},MIN(${c.r("d.dscr50")}/${c.k("in.t50")},${c.r("d.dscr90")}/${c.k("in.t90")}),"")`,
-      L.cfadsP50.map((cf, y) => (L.debtService[y]! > 1e-6 ? Math.min(cf / L.debtService[y]! / i.financing.targetDscrP50, L.cfadsP90[y]! / L.debtService[y]! / i.financing.targetDscrP90) : "")),
+      (c) => `IF(${c.r("d.ds")}>=${c.k("k.dsMin")},MIN(${c.r("d.dscr50")}/${c.k("in.t50")},${c.r("d.dscr90")}/${c.k("in.t90")}),"")`,
+      L.cfadsP50.map((cf, y) => (L.debtService[y]! >= MIN_DEBT_SERVICE ? Math.min(cf / L.debtService[y]! / i.financing.targetDscrP50, L.cfadsP90[y]! / L.debtService[y]! / i.financing.targetDscrP90) : "")),
       { fmt: "dec4" },
     ),
   );
   const headroom = L.cfadsP50
-    .map((cf, y) => (L.debtService[y]! > 1e-6 ? Math.min(cf / L.debtService[y]! / i.financing.targetDscrP50, L.cfadsP90[y]! / L.debtService[y]! / i.financing.targetDscrP90) : Infinity))
+    .map((cf, y) => (L.debtService[y]! >= MIN_DEBT_SERVICE ? Math.min(cf / L.debtService[y]! / i.financing.targetDscrP50, L.cfadsP90[y]! / L.debtService[y]! / i.financing.targetDscrP90) : Infinity))
     .reduce((a, x) => Math.min(a, x), Infinity);
   const usesBase = b.sourcesUses.totalUses;
   const loanDscr = D * headroom;

@@ -10,7 +10,7 @@ import {
   SITE_REVIEW_YEARS,
   SUPPORT_YEARS,
 } from "@/engine/eeg";
-import { AVAILABILITY_IN_SITE_YIELD, profileWeights } from "@/engine/model";
+import { AVAILABILITY_IN_SITE_YIELD, MIN_DEBT_SERVICE, profileWeights } from "@/engine/model";
 import { corporateTaxRate } from "@/engine/tax";
 import { addMonthsDay, addYearsDay, COLS_PERIOD, cumulative, MONEY, xd, type Env } from "./common";
 import { blank, period, scalar, text, type Ctx, type Row, type SheetDef } from "./grid";
@@ -201,6 +201,7 @@ export function inputsSheet(e: Env): SheetDef {
   k("thirdsShare", "Thirds profile: first and second third", 0.4, "%", "pct1");
   k("thirdsLast", "Thirds profile: last third", 0.2, "%", "pct1");
   k("tiny", "Numerical zero", 1e-6, "", "general");
+  k("dsMin", "Debt service counted for a DSCR from", MIN_DEBT_SERVICE, "€", "int");
   rows.push({
     kind: "table",
     id: "tab.kf",
@@ -280,6 +281,13 @@ export function timingSheet(e: Env): SheetDef {
     scalar("t.review2", "§ 36h review from", (c) => `EDATE(${c.k("t.cod")},12*${c.k("k.review2")})`, reviews[1]!, { fmt: "date" }),
     scalar("t.review3", "§ 36h review from", (c) => `EDATE(${c.k("t.cod")},12*${c.k("k.review3")})`, reviews[2]!, { fmt: "date" }),
     scalar("t.codYear", "Year of COD", (c) => `YEAR(${c.k("t.cod")})`, codYear, { fmt: "year" }),
+    scalar(
+      "t.firstFullYear",
+      "First full operating year",
+      (c) => `IF(${c.k("t.cod")}=DATE(YEAR(${c.k("t.cod")}),1,1),YEAR(${c.k("t.cod")}),YEAR(${c.k("t.cod")})+1)`,
+      toIso(toDay(tl.cod)).endsWith("-01-01") ? codYear : codYear + 1,
+      { fmt: "year" },
+    ),
     scalar("t.lastYear", "Last operating year", (c) => `YEAR(${c.k("t.end")}-1)`, lastYear, { fmt: "year" }),
     scalar("t.awardLapse", "Award lapses (§ 36e)", (c) => `EDATE(${c.k("in.awardNotice")},${c.k("k.lapseMonths")})`, xd(tl.awardLapse), { fmt: "date" }),
     scalar(
@@ -457,6 +465,26 @@ export function timingSheet(e: Env): SheetDef {
     { fmt: "int" },
   );
   P("t.cfDate", "Cash-flow date", (c) => `${c.r("t.opEnd")}-1`, base.annual.map((a) => xd(a.cashFlowDate)), { fmt: "date" });
+  const maturityDay = toDay(tl.loanMaturity);
+  const maturityYear = Number(tl.loanMaturity.slice(0, 4));
+  P(
+    "t.loanShare",
+    "Share of the year's cash flow within the loan term (for the LLCR)",
+    (c) =>
+      `IF(${c.r("t.year")}<${c.k("t.maturityYear")},1,IF(${c.r("t.year")}>${c.k("t.maturityYear")},0,` +
+      `MIN(1,MAX(0,(${c.k("t.maturity")}+1-${c.r("t.opStart")})/MAX(1,${c.r("t.opEnd")}-${c.r("t.opStart")})))))`,
+    e.years.map((y, k) =>
+      y < maturityYear ? 1 : y > maturityYear ? 0 : Math.min(1, Math.max(0, (maturityDay + 1 - toDay(t.start[k]!)) / Math.max(1, toDay(t.end[k]!) - toDay(t.start[k]!)))),
+    ),
+    { fmt: "dec6" },
+  );
+  P(
+    "t.llcrDate",
+    "LLCR discount date: the cash-flow date, at the latest the loan maturity",
+    (c) => `MIN(${c.r("t.cfDate")},${c.k("t.maturity")})`,
+    base.annual.map((a) => Math.min(xd(a.cashFlowDate), xd(tl.loanMaturity))),
+    { fmt: "date" },
+  );
   P(
     "t.loanMonths",
     "Loan months in the year",

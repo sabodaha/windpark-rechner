@@ -41,6 +41,12 @@ export const AVAILABILITY_IN_SITE_YIELD = 0.98;
 export const P90_Z = 1.2816;
 const TOLERANCE = 1; // € — accounting checks
 const DEBT_TOLERANCE = 0.5; // € — convergence of the debt size
+/** € — a loan balance below one cent is repaid with the instalment that leaves it: no dust stays on the books. */
+const DEBT_DUST = 0.01;
+/** € — debt service below one euro is not material: such a year has no DSCR (engine and workbook alike). */
+export const MIN_DEBT_SERVICE = 1;
+/** € — a smaller loan is no loan (a lender's case with a year without cash for debt service allows none). */
+const MIN_LOAN = 1;
 
 export const NEUTRAL_SCENARIO: ScenarioAdjustments = {
   energyScale: 1,
@@ -539,7 +545,8 @@ function operatingYears(ctx: Context, mode: PriceMode, energyScale: number): Ope
     let december = 0;
     let open = 0;
     if (lagYears > 0) {
-      december = row.premiumAdvance / s.opMonths;
+      // December's advance is paid on 15 January — only if the support period still runs in December.
+      december = ctx.eegEndDay > addMonths(yearStart(s.year), 11) ? row.premiumAdvance / s.opMonths : 0;
       for (let j = i; j >= 0 && ctx.years[j]!.year + lagYears > s.year; j--) {
         const q = rows[j]!;
         open += q.revenuePremium - q.premiumAdvance + q.municipalRefund;
@@ -600,6 +607,7 @@ function debtSchedule(ctx: Context, amount: number, plan: LoanPlan, months?: Loa
       else if (plan.kind === "annuity") principal = quarterly - (balance * r) / 4;
       else principal = amount / n;
       principal = Math.max(0, Math.min(principal, balance));
+      if (balance - principal < DEBT_DUST) principal = balance;
       instalments.push(principal);
       row.principal += principal;
       balance -= principal;
@@ -627,6 +635,17 @@ function dsraTarget(ctx: Context, schedule: DebtSchedule, year: number): number 
   if (year >= ctx.loan.maturityYear) return 0;
   const next = Math.max(year + 1, ctx.loan.firstRepaymentYear);
   return (ctx.inputs.financing.dsraMonths / 12) * debtServiceOf(schedule, next);
+}
+
+/**
+ * DSRA funded at COD: the given months of the debt service of the first full calendar year with repayment — the
+ * COD year itself when the farm starts on 1 January and repays that year, otherwise the year after at the earliest.
+ */
+function dsraAtCod(ctx: Context, schedule: DebtSchedule): number {
+  const firstFullYear = ctx.codDay === yearStart(ctx.codYear) ? ctx.codYear : ctx.codYear + 1;
+  const basis = Math.max(ctx.loan.firstRepaymentYear, firstFullYear);
+  if (basis > ctx.loan.maturityYear) return 0;
+  return (ctx.inputs.financing.dsraMonths / 12) * debtServiceOf(schedule, basis);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -934,7 +953,7 @@ function lenderPasses(ctx: Context, schedule: DebtSchedule, capitalized: number)
   const cfadsP50 = cfadsFrom(ctx, ops50, tax50);
   const cfadsP90 = cfadsFrom(ctx, ops90, tax90);
   const debtService = ctx.years.map((s) => debtServiceOf(schedule, s.year));
-  const ratio = (cf: number, ds: number) => (ds > 1e-9 ? cf / ds : null);
+  const ratio = (cf: number, ds: number) => (ds >= MIN_DEBT_SERVICE ? cf / ds : null);
   const summary: LenderCase = {
     years: ctx.years.map((s) => s.year),
     cfadsP50,
@@ -957,6 +976,7 @@ function sizingInfo(ctx: Context, sizing: Sizing, lender: LenderCase): SizingInf
   let binding: SizingInfo["binding"] = "none";
   if (sizing.locked) binding = "locked";
   else if (sizing.gearingBound) binding = "gearing";
+  else if (sizing.amount === 0) binding = "cashflow";
   else if (min90 !== null && Math.abs(min90 - f.targetDscrP90) < 1e-4) binding = "dscrP90";
   else if (min50 !== null && Math.abs(min50 - f.targetDscrP50) < 1e-4) binding = "dscrP50";
   return {
@@ -1027,9 +1047,10 @@ function sculptSchedule(ctx: Context, targets: Map<number, number>, amount: numb
     if (!c) continue;
     const target = targets.get(s.year) ?? 0;
     const due = s.year === ctx.loan.maturityYear ? balance : (target - (r * c.months * balance) / 12) / c.denom;
-    const p = Math.max(0, Math.min(due, balance));
+    let p = Math.max(0, Math.min(due, balance));
+    if (balance - p < DEBT_DUST) p = balance;
     const interest = (r / 12) * (c.months * balance - (p / c.k) * c.S);
-    if (p + interest > target * (1 + 1e-9) + 1e-6) feasible = false;
+    if (p + interest > target * (1 + 1e-9) + DEBT_DUST) feasible = false;
     principal[s.year] = p;
     balance -= p;
   }
@@ -1082,7 +1103,7 @@ function sizeDebt(ctx: Context): Sizing {
   for (let iter = 1; iter <= 200; iter++) {
     iterations = iter;
     const schedule = debtSchedule(ctx, amount, plan);
-    const cons = construction(ctx, amount, dsraTarget(ctx, schedule, ctx.codYear));
+    const cons = construction(ctx, amount, dsraAtCod(ctx, schedule));
     const interest = interestOf(ctx, schedule);
     const cf50 = cfadsOf(ctx, bank50, cons.capitalized, interest);
     const cf90 = cfadsOf(ctx, bank90, cons.capitalized, interest);
@@ -1116,12 +1137,16 @@ function sizeDebt(ctx: Context): Sizing {
     let capped = candidate;
     for (let k = 0; k < 50; k++) {
       const sch = debtSchedule(ctx, capped, rescale(nextPlan, candidate, capped));
-      const limit = f.maxGearing * construction(ctx, capped, dsraTarget(ctx, sch, ctx.codYear)).uses;
+      const limit = f.maxGearing * construction(ctx, capped, dsraAtCod(ctx, sch)).uses;
       if (capped <= limit + 1e-6) break;
       capped = limit;
     }
     nextPlan = rescale(nextPlan, candidate, capped);
     gearingBound = capped < candidate - DEBT_TOLERANCE;
+    if (capped < MIN_LOAN) {
+      capped = 0;
+      if (nextPlan.kind === "byYear") nextPlan = { kind: "byYear", principal: {} };
+    }
 
     const done = Math.abs(capped - amount) < DEBT_TOLERANCE;
     amount = iter > 50 ? (amount + capped) / 2 : capped;
@@ -1211,7 +1236,7 @@ function assemble(ctx: Context, sizing: Sizing, tracing: boolean): ModelResult {
   const ops = operatingYears(ctx, "base", ctx.adj.energyScale);
   const loanMonths: LoanMonth[] = [];
   const schedule = debtSchedule(ctx, sizing.amount, sizing.plan, tracing ? loanMonths : undefined);
-  const dsra0 = dsraTarget(ctx, schedule, ctx.codYear);
+  const dsra0 = dsraAtCod(ctx, schedule);
   const cons = construction(ctx, sizing.amount, dsra0);
   const interest = interestOf(ctx, schedule);
   const levered = taxPass(ctx, ops, cons.capitalized, interest);
@@ -1289,7 +1314,7 @@ function assemble(ctx: Context, sizing: Sizing, tracing: boolean): ModelResult {
     }
 
     // Lock-up: distributions stay in the company while the DSCR is below the threshold.
-    const dscr = debtService > 1e-9 ? cfads / debtService : null;
+    const dscr = debtService >= MIN_DEBT_SERVICE ? cfads / debtService : null;
     const lockUp = dscr !== null && dscr < f.lockupDscr && s.year <= ctx.loan.maturityYear;
     let trappedAdded = 0;
     let trappedReleased = 0;
@@ -1314,9 +1339,11 @@ function assemble(ctx: Context, sizing: Sizing, tracing: boolean): ModelResult {
       reserve = 0;
     }
 
+    // Cash short at a year end — the final year included — stays a shortfall: payments by the owners are not
+    // modelled (D01), so the case is not funded and its returns are not meaningful.
     let distribution = 0;
-    if (cash >= 0 || s.isLast) {
-      distribution = cash; // negative only in the final year: the owners fund what the company cannot pay
+    if (cash >= 0) {
+      distribution = cash;
       deficit = 0;
     } else deficit = cash;
     cumDistribution += distribution;
@@ -1613,13 +1640,18 @@ function computeKpis(ctx: Context, cons: ConstructionResult, annual: AnnualRow[]
       minDscrYear = a.year;
     }
   }
-  const repaying = annual.filter((a) => a.dscr !== null && a.principal > 1e-9).map((a) => a.dscr!);
+  const repaying = annual.filter((a) => a.dscr !== null && a.principal >= DEBT_DUST).map((a) => a.dscr!);
   let llcr: number | null = null;
   if (debt > 0) {
     const r = inputs.financing.interestRate;
     let pv = 0;
-    annual.forEach((a) => {
-      if (a.year <= ctx.loan.maturityYear) pv += a.cfads / Math.pow(1 + r, (toDay(a.cashFlowDate) - ctx.codDay) / 365);
+    annual.forEach((a, i) => {
+      if (a.year > ctx.loan.maturityYear) return;
+      // A loan maturing during the year counts that year's cash flow only up to maturity, discounted to it.
+      const s = ctx.years[i]!;
+      const share = a.year < ctx.loan.maturityYear ? 1 : Math.min(1, Math.max(0, (ctx.loan.maturityDay + 1 - s.start) / Math.max(1, s.end - s.start)));
+      const day = Math.min(toDay(a.cashFlowDate), ctx.loan.maturityDay);
+      pv += (share * a.cfads) / Math.pow(1 + r, (day - ctx.codDay) / 365);
     });
     llcr = pv / debt;
   }
@@ -1755,14 +1787,14 @@ function runChecks(
   // Funding: can the company pay its obligations?
   const minCash = Math.min(0, ...annual.map((a) => a.cashDeficit));
   add("noNegativeCash", "funding", minCash > -TOLERANCE, "error", minCash, "Lowest cash balance after the waterfall (€)");
-  const lastDistribution = annual[annual.length - 1]!.distribution;
+  const lastDeficit = annual[annual.length - 1]!.cashDeficit;
   add(
     "closureFunded",
     "funding",
-    lastDistribution > -TOLERANCE,
-    "warning",
-    lastDistribution,
-    "The final year's cash covers decommissioning without payments by the owners (€)",
+    lastDeficit > -TOLERANCE,
+    "error",
+    lastDeficit,
+    "The final year's cash covers decommissioning; payments by the owners are not modelled (€)",
   );
 
   // Covenant.

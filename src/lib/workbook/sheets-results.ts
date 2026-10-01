@@ -117,11 +117,11 @@ export function waterfallSheet(e: Env): SheetDef {
     });
     P("cash4", "Cash after the reserve", (c) => `${R(c, "cash3")}-${R(c, "contribution")}`, cash4, { unit: "€", fmt: MONEY });
     P("decomPaid", "Decommissioning paid", (c) => `IF(${c.r("t.isLast")}=1,${c.k("t.decomCost")},0)`, W.decommissioningPaid, { unit: "€", fmt: MONEY });
-    P("dscr", "DSCR", (c) => `IF(${R(c, "ds")}>${c.k("k.tiny")},${R(c, "cfads")}/${R(c, "ds")},"")`, dscr, { fmt: "ratio", role: "total" });
+    P("dscr", "DSCR", (c) => `IF(${R(c, "ds")}>=${c.k("k.dsMin")},${R(c, "cfads")}/${R(c, "ds")},"")`, dscr, { fmt: "ratio", role: "total" });
     P(
       "lockUp",
       "Lock-up (1 = distributions held back)",
-      (c) => `IF(${R(c, "ds")}>${c.k("k.tiny")},IF(AND(${R(c, "cfads")}/${R(c, "ds")}<${c.k("in.lockup")},${c.r("t.year")}<=${c.k("t.maturityYear")}),1,0),0)`,
+      (c) => `IF(${R(c, "ds")}>=${c.k("k.dsMin")},IF(AND(${R(c, "cfads")}/${R(c, "ds")}<${c.k("in.lockup")},${c.r("t.year")}<=${c.k("t.maturityYear")}),1,0),0)`,
       W.lockUp,
       { fmt: "int" },
     );
@@ -142,12 +142,12 @@ export function waterfallSheet(e: Env): SheetDef {
     P("reserveClose", "Decommissioning reserve at the year end", (c) => `IF(${c.r("t.isLast")}=1,0,${R(c, "reservePre")})`, W.reserveClose, { unit: "€", fmt: MONEY });
     rows.push(
       period(`${pre}.trappedClose`, "Cash held back at the year end", N, (c) => `IF(${c.r("t.isLast")}=1,0,${R(c, "trappedPre")})`, W.trappedClose, { unit: "€", fmt: MONEY, open: { v: 0 } }),
-      period(`${pre}.deficitOut`, "Unpaid cash at the year end (shortfall)", N, (c) => `IF(OR(${R(c, "cash6")}>=0,${c.r("t.isLast")}=1),0,${R(c, "cash6")})`, W.deficitOut, { unit: "€", fmt: MONEY, open: { v: 0 } }),
+      period(`${pre}.deficitOut`, "Unpaid cash at the year end (shortfall; no payments by the owners)", N, (c) => `IF(${R(c, "cash6")}>=0,0,${R(c, "cash6")})`, W.deficitOut, { unit: "€", fmt: MONEY, open: { v: 0 } }),
     );
     P(
       "distribution",
       "Cash available to equity (before legal limits on distributions)",
-      (c) => `IF(OR(${R(c, "cash6")}>=0,${c.r("t.isLast")}=1),${R(c, "cash6")},0)`,
+      (c) => `IF(${R(c, "cash6")}>=0,${R(c, "cash6")},0)`,
       W.distribution,
       { unit: "€", fmt: MONEY, role: "total" },
     );
@@ -368,7 +368,7 @@ export function resultsSheet(e: Env): SheetDef {
       "llcr",
       "LLCR at COD (reserves not counted)",
       (c) =>
-        `SUMPRODUCT((${c.range("t.year")}<=${c.k("t.maturityYear")})*${c.range(`tx.${sc}.cfads`)}/(1+${c.k("in.rate")})^((${c.range("t.cfDate")}-${c.k("t.cod")})/${c.k("k.daysPerYear")}))/${c.k("d.debt")}`,
+        `SUMPRODUCT(${c.range("t.loanShare")}*${c.range(`tx.${sc}.cfads`)}/(1+${c.k("in.rate")})^((${c.range("t.llcrDate")}-${c.k("t.cod")})/${c.k("k.daysPerYear")}))/${c.k("d.debt")}`,
       k.llcr,
       "ratio",
     );

@@ -305,8 +305,8 @@ P90               E_P90   = E_P50 × (1 − ${P90_Z} × σ)`}</pre>
               hours.
             </li>
             <li>
-              f<sub>y</sub> is the share of the year in operation, n<sub>y</sub> the full years since commissioning;
-              degradation is {pct(i.energy.degradationPerYear, 1)} a year.
+              f<sub>y</sub> is the share of the year in operation, n<sub>y</sub> the calendar years since the year of
+              commissioning; degradation is {pct(i.energy.degradationPerYear, 1)} a year.
             </li>
             <li>
               In periods with negative prices the direct marketer curtails the farm and no premium is paid (§ 51 EEG).{" "}
@@ -397,10 +397,13 @@ After support              = E_y × JW_y, or E_sold × PPA price, × rest of the
             <li>
               <strong>Payment timing.</strong> The grid operator pays monthly advances, due on the 15th of the following
               month. § 26 EEG allows them to be based on the previous year’s market value, which the model assumes. The
-              rest of the premium and the § 6 refund come with the final settlement, assumed on 31 March of the next year
-              (the settlement lag is an input, for a delay stress). So in the first year the market value falls below
-              the AW, the advances are still zero and the whole premium arrives the year after; the lender’s case
-              contains the same lag. Market sales are collected after {i.revenue.receivableDays} days of revenue,
+              rest of the premium and the § 6 refund come with the final settlement, assumed on 31 March of the next year.
+              The settlement lag is an input, but the model runs in calendar years: a lag of 1 to 12 months puts the
+              final settlement into the next year, 13 to 24 months into the year after — that is the delay stress — and
+              the month within the year does not change the annual cash flows. So in the first year the market value
+              falls below the AW, the advances are still zero and the whole premium arrives the year after; the lender’s
+              case contains the same lag. December’s advance, paid on 15 January, is open at a year end only while the
+              support period runs in December. Market sales are collected after {i.revenue.receivableDays} days of revenue,
               counted on the actual operating days of a part year.
             </li>
             <li>
@@ -490,7 +493,7 @@ Generator grid fee = €/kW a year                              (${num(i.opex.gr
             </li>
             <li>
               The debt service reserve account (DSRA) is funded at commissioning with {f.dsraMonths} months of the debt
-              service of the first repayment year ({firstRepaymentYear}): {eurCompact(su.dsraInitial)}.
+              service of the first full repayment year ({firstRepaymentYear}): {eurCompact(su.dsraInitial)}.
             </li>
             <li>
               Start-up liquidity of {eurCompact(su.workingCapitalInitial)} funds the receivables of the first operating
@@ -541,6 +544,19 @@ Loan                            D      = min( D_DSCR, ${pct(f.maxGearing, 0)} ×
               show 79–90% debt in their prospectuses; at {pct(f.interestRate, 2)} and a floor of {ct(k.awCt)} the debt
               capacity is far lower. In September 2026 a group of 18 banks warned of rising equity requirements for wind
               projects.
+            </li>
+            <li>
+              <strong>Sizing target and covenant.</strong> The one-year P90 target of {ratio(f.targetDscrP90)} sits below
+              the covenant of {ratio(f.covenantDscr)}. The target applies to the lender’s case at floor prices; the
+              covenant is tested on the operating cash flows, where the one-year P90 stress in the base case still shows{" "}
+              {ratio(BASE.p90.kpis.minDscr)}. Neither threshold has a published market value; both are assumptions and
+              inputs.
+            </li>
+            <li>
+              <strong>No loan.</strong> If the lender’s case has a year without cash for debt service — CFADS at or
+              below zero — no amount of equal instalments fits, and the model sizes no loan. A sculpted loan is repaid
+              before such a year where the earlier years allow it. Loans below €1 count as none, and years with less than
+              €1 of debt service have no DSCR.
             </li>
           </ul>
 
@@ -598,7 +614,8 @@ Solidarity    = 5.5% × corporate tax`}</pre>
           <ul>
             <li>
               In the final year the DSRA, any cash held back and the reserve are released and decommissioning is paid. If
-              the final year’s cash falls short, the owners pay the gap (a negative last line), and a check flags it.
+              the final year’s cash falls short, the case counts as not funded like any other shortfall: payments by the
+              owners are not modelled.
             </li>
             <li>
               <strong>Funding.</strong> If cash still falls short during the life, the model carries the shortfall as
@@ -647,7 +664,7 @@ Solidarity    = 5.5% × corporate tax`}</pre>
                 "CFADS ÷ (interest + principal) in each year of the loan; the minimum over all years with debt service, the average over the repayment years",
                 `${ratio(k.minDscr)} min (${k.minDscrYear}), ${ratio(k.avgDscr)} average`,
               ],
-              ["LLCR", "PV of CFADS over the loan term at the loan rate ÷ loan, at COD; reserves not counted", ratio(k.llcr)],
+              ["LLCR", "PV of CFADS over the loan term at the loan rate ÷ loan, at COD — the year of maturity only until the maturity date; reserves not counted", ratio(k.llcr)],
               ["Payback", "Years from commissioning until the owners’ cumulative cash flow turns positive", `${num(k.paybackYears, 1)} years`],
               ["Gearing", "Loan ÷ total uses", pct(k.gearing, 1)],
             ]}
@@ -676,7 +693,8 @@ Solidarity    = 5.5% × corporate tax`}</pre>
           />
           <p>
             <strong>Tornado.</strong> Each driver is moved to its low and high value with the loan re-sized — the view
-            before financial close — and the drivers are sorted by the swing of the chosen measure. The negative-price
+            before financial close — and the drivers are sorted by the swing of the chosen measure. A run in which the
+            company runs out of cash, or a calculation check fails, shows no equity IRR. The negative-price
             driver also moves the capture factor with (1 − share): output that moves into negative-price periods earns
             about nothing, so the market value of wind falls with it.
           </p>
@@ -687,10 +705,11 @@ Solidarity    = 5.5% × corporate tax`}</pre>
           <p>
             <strong>Bid calculator.</strong> It finds the lowest award price at which the equity IRR reaches a target,
             re-sizing the loan at every step, and reports three things: the price for the return alone; the lowest price
-            that is also financeable — fully funded and within the covenant; and whether that price is within the tender
-            ceiling of the inputs. The IRR is not monotonic in the award price: a higher floor allows more debt at{" "}
+            that is also financeable — fully funded, within the covenant and with an award that has not lapsed under
+            § 36e; and whether that price is within the tender ceiling of the inputs. The IRR is not monotonic in the award price: a higher floor allows more debt at{" "}
             {pct(f.interestRate, 2)}, which can lower the equity return. So the search scans a 0.25 ct grid for the first
-            qualifying price and then bisects within that step to 0.0005 ct.
+            qualifying price and then bisects within that step. Bids carry two decimals, so the answer is the lowest such
+            price that qualifies, re-run at that price.
             {bid.feasible && (
               <>
                 {" "}
@@ -729,7 +748,9 @@ Solidarity    = 5.5% × corporate tax`}</pre>
             </li>
             <li>
               A seeded sweep of 500 random input sets within the usual ranges runs as a test: with the one-sided premium,
-              the base scenario never breaches its covenant, never runs out of cash and passes every calculation check.
+              the base scenario never breaches its covenant, never runs out of cash and passes every calculation check. A
+              wider sweep of 1,000 sets also moves total capex and opex, the futures, inflation, the two-sided switch and
+              the repayment profile: every scenario passes every calculation check, and no year carries debt-service dust.
             </li>
             <li>
               The <a href={PATHS.workbook}>Excel workbook</a> is a second implementation of the model in spreadsheet
