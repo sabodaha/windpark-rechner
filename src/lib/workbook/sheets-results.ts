@@ -328,29 +328,56 @@ export function resultsSheet(e: Env): SheetDef {
     );
     const S = (id: string, label: string, f: (c: Ctx) => string, v: CellValue, fmt: Fmt, unit = "") =>
       rows.push(scalar(`${pre}.${id}`, label, f, v, { fmt, unit, role: "total" }));
-    rows.push(scalar(`${pre}.guess`, "Start value for XIRR (the website's result)", undefined, k.equityIrr ?? 0.05, { fmt: "pct3", role: "snapshot" }));
-    rows.push(scalar(`${pre}.guessPre`, "Start value for the project XIRR before tax (website)", undefined, k.projectIrrPreTax ?? 0.05, { fmt: "pct3", role: "snapshot" }));
-    rows.push(scalar(`${pre}.guessProject`, "Start value for the project XIRR after tax (website)", undefined, k.projectIrrPostTax ?? 0.05, { fmt: "pct3", role: "snapshot" }));
+    rows.push(scalar(`${pre}.guess`, "Start value for XIRR (the website's result)", undefined, k.equityIrr ?? 0.05, { fmt: "pct2", role: "snapshot" }));
+    rows.push(scalar(`${pre}.guessPre`, "Start value for the project XIRR before tax (website)", undefined, k.projectIrrPreTax ?? 0.05, { fmt: "pct2", role: "snapshot" }));
+    rows.push(scalar(`${pre}.guessProject`, "Start value for the project XIRR after tax (website)", undefined, k.projectIrrPostTax ?? 0.05, { fmt: "pct2", role: "snapshot" }));
     const irr = (v: number | null) => (v === null ? "n/a" : v);
     // XIRR starts with the first construction month: a leading zero flow at financial close derails Excel's XIRR.
-    // Excel's XIRR can also fail to converge from a start value near zero, so it tries the website's result, then
-    // Excel's default start value, then −5 %.
+    // Excel's XIRR can also stop at a value that is no root (2.98E-09 without a start value), and it can fail from a
+    // start value right at the root (−16.8 % in a stress case) while converging from 0.01 below it. So it tries the
+    // website's result, then that result ∓ k.guessStep, then the two fixed start values of the Inputs sheet; a try
+    // counts only if the NPV changes sign within ± k.irrEps of its result (Excel stops within about 1E-08, so a real
+    // root always passes).
     const xirr = (c: Ctx, flows: string, guess: string) => {
       const v = c.range(flows, 1);
       const d = c.range("r.date", 1);
-      return `IFERROR(XIRR(${v},${d},${c.k(guess)}),IFERROR(XIRR(${v},${d}),IFERROR(XIRR(${v},${d},-0.05),"n/a")))`;
+      const eps = c.k("k.irrEps");
+      // The NPV is summed directly: Excel's XNPV rejects a negative rate.
+      const npvAt = (rate: string) => `SUMPRODUCT(${v}/(1+${rate})^((${d}-MIN(${d}))/${c.k("k.daysPerYear")}))`;
+      // A try that is no root becomes an error, so the next try is written once and the formula grows linearly.
+      const attempt = (g: string, next: string) => {
+        const r = `XIRR(${v},${d},${g})`;
+        return `IFERROR(IF(${npvAt(`${r}-${eps}`)}*${npvAt(`${r}+${eps}`)}<=0,${r},NA()),${next})`;
+      };
+      const g = c.k(guess);
+      const step = c.k("k.guessStep");
+      const starts = [g, `${g}-${step}`, `${g}+${step}`, c.k("k.guessLow"), c.k("k.guessHigh")];
+      return starts.reduceRight((next, start) => attempt(start, next), `"n/a"`);
     };
-    S("irr", "Equity IRR", (c) => xirr(c, `${pre}.equity`, `${pre}.guess`), irr(k.equityIrr), "pct3");
-    S("npv", "Equity NPV at the cost of equity, at financial close", (c) => `XNPV(${c.k("in.coe")},${c.range(`${pre}.equity`)},${c.range("r.date")})`, k.npvEquity, MONEY, "€");
-    S("pirrPre", "Project IRR before tax", (c) => xirr(c, `${pre}.pre`, `${pre}.guessPre`), irr(k.projectIrrPreTax), "pct3");
-    S("pirrPost", "Project IRR after tax", (c) => xirr(c, `${pre}.post`, `${pre}.guessProject`), irr(k.projectIrrPostTax), "pct3");
+    // Returns are not meaningful when the company runs out of cash (D01): the headline cells say n.m., as on the
+    // website, and the rows "as calculated" keep the arithmetic for review.
+    const funded = run.validity.shortfall === null;
+    rows.push(
+      scalar(
+        `${pre}.funded`,
+        "Funding: the company never runs out of cash (otherwise the owners' returns are n.m.)",
+        (c) => `IF(MIN(${c.range(`w.${sc}.deficitOut`)})>-1,"funded","not funded")`,
+        funded ? "funded" : "not funded",
+        { role: "check" },
+      ),
+    );
+    const gate = (c: Ctx, id: string) => `IF(${c.k(`${pre}.funded`)}="funded",${c.k(`${pre}.${id}`)},"n.m.")`;
+    S("irr", "Equity IRR", (c) => gate(c, "irrCalc"), funded ? irr(k.equityIrr) : "n.m.", "pct2");
+    S("npv", "Equity NPV at the cost of equity, at financial close", (c) => gate(c, "npvCalc"), funded ? k.npvEquity : "n.m.", MONEY, "€");
+    S("pirrPre", "Project IRR before tax", (c) => xirr(c, `${pre}.pre`, `${pre}.guessPre`), irr(k.projectIrrPreTax), "pct2");
+    S("pirrPost", "Project IRR after tax", (c) => xirr(c, `${pre}.post`, `${pre}.guessProject`), irr(k.projectIrrPostTax), "pct2");
     S("npvProject", "Project NPV at the nominal WACC", (c) => `XNPV(${c.k("in.waccNominal")},${c.range(`${pre}.post`)},${c.range("r.date")})`, k.npvProject, MONEY, "€");
     S(
       "lcoeReal",
       "LCOE, real 2026 money (in the style of Fraunhofer ISE)",
       (c) => `SUMPRODUCT(${c.range(`${pre}.cost`)}/${c.range("r.deflator")}/${c.range("r.dfReal")})/SUMPRODUCT(${c.range(`${pre}.kwh`)}/${c.range("r.dfReal")})*100`,
       k.lcoeRealCt,
-      "dec4",
+      "dec2",
       "ct/kWh",
     );
     S(
@@ -358,18 +385,25 @@ export function resultsSheet(e: Env): SheetDef {
       "LCOE, nominal",
       (c) => `SUMPRODUCT(${c.range(`${pre}.cost`)}/${c.range("r.dfNom")})/SUMPRODUCT(${c.range(`${pre}.kwh`)}/${c.range("r.dfNom")})*100`,
       k.lcoeNominalCt,
-      "dec4",
+      "dec2",
       "ct/kWh",
     );
-    S("minDscr", "Minimum DSCR", (c) => `MIN(${c.range(`w.${sc}.dscr`)})`, k.minDscr, "ratio");
-    S("minDscrYear", "Year of the minimum DSCR", (c) => `INDEX(${c.range("t.year")},MATCH(${c.k(`${pre}.minDscr`)},${c.range(`w.${sc}.dscr`)},0))`, k.minDscrYear, "year");
-    S("avgDscr", "Average DSCR over the repayment years", (c) => `AVERAGEIFS(${c.range(`w.${sc}.dscr`)},${c.range("d.principal")},">0")`, k.avgDscr, "ratio");
+    // Without debt service (no loan) there is no DSCR or LLCR: "n/a", as on the website.
+    S("minDscr", "Minimum DSCR", (c) => `IF(COUNT(${c.range(`w.${sc}.dscr`)})=0,"n/a",MIN(${c.range(`w.${sc}.dscr`)}))`, k.minDscr ?? "n/a", "ratio");
+    S(
+      "minDscrYear",
+      "Year of the minimum DSCR",
+      (c) => `IFERROR(INDEX(${c.range("t.year")},MATCH(${c.k(`${pre}.minDscr`)},${c.range(`w.${sc}.dscr`)},0)),"n/a")`,
+      k.minDscrYear ?? "n/a",
+      "year",
+    );
+    S("avgDscr", "Average DSCR over the repayment years", (c) => `IFERROR(AVERAGEIFS(${c.range(`w.${sc}.dscr`)},${c.range("d.principal")},">0"),"n/a")`, k.avgDscr ?? "n/a", "ratio");
     S(
       "llcr",
       "LLCR at COD (reserves not counted)",
       (c) =>
-        `SUMPRODUCT(${c.range("t.loanShare")}*${c.range(`tx.${sc}.cfads`)}/(1+${c.k("in.rate")})^((${c.range("t.llcrDate")}-${c.k("t.cod")})/${c.k("k.daysPerYear")}))/${c.k("d.debt")}`,
-      k.llcr,
+        `IF(${c.k("d.debt")}=0,"n/a",SUMPRODUCT(${c.range("t.loanShare")}*${c.range(`tx.${sc}.cfads`)}/(1+${c.k("in.rate")})^((${c.range("t.llcrDate")}-${c.k("t.cod")})/${c.k("k.daysPerYear")}))/${c.k("d.debt")})`,
+      k.llcr ?? "n/a",
       "ratio",
     );
     S(
@@ -383,6 +417,10 @@ export function resultsSheet(e: Env): SheetDef {
     S("uses", "Total uses", (c) => c.k(`c.${blk}.uses`), run.sourcesUses.totalUses, MONEY, "€");
     S("equityIn", "Equity paid in", (c) => c.k(`c.${blk}.equity`), k.equity, MONEY, "€");
     S("gearing", "Gearing (loan ÷ total uses)", (c) => `${c.k("d.debt")}/${c.k(`${pre}.uses`)}`, k.gearing, "pct2");
+    rows.push(
+      scalar(`${pre}.irrCalc`, "Equity IRR as calculated, whether funded or not (XIRR, checked to be a root)", (c) => xirr(c, `${pre}.equity`, `${pre}.guess`), irr(k.equityIrr), { fmt: "pct2" }),
+      scalar(`${pre}.npvCalc`, "Equity NPV as calculated, whether funded or not", (c) => `XNPV(${c.k("in.coe")},${c.range(`${pre}.equity`)},${c.range("r.date")})`, k.npvEquity, { fmt: MONEY, unit: "€" }),
+    );
   }
   return {
     name: "Results",

@@ -89,16 +89,16 @@ export function operationsSheet(e: Env): SheetDef {
         role: s.lender ? "calc" : "calc",
       }),
       scalar(`${pre}.twoSided`, "Two-sided premium in this case (1 = yes)", (c) => `IF(AND(${K(c, "floor")}=0,${c.k("in.twoSided")}),1,0)`, twoSided ? 1 : 0, { fmt: "int" }),
-      scalar(`${pre}.q0`, "Site quality until the first § 36h review", (c) => c.k("in.siteQuality"), q0, { fmt: "pct3", role: "link" }),
+      scalar(`${pre}.q0`, "Site quality until the first § 36h review", (c) => c.k("in.siteQuality"), q0, { fmt: "pct1", role: "link" }),
       scalar(
         `${pre}.qR`,
         "Site quality after the reviews",
         s.review ? (c) => `${c.k("in.siteQuality")}*${energy(c)}` : (c) => c.k("in.siteQuality"),
         qR,
-        { fmt: "pct3", note: s.review ? "multi-year stress: § 36h review applies" : "no review in this case" },
+        { fmt: "pct1", note: s.review ? "multi-year stress: § 36h review applies" : "no review in this case" },
       ),
-      scalar(`${pre}.kf0`, "Correction factor until the first review", (c) => kf(c, K(c, "q0")), correctionFactor(q0, i.energy.southRegion), { fmt: "dec4" }),
-      scalar(`${pre}.kfR`, "Correction factor after the reviews", (c) => kf(c, K(c, "qR")), correctionFactor(qR, i.energy.southRegion), { fmt: "dec4" }),
+      scalar(`${pre}.kf0`, "Correction factor until the first review", (c) => kf(c, K(c, "q0")), correctionFactor(q0, i.energy.southRegion), { fmt: "dec3" }),
+      scalar(`${pre}.kfR`, "Correction factor after the reviews", (c) => kf(c, K(c, "qR")), correctionFactor(qR, i.energy.southRegion), { fmt: "dec3" }),
       scalar(`${pre}.aw0`, "AW until the first review (rounded to 0.01 ct)", (c) => `ROUND(${c.k("in.award")}*${K(c, "kf0")},2)/100`, aw0, { unit: "€/kWh", fmt: "dec4" }),
       scalar(`${pre}.awR`, "AW after the reviews", (c) => `ROUND(${c.k("in.award")}*${K(c, "kfR")},2)/100`, awR, { unit: "€/kWh", fmt: "dec4" }),
     );
@@ -491,7 +491,7 @@ export function taxSheet(e: Env): SheetDef {
       "cRate",
       "Corporate tax rate (§ 23 KStG)",
       (c) =>
-        `IF(${c.k("in.legalForm")}="GmbH",IF(${c.r("t.year")}<=${c.k("k.kstStepFrom")},${c.k("k.kstHigh")},IF(${c.r("t.year")}>=${c.k("k.kstStepFrom")}+5,${c.k("k.kstLow")},${c.k("k.kstHigh")}-${c.k("k.kstStep")}*(${c.r("t.year")}-${c.k("k.kstStepFrom")}))),0)`,
+        `IF(${c.k("in.legalForm")}="GmbH",MAX(${c.k("k.kstLow")},${c.k("k.kstHigh")}-${c.k("k.kstStep")}*MAX(0,${c.r("t.year")}-${c.k("k.kstStepFrom")})),0)`,
       tr.corporateRate,
       { fmt: "pct1" },
     );
@@ -593,14 +593,21 @@ export function debtSheet(e: Env): SheetDef {
     .map((cf, y) => (L.debtService[y]! >= MIN_DEBT_SERVICE ? Math.min(cf / L.debtService[y]! / i.financing.targetDscrP50, L.cfadsP90[y]! / L.debtService[y]! / i.financing.targetDscrP90) : Infinity))
     .reduce((a, x) => Math.min(a, x), Infinity);
   const usesBase = b.sourcesUses.totalUses;
-  const loanDscr = D * headroom;
+  // Without debt service there is no DSCR to scale from: no loan.
+  const loanDscr = Number.isFinite(headroom) ? D * headroom : 0;
   const loanCap = i.financing.maxGearing * usesBase;
   rows.push(
-    scalar("d.minHeadroom", "Lowest DSCR ÷ target over the loan (1 = a target binds)", (c) => `MIN(${c.range("d.headroom")})`, headroom, { fmt: "dec6" }),
+    scalar(
+      "d.minHeadroom",
+      "Lowest DSCR ÷ target over the loan (1 = a target binds)",
+      (c) => `IF(COUNT(${c.range("d.headroom")})=0,"n/a",MIN(${c.range("d.headroom")}))`,
+      Number.isFinite(headroom) ? headroom : "n/a",
+      { fmt: "dec6" },
+    ),
     scalar(
       "d.loanDscr",
       "Loan the DSCR targets allow (equal instalments or annuity)",
-      (c) => `${c.k("d.debt")}*${c.k("d.minHeadroom")}`,
+      (c) => `IF(COUNT(${c.range("d.headroom")})=0,0,${c.k("d.debt")}*${c.k("d.minHeadroom")})`,
       loanDscr,
       { unit: "€", fmt: MONEY, note: "debt service is proportional to the loan" },
     ),

@@ -10,7 +10,7 @@ import {
   SITE_REVIEW_YEARS,
   SUPPORT_YEARS,
 } from "@/engine/eeg";
-import { AVAILABILITY_IN_SITE_YIELD, MIN_DEBT_SERVICE, profileWeights } from "@/engine/model";
+import { AVAILABILITY_IN_SITE_YIELD, KFW_DRAWDOWN_MAX_MONTHS, KFW_VARIANTS, MIN_DEBT_SERVICE, profileWeights } from "@/engine/model";
 import { corporateTaxRate } from "@/engine/tax";
 import { addMonthsDay, addYearsDay, COLS_PERIOD, cumulative, MONEY, xd, type Env } from "./common";
 import { blank, period, scalar, text, type Ctx, type Row, type SheetDef } from "./grid";
@@ -25,8 +25,9 @@ export function inputsSheet(e: Env): SheetDef {
   const g = e.grid;
   const b = e.base;
   const rows: Row[] = [];
-  const inp = (id: string, label: string, v: CellValue, unit: string, fmt: Fmt = "general", note?: string) =>
-    rows.push(scalar(`in.${id}`, label, undefined, v, { unit, fmt, role: "input", note }));
+  const inp = (id: string, label: string, v: CellValue, unit: string, fmt: Fmt = "general", note?: string, list?: string[]) =>
+    rows.push(scalar(`in.${id}`, label, undefined, v, { unit, fmt, role: "input", note, list }));
+  const BOOL = ["TRUE", "FALSE"];
   const k = (id: string, label: string, v: CellValue, unit: string, fmt: Fmt = "general", note?: string) =>
     rows.push(scalar(`k.${id}`, label, undefined, v, { unit, fmt, role: "calc", note }));
   const S = "structure: changing it needs a new download";
@@ -42,7 +43,7 @@ export function inputsSheet(e: Env): SheetDef {
   rows.push(blank(), text("Energy yield"));
   inp("refYield", "Reference yield (100 % site)", i.energy.referenceYieldHours, "h/yr", "int");
   inp("siteQuality", "Site quality (Gütefaktor)", i.energy.siteQuality, "%", "pct1");
-  inp("south", "Site in the EEG Südregion", i.energy.southRegion, "TRUE/FALSE");
+  inp("south", "Site in the EEG Südregion", i.energy.southRegion, "TRUE/FALSE", "general", undefined, BOOL);
   inp("availability", "Availability", i.energy.availability, "%", "pct1");
   inp("otherLoss", "Other extra losses", i.energy.otherExtraLosses, "%", "pct1");
   inp("degradation", "Degradation per year", i.energy.degradationPerYear, "%", "pct2");
@@ -57,14 +58,14 @@ export function inputsSheet(e: Env): SheetDef {
   inp("ltPrice", "Long-term baseload price (2026 money)", i.revenue.longTermBaseEurMwh2026, "€/MWh", "dec2");
   inp("capture", "Wind capture factor", i.revenue.captureFactor, "", "dec3");
   inp("dv", "Direct-marketing fee (2026 money)", i.revenue.directMarketingCtKwh2026, "ct/kWh", "dec3");
-  inp("postEeg", "After the EEG period", i.revenue.postEeg, "market / ppa");
+  inp("postEeg", "After the EEG period", i.revenue.postEeg, "market / ppa", "general", undefined, ["market", "ppa"]);
   inp("ppa", "PPA price (2026 money)", i.revenue.ppaEurMwh2026, "€/MWh", "dec2");
-  inp("twoSided", "Two-sided premium (simplified stress)", i.revenue.twoSidedPremium, "TRUE/FALSE");
+  inp("twoSided", "Two-sided premium (simplified stress)", i.revenue.twoSidedPremium, "TRUE/FALSE", "general", undefined, BOOL);
   inp("receivableDays", "Receivable days (market sales)", i.revenue.receivableDays, "days", "int");
   inp("lag", "Premium settlement lag after the year end", i.revenue.premiumTrueUpLagMonths, "months", "int");
   inp("municipal", "Municipal payment (§ 6)", i.revenue.municipalCtKwh, "ct/kWh", "dec2");
-  inp("municipalAfter", "Continue the municipal payment after the EEG", i.revenue.municipalAfterEeg, "TRUE/FALSE");
-  inp("bankBasis", "Revenue the lender counts on", i.revenue.bankPriceBasis, "floor / base");
+  inp("municipalAfter", "Continue the municipal payment after the EEG", i.revenue.municipalAfterEeg, "TRUE/FALSE", "general", undefined, BOOL);
+  inp("bankBasis", "Revenue the lender counts on", i.revenue.bankPriceBasis, "floor / base", "general", undefined, ["floor", "base"]);
   rows.push({
     kind: "table",
     id: "tab.futures",
@@ -115,7 +116,7 @@ export function inputsSheet(e: Env): SheetDef {
   inp("rate", "Interest rate", i.financing.interestRate, "%", "pct2");
   inp("tenor", "Loan term from financial close", i.financing.tenorYearsFromClose, "years", "int", S);
   inp("grace", "Grace years", i.financing.graceYears, "years", "int", S);
-  inp("repayment", "Repayment", i.financing.repayment, "linear / annuity / sculpted", "general", S);
+  inp("repayment", "Repayment", i.financing.repayment, "linear / annuity / sculpted", "general", S, ["linear", "annuity", "sculpted"]);
   inp("t50", "Target DSCR, P50", i.financing.targetDscrP50, "x", "ratio");
   inp("t90", "Target DSCR, P90 1-year", i.financing.targetDscrP90, "x", "ratio");
   inp("covenant", "Covenant DSCR", i.financing.covenantDscr, "x", "ratio");
@@ -126,12 +127,12 @@ export function inputsSheet(e: Env): SheetDef {
   inp("commitmentStart", "Commitment fee from construction month", i.financing.commitmentFeeStartMonth, "", "int");
   inp("dsraMonths", "Debt service reserve", i.financing.dsraMonths, "months", "dec2");
   inp("vatSpread", "VAT bridge loan spread", i.financing.vatFacilitySpread, "%", "pct2");
-  inp("equityFirst", "Equity first", i.financing.equityFirst, "TRUE/FALSE");
+  inp("equityFirst", "Equity first", i.financing.equityFirst, "TRUE/FALSE", "general", undefined, BOOL);
   rows.push(blank(), text("Tax"));
-  inp("legalForm", "Legal form", i.tax.legalForm, "KG / GmbH");
+  inp("legalForm", "Legal form", i.tax.legalForm, "KG / GmbH", "general", undefined, ["KG", "GmbH"]);
   inp("hebesatz", "Trade-tax multiplier (Hebesatz)", i.tax.hebesatz, "%", "pct1");
   inp("depYears", "Depreciation period", i.tax.depreciationYears, "years", "int");
-  inp("degressive", "Declining-balance depreciation", i.tax.degressive, "TRUE/FALSE");
+  inp("degressive", "Declining-balance depreciation", i.tax.degressive, "TRUE/FALSE", "general", undefined, BOOL);
   rows.push(blank(), text("Valuation and inflation"));
   rows.push({
     kind: "table",
@@ -202,6 +203,23 @@ export function inputsSheet(e: Env): SheetDef {
   k("thirdsLast", "Thirds profile: last third", 0.2, "%", "pct1");
   k("tiny", "Numerical zero", 1e-6, "", "general");
   k("dsMin", "Debt service counted for a DSCR from", MIN_DEBT_SERVICE, "€", "int");
+  k("debtTol", "Tolerance of the pasted loan and uses (as the website's solver)", 0.5, "€", "dec2");
+  k("irrEps", "An XIRR result counts as an IRR when the NPV changes sign within ± this of the rate", 1e-6, "", "general");
+  k("guessStep", "XIRR: the second and third tries start this far below and above the website's result", 0.01, "%", "pct1");
+  k("guessLow", "XIRR start value, fourth try", -0.05, "%", "pct1");
+  k("guessHigh", "XIRR start value, fifth try", 0.1, "%", "pct1");
+  k("minHebesatzFrom", "Minimum trade-tax multiplier applies from", 2027, "", "year");
+  k("priceYear", "Price basis of the inputs in “2026 money”", 2026, "", "year");
+  k("kfwDrawdownMax", "KfW 270: longest drawdown period (12 months, extendable by up to 24)", KFW_DRAWDOWN_MAX_MONTHS, "months", "int");
+  rows.push({
+    kind: "table",
+    id: "tab.kfw",
+    head: ["KfW 270 variant: loan term up to (years)", "Grace years at most"],
+    rows: KFW_VARIANTS.map(([term, grace]) => [
+      { v: term, fmt: "int" },
+      { v: grace, fmt: "int" },
+    ]),
+  });
   rows.push({
     kind: "table",
     id: "tab.kf",
@@ -322,7 +340,8 @@ export function timingSheet(e: Env): SheetDef {
     scalar(
       "t.idx2026",
       "Price index 2026 (2025 = 1)",
-      (c) => `1+IF(COUNTIF(${c.table("tab.inflation", 0)},2026)>0,SUMIFS(${c.table("tab.inflation", 1)},${c.table("tab.inflation", 0)},2026),${c.k("in.inflLR")})`,
+      (c) =>
+        `1+IF(COUNTIF(${c.table("tab.inflation", 0)},${c.k("k.priceYear")})>0,SUMIFS(${c.table("tab.inflation", 1)},${c.table("tab.inflation", 0)},${c.k("k.priceYear")}),${c.k("in.inflLR")})`,
       1 + infl(2026),
       { fmt: "dec6" },
     ),
@@ -501,8 +520,8 @@ export function timingSheet(e: Env): SheetDef {
   );
   P(
     "t.depMonths",
-    "Depreciation months (first year from the COD month)",
-    (c) => `IF(${c.r("t.period")}=1,13-MONTH(${c.k("t.cod")}),12)`,
+    "Depreciation months (first year: 12 less the months before COD)",
+    (c) => `IF(${c.r("t.period")}=1,12-(MONTH(${c.k("t.cod")})-1),12)`,
     e.years.map((_, k) => (k === 0 ? 13 - (new Date(e.cod * 86_400_000).getUTCMonth() + 1) : 12)),
     { fmt: "int" },
   );

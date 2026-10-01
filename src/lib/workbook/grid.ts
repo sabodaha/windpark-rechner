@@ -51,6 +51,8 @@ export interface ScalarRow extends Base {
   kind: "scalar";
   f?: Formula;
   v: CellValue;
+  /** The only values the cell accepts (a list validation in the workbook). */
+  list?: string[];
 }
 
 export interface TableRow {
@@ -191,6 +193,7 @@ export class Grid {
     for (const [id, l] of this.where) if (l.kind === "scalar") scalars[id] = `${l.sheet}!${colName(LABEL_COLS.value)}${l.row + 1}`;
     const specs = this.sheets.map((def) => {
       const rows: (Cell | undefined)[][] = [];
+      const validations: { ref: string; list: string[] }[] = [];
       const set = (r: number, c: number, cell: Cell) => {
         (rows[r] ??= [])[c] = cell;
       };
@@ -244,6 +247,7 @@ export class Grid {
             manifest.push({ sheet: def.name, cell: `${colName(LABEL_COLS.value)}${r + 1}`, id: row.id, expected: row.v, fmt: row.fmt });
           }
           set(r, LABEL_COLS.value, cell);
+          if (row.list) validations.push({ ref: `${colName(LABEL_COLS.value)}${r + 1}`, list: row.list });
         } else {
           if (row.open) {
             const cell: Cell = { v: row.open.v, fmt: row.fmt, role: row.open.f ? "calc" : (row.role ?? "input") };
@@ -272,6 +276,8 @@ export class Grid {
         freeze: def.freeze,
         tabColor: def.tabColor,
         zoom: 85,
+        validations,
+        printTitles: def.periods !== undefined,
       } satisfies SheetSpec;
     });
     return { sheets: specs, manifest, scalars };

@@ -9,6 +9,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { BASE_CASE, buildSnapshot, type Inputs } from "../../src/engine";
+import { decodeInputs } from "../../src/lib/url-state";
 import { buildFormulaWorkbook, canonicalInputs, workbookExtras } from "../../src/lib/workbook/build";
 import type { ManifestEntry } from "../../src/lib/workbook/grid";
 import { en } from "../../src/messages/en";
@@ -71,6 +72,77 @@ export const VARIANTS: Record<string, Inputs> = {
     c.revenue.municipalCtKwh = 0.5;
     c.opex.gridFeePerKw2026 = 5.5;
   }),
+  // Second review (1 Oct 2026): no loan, no cash, negative returns, edges of the loan and of the model's scope.
+  gmbhSculpted: edit((c) => {
+    c.tax.legalForm = "GmbH";
+    c.financing.repayment = "sculpted";
+  }),
+  zeroDebt: edit((c) => (c.financing.maxGearing = 0)),
+  noCashDebt: edit((c) => {
+    c.revenue.longTermBaseEurMwh2026 = 20;
+    c.revenue.awardPriceCt = 2;
+  }),
+  closureGap: edit((c) => {
+    c.opex.decommissioningCostPerKw2026 = 100;
+    c.opex.decommissioningReserveYears = 1;
+  }),
+  unfundedTwoSided: edit((c) => {
+    c.revenue.twoSidedPremium = true;
+    c.opex.gridFeePerKw2026 = 50;
+  }),
+  negativeIrr: edit((c) => {
+    c.revenue.awardPriceCt = 4.2;
+    c.revenue.longTermBaseEurMwh2026 = 45;
+    c.financing.maxGearing = 0.5;
+  }),
+  sculptedEdge: decodeInputs(
+    "om1=22.4&om2=25.6&om3=28.16&mg1=6.4&mg2=8&mg3=8&in1=1.6&in2=1.6&in3=1.6&ot1=9.6&ot2=9.6&ot3=9.6&gridFee=4&repayment=sculpted&infLR=0.03",
+    BASE_CASE,
+  )!,
+  lapsed: edit((c) => {
+    c.revenue.awardNoticeDate = "2023-01-01";
+    c.revenue.ceilingPriceCt = 8;
+  }),
+  unusual: edit((c) => {
+    c.revenue.awardPriceCt = 7.6;
+    c.revenue.awardNoticeDate = "2027-02-01";
+    c.tax.hebesatz = 2.5;
+    c.tax.degressive = true;
+    c.financing.tenorYearsFromClose = 10;
+    c.financing.graceYears = 3;
+  }),
+  penaltyLong: edit((c) => {
+    c.revenue.awardNoticeDate = "2025-12-01";
+    c.financing.tenorYearsFromClose = 26;
+  }),
+  interestBarrier: edit((c) => {
+    c.revenue.awardPriceCt = 9.5;
+    c.revenue.ceilingPriceCt = 10;
+    c.financing.interestRate = 0.075;
+    c.financing.maxGearing = 0.9;
+    c.financing.targetDscrP50 = 1.1;
+    c.financing.targetDscrP90 = 1;
+    c.financing.covenantDscr = 1;
+    c.financing.lockupDscr = 1.05;
+    c.financing.repayment = "annuity";
+    c.financing.tenorYearsFromClose = 20;
+  }),
+  construction40: edit((c) => {
+    c.project.constructionMonths = 40;
+    c.financing.graceYears = 4;
+    c.financing.tenorYearsFromClose = 22;
+  }),
+  coe9: edit((c) => (c.macro.costOfEquity = 0.09)),
+};
+
+/**
+ * Edits made in the file after the download: the base workbook with one input changed. "same": a valuation-only
+ * edit, so every formula must give what the engine gives for the edited inputs (that variant's manifest). Without
+ * it, the edit moves the loan: no formula may show an error, and the Checks sheet must ask for a re-solve.
+ */
+export const USER_EDITS: Record<string, { id: string; value: number; same?: string }> = {
+  editCoe: { id: "in.coe", value: 0.09, same: "coe9" },
+  editAward: { id: "in.award", value: 5.5 },
 };
 
 function build(dir: string, names: string[]) {
@@ -88,6 +160,24 @@ function build(dir: string, names: string[]) {
     writeFileSync(join(dir, `${name}.cells.json`), JSON.stringify(full.scalars));
     console.log(`${name}: ${full.manifest.length} formula cells, ${(full.bytes.length / 1024).toFixed(0)} KB`);
   }
+  if (names.includes("base")) for (const [name, ed] of Object.entries(USER_EDITS)) patchInput(dir, "base", name, ed.id, ed.value);
+}
+
+/** Copies <from>.nocache.xlsx to <name>.nocache.xlsx with the value of one input cell replaced. */
+function patchInput(dir: string, from: string, name: string, id: string, value: number) {
+  const cells = JSON.parse(readFileSync(join(dir, `${from}.cells.json`), "utf8")) as Record<string, string>;
+  const [sheet, ref] = cells[id]!.split("!") as [string, string];
+  const files = unzipSync(new Uint8Array(readFileSync(join(dir, `${from}.nocache.xlsx`))));
+  const wb = strFromU8(files["xl/workbook.xml"]!);
+  const sheets = [...wb.matchAll(/<sheet [^>]*name="([^"]+)"/g)].map((m) => m[1]);
+  const path = `xl/worksheets/sheet${sheets.indexOf(sheet) + 1}.xml`;
+  const re = new RegExp(`(<c r="${ref}"[^>]*>)<v>([^<]*)</v>`);
+  const xml = strFromU8(files[path]!);
+  const m = re.exec(xml);
+  if (!m) throw new Error(`cell ${ref} not found`);
+  files[path] = strToU8(xml.replace(re, `$1<v>${value}</v>`));
+  writeFileSync(join(dir, `${name}.nocache.xlsx`), zipSync(files));
+  console.log(`${name}: ${from} with ${id} (${sheet}!${ref}) ${m[2]} → ${value}`);
 }
 
 /** Values of every cell of a workbook, by "Sheet!A1". */
@@ -145,9 +235,15 @@ function close(expected: unknown, actual: unknown, entry: ManifestEntry): boolea
 function compare(dir: string, names: string[]): boolean {
   let allOk = true;
   for (const name of names) {
-    const manifest = JSON.parse(readFileSync(join(dir, `${name}.manifest.json`), "utf8")) as ManifestEntry[];
+    const ed = USER_EDITS[name];
+    if (ed && !ed.same) {
+      allOk &&= compareMovedEdit(dir, name);
+      continue;
+    }
+    const source = ed?.same ?? name;
+    const manifest = JSON.parse(readFileSync(join(dir, `${source}.manifest.json`), "utf8")) as ManifestEntry[];
     const recalc = readValues(join(dir, `${name}.recalc.xlsx`));
-    const cached = readValues(join(dir, `${name}.xlsx`));
+    const cached = readValues(join(dir, `${source}.xlsx`));
     const wrong: string[] = [];
     let cacheWrong = 0;
     for (const m of manifest) {
@@ -162,6 +258,20 @@ function compare(dir: string, names: string[]): boolean {
     for (const w of wrong.slice(0, Number(process.env.SHOW ?? 25))) console.log(`     ${w}`);
   }
   return allOk;
+}
+
+/** An edit that moves the loan: no formula shows an error, and the Checks sheet asks for a re-solve. */
+function compareMovedEdit(dir: string, name: string): boolean {
+  const manifest = JSON.parse(readFileSync(join(dir, "base.manifest.json"), "utf8")) as ManifestEntry[];
+  const cells = JSON.parse(readFileSync(join(dir, "base.cells.json"), "utf8")) as Record<string, string>;
+  const recalc = readValues(join(dir, `${name}.recalc.xlsx`));
+  const errors = manifest.filter((m) => /^#/.test(String(recalc.get(`${m.sheet}!${m.cell}`) ?? "")));
+  const at = (id: string) => recalc.get(cells[id]!);
+  const asks = at("chk.loan") === "Re-solve the financing on the website" || at("chk.usesBase") === "Re-solve the financing on the website";
+  const ok = errors.length === 0 && asks && at("chk.master") === "See the checks above";
+  console.log(`${ok ? "OK  " : "FAIL"} ${name}: ${errors.length} error values; loan ${JSON.stringify(at("chk.loan"))}, uses ${JSON.stringify(at("chk.usesBase"))}, all checks ${JSON.stringify(at("chk.master"))}`);
+  for (const m of errors.slice(0, 10)) console.log(`     ${m.sheet}!${m.cell} ${m.id}: ${String(recalc.get(`${m.sheet}!${m.cell}`))}`);
+  return ok;
 }
 
 /**
@@ -207,7 +317,7 @@ function checkNegativeControl(dir: string): boolean {
 const [, , cmd, dir, ...rest] = process.argv;
 const names = rest.length ? rest : Object.keys(VARIANTS);
 if (cmd === "build") build(dir!, names);
-else if (cmd === "compare") process.exit(compare(dir!, names) ? 0 : 1);
+else if (cmd === "compare") process.exit(compare(dir!, rest.length ? rest : [...names, ...Object.keys(USER_EDITS)]) ? 0 : 1);
 else if (cmd === "negctl") negativeControl(dir!);
 else if (cmd === "negctl-check") process.exit(checkNegativeControl(dir!) ? 0 : 1);
 else {

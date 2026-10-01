@@ -24,7 +24,7 @@ const formulas = sheetXml.flatMap((x) => [...x.matchAll(/<f>([^<]*)<\/f>/g)].map
 
 const ALLOWED = new Set([
   "IF", "AND", "OR", "MIN", "MAX", "SUM", "SUMIFS", "SUMPRODUCT", "COUNTIF", "COUNTIFS", "AVERAGEIFS", "INDEX", "MATCH",
-  "CHOOSE", "ROUND", "ROUNDUP", "ROUNDDOWN", "ABS", "INT", "MOD", "DATE", "YEAR", "MONTH", "EDATE", "XIRR", "XNPV",
+  "CHOOSE", "COUNT", "ROUND", "ROUNDUP", "ROUNDDOWN", "ABS", "INT", "MOD", "NA", "DATE", "YEAR", "MONTH", "EDATE", "XIRR", "XNPV",
   "IFERROR",
 ]);
 
@@ -44,6 +44,20 @@ describe("formula workbook", () => {
     const used = new Set(formulas.flatMap((f) => [...f.matchAll(/([A-Z][A-Z0-9.]*)\(/g)].map((m) => m[1]!)));
     for (const fn of used) expect(ALLOWED.has(fn), fn).toBe(true);
     expect(Object.keys(files).some((k) => /vba|macro|externalLink/i.test(k))).toBe(false);
+  });
+
+  it("keeps every formula within Excel's limits: 8,192 characters and 64 nested functions", () => {
+    const longest = Math.max(...formulas.map((f) => f.length));
+    expect(longest).toBeLessThan(8192);
+    let deepest = 0;
+    for (const f of formulas) {
+      let depth = 0;
+      for (const ch of f.replace(/"[^"]*"/g, "")) {
+        if (ch === "(") deepest = Math.max(deepest, ++depth);
+        else if (ch === ")") depth--;
+      }
+    }
+    expect(deepest).toBeLessThanOrEqual(64);
   });
 
   it("stores a result with every formula, so previews show numbers", () => {

@@ -36,8 +36,13 @@ export function canonicalInputs(inputs: Inputs): Inputs {
 /** The website's tornado, bid calculator and IRR curve for the Sensitivities sheet. */
 export const workbookExtras = modelExtras;
 
-const TITLES: Record<string, { title: string; subtitle: string }> = {
-  Readme: { title: "Wind Farm Investment Calculator — formula workbook", subtitle: "Fictional wind farm “Musterhöhe” · 5 × 6.3 MW · Hesse, Germany" },
+const mw = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 2 });
+/** Sheet titles; the Readme names the turbines of the inputs, not the base case's. */
+const titles = (i: Inputs): Record<string, { title: string; subtitle: string }> => ({
+  Readme: {
+    title: "Wind Farm Investment Calculator — formula workbook",
+    subtitle: `Fictional wind farm “Musterhöhe” · ${i.project.turbines} × ${mw.format(i.project.turbineMw)} MW · Hesse, Germany`,
+  },
   Inputs: { title: "Inputs", subtitle: "Blue on yellow: inputs you may change. Purple: solved on the website — do not edit." },
   Timing: { title: "Timing", subtitle: "Dates, operating days, support shares, price index and loan calendar by calendar year" },
   Construction: { title: "Construction", subtitle: "By month: capex, VAT bridge, fees, interest during construction and funding" },
@@ -51,7 +56,7 @@ const TITLES: Record<string, { title: string; subtitle: string }> = {
   Scenarios: { title: "Scenarios", subtitle: "The workbook's results next to the website's" },
   Sensitivities: { title: "Sensitivities", subtitle: "Tornado and bid calculator of the website, as values" },
   Sources: { title: "Sources", subtitle: "Public sources behind the inputs" },
-};
+});
 
 export interface FormulaWorkbook {
   bytes: Uint8Array;
@@ -71,10 +76,12 @@ export function buildFormulaWorkbook(
   const grid = new Grid();
   const e = makeEnv(snapshot, grid);
   const checks = checksSheet(e);
-  const master = checks.rows.find((r) => r.kind === "scalar" && r.id === "chk.master");
-  const status = master && master.kind === "scalar" ? String(master.v) : "OK";
+  const value = (id: string) => {
+    const row = checks.rows.find((r) => r.kind === "scalar" && r.id === id);
+    return row && row.kind === "scalar" ? row.v : undefined;
+  };
   const defs = [
-    readmeSheet(e, t, pageUrl, status),
+    readmeSheet(e, t, pageUrl, String(value("chk.master") ?? "OK"), Number(value("chk.warnings") ?? 0)),
     inputsSheet(e),
     timingSheet(e),
     constructionSheet(e),
@@ -90,7 +97,7 @@ export function buildFormulaWorkbook(
     sourcesSheet(),
   ];
   for (const d of defs) grid.add(d);
-  const { sheets, manifest, scalars } = grid.render(TITLES);
+  const { sheets, manifest, scalars } = grid.render(titles(snapshot.inputs));
   const bytes = buildWorkbookXlsx({
     sheets,
     props: {

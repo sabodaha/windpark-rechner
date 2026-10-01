@@ -1703,13 +1703,21 @@ function payback(flows: DatedFlow[], codDay: number): number | null {
 // Checks and validity
 // ---------------------------------------------------------------------------------------------
 
-/** KfW 270 term variants (Merkblatt 05/2025): the longest term allowed for a number of grace years. */
+/** KfW 270 term variants (Merkblatt 05/2025): [loan term up to (years), grace years at most]. */
+export const KFW_VARIANTS: readonly (readonly [number, number])[] = [
+  [5, 1],
+  [10, 2],
+  [20, 3],
+  [30, 5],
+];
+/** KfW 270 drawdown period in months, and the longest it can be extended to (12 + 24). */
+export const KFW_DRAWDOWN_MONTHS = 12;
+export const KFW_DRAWDOWN_MAX_MONTHS = 36;
+
+/** The variant is the first whose term is not shorter than the loan's; a longer loan has none. */
 function kfwVariantOk(tenor: number, grace: number): boolean {
-  if (tenor <= 5) return grace <= 1;
-  if (tenor <= 10) return grace <= 2;
-  if (tenor <= 20) return grace <= 3;
-  if (tenor <= 30) return grace <= 5;
-  return false;
+  const variant = KFW_VARIANTS.find(([term]) => tenor <= term);
+  return variant !== undefined && grace <= variant[1];
 }
 
 function runChecks(
@@ -1855,8 +1863,8 @@ function runChecks(
   add(
     "kfwDrawdown",
     "inputs",
-    inputs.project.constructionMonths <= 12,
-    inputs.project.constructionMonths > 36 ? "warning" : "info",
+    inputs.project.constructionMonths <= KFW_DRAWDOWN_MONTHS,
+    inputs.project.constructionMonths > KFW_DRAWDOWN_MAX_MONTHS ? "warning" : "info",
     inputs.project.constructionMonths,
     "Drawdown within the KfW period of 12 months (extendable by up to 24 months)",
   );

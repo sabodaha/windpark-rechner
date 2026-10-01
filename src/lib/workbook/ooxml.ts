@@ -47,6 +47,10 @@ export interface SheetSpec {
   tabColor?: string;
   landscape?: boolean;
   zoom?: number;
+  /** List validations: the cell accepts only these values. */
+  validations?: { ref: string; list: string[] }[];
+  /** A wide period sheet: print at 70 % across pages with rows 1–4 and columns A–B repeated, instead of fitting one page. */
+  printTitles?: boolean;
 }
 
 export interface WorkbookSpec {
@@ -94,12 +98,13 @@ const NUMFMTS: Record<Fmt, { id: number; code?: string }> = {
   int: { id: 3 },
   dec2: { id: 4 },
   text: { id: 49 },
-  dec3: { id: 164, code: "#,##0.000" },
-  dec4: { id: 165, code: "0.0000" },
-  dec6: { id: 166, code: "0.000000" },
+  // More decimals only where a value has them: 0.8 shows as 0.80, 1.316 as 1.316 — the value is never rounded.
+  dec3: { id: 164, code: "#,##0.00#" },
+  dec4: { id: 165, code: "#,##0.00##" },
+  dec6: { id: 166, code: "#,##0.00##" },
   pct1: { id: 167, code: "0.0%" },
   pct2: { id: 10 },
-  pct3: { id: 168, code: "0.000%" },
+  pct3: { id: 168, code: "0.00#%" },
   date: { id: 169, code: "yyyy-mm-dd" },
   ratio: { id: 170, code: '0.00"x"' },
   year: { id: 1 },
@@ -214,7 +219,8 @@ function cellXml(ref: string, c: Cell, styles: StyleTable, withoutCache: boolean
 
 function sheetXml(sheet: SheetSpec, styles: StyleTable, book: WorkbookSpec): string {
   const tab = sheet.tabColor ? `<tabColor rgb="${sheet.tabColor}"/>` : "";
-  const sheetPr = `<sheetPr>${tab}<pageSetUpPr fitToPage="1"/></sheetPr>`;
+  const fit = !sheet.printTitles;
+  const sheetPr = `<sheetPr>${tab}${fit ? `<pageSetUpPr fitToPage="1"/>` : ""}</sheetPr>`;
   const fr = sheet.freeze;
   const pane =
     fr && (fr.rows > 0 || fr.cols > 0)
@@ -234,15 +240,26 @@ function sheetXml(sheet: SheetSpec, styles: StyleTable, book: WorkbookSpec): str
     });
     if (cells) rows += `<row r="${r + 1}">${cells}</row>`;
   });
+  const validations = sheet.validations?.length
+    ? `<dataValidations count="${sheet.validations.length}">` +
+      sheet.validations
+        .map(
+          (v) =>
+            `<dataValidation type="list" allowBlank="0" showErrorMessage="1" errorTitle="Not a valid value" ` +
+            `error="${esc(`Choose one of: ${v.list.join(", ")}`)}" sqref="${v.ref}"><formula1>${esc(`"${v.list.join(",")}"`)}</formula1></dataValidation>`,
+        )
+        .join("") +
+      `</dataValidations>`
+    : "";
   const hf =
     `<headerFooter><oddHeader>${esc(`&L&8${book.headerText}`)}</oddHeader>` +
     `<oddFooter>${esc(`&L&8${book.footerText}&R&8&A · &P / &N`)}</oddFooter></headerFooter>`;
   return (
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
-    `${sheetPr}${views}<sheetFormatPr defaultRowHeight="13.2"/>${cols}<sheetData>${rows}</sheetData>` +
+    `${sheetPr}${views}<sheetFormatPr defaultRowHeight="13.2"/>${cols}<sheetData>${rows}</sheetData>${validations}` +
     `<pageMargins left="0.4" right="0.4" top="0.6" bottom="0.6" header="0.3" footer="0.3"/>` +
-    `<pageSetup paperSize="9" orientation="${sheet.landscape === false ? "portrait" : "landscape"}" fitToWidth="1" fitToHeight="0"/>` +
+    `<pageSetup paperSize="9"${fit ? "" : ` scale="70"`} orientation="${sheet.landscape === false ? "portrait" : "landscape"}"${fit ? ` fitToWidth="1" fitToHeight="0"` : ""}/>` +
     `${hf}</worksheet>`
   );
 }
@@ -252,9 +269,14 @@ export function buildWorkbookXlsx(book: WorkbookSpec): Uint8Array {
   const sheetFiles = book.sheets.map((s) => sheetXml(s, styles, book));
   const names = book.sheets.map((s) => esc(s.name.slice(0, 31)));
   const p = book.props;
-  const definedNames = book.names?.length
-    ? `<definedNames>${book.names.map((n) => `<definedName name="${esc(n.name)}">${esc(n.ref)}</definedName>`).join("")}</definedNames>`
-    : "";
+  const quoted = (name: string) => (/^[A-Za-z][A-Za-z0-9_]*$/.test(name) ? name : `'${name.replace(/'/g, "''")}'`);
+  const printTitles = book.sheets
+    .map((s, i) =>
+      s.printTitles ? `<definedName name="_xlnm.Print_Titles" localSheetId="${i}">${esc(`${quoted(s.name)}!$A:$B,${quoted(s.name)}!$1:$4`)}</definedName>` : "",
+    )
+    .join("");
+  const named = (book.names ?? []).map((n) => `<definedName name="${esc(n.name)}">${esc(n.ref)}</definedName>`).join("");
+  const definedNames = named || printTitles ? `<definedNames>${printTitles}${named}</definedNames>` : "";
   const files: Record<string, Uint8Array> = {
     "[Content_Types].xml": strToU8(
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
