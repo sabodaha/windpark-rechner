@@ -12,7 +12,22 @@ import { ct, dateLabel, eurCompact, keur, meur, num, pct, ratio } from "@/lib/fo
 import { absoluteUrl, PATHS, SITE } from "@/lib/site";
 import { cn } from "@/lib/utils";
 import { en } from "@/messages/en";
-import { irrText, keep, npvText, SLIDE_COUNT, SLIDE_NAMES, statusOf, type ReportData, type SlideId } from "./data";
+import { VERIFIED_VARIANTS } from "@/lib/workbook/verification";
+import {
+  ASSUMPTION_GROUPS,
+  irrText,
+  keep,
+  LEFT_OUT,
+  notMeaningfulReason,
+  npvText,
+  risksTested,
+  roundToTotal,
+  SLIDE_COUNT,
+  SLIDE_NAMES,
+  statusOf,
+  type ReportData,
+  type SlideId,
+} from "./data";
 import { BODY_W, Bridge, Bullets, Gantt, Kpi, Panel, Slide, StatusIcon, Table, type BridgeStep, type Level, type Row, type SlideMeta } from "./parts";
 
 const m = (v: number) => v / 1e6;
@@ -52,6 +67,18 @@ export function Report({ d }: { d: ReportData }) {
 }
 
 type SlideProps = { d: ReportData; meta: SlideMeta };
+const LEVEL_WORD: Record<Level, string> = { ok: "OK", warning: "Warning", error: "Error", info: "Info" };
+/** Failed checks listed on the summary slide; the rest are counted. */
+const MAX_LISTED = 3;
+
+/** In place of a loan chart when the case has no loan. */
+function NoLoan({ text }: { text: string }) {
+  return (
+    <Panel className="mt-2">
+      <p className="text-[14px] leading-snug">{keep(text)}</p>
+    </Panel>
+  );
+}
 const kicker = (id: SlideId) => SLIDE_NAMES.find(([k]) => k === id)?.[1] ?? id;
 
 // 1 ---------------------------------------------------------------------------------------------
@@ -156,7 +183,12 @@ function SummarySlide({ d, meta }: SlideProps) {
             />
             <Kpi label={en.kpis.npv.label} value={npvText(b)} note={`At ${pct(i.macro.costOfEquity, 0)}, to financial close`} />
             <Kpi label={en.kpis.lcoe.label} value={ct(k.lcoeRealCt)} note={`Real 2026 money (nominal ${num(k.lcoeNominalCt, 2)} ct/kWh)`} />
-            <Kpi label={en.kpis.minDscr.label} value={ratio(k.minDscr)} note={`In ${k.minDscrYear}; covenant ${ratio(i.financing.covenantDscr)}, P90 1-yr ${ratio(d.results.p90.kpis.minDscr)}`} />
+            <Kpi
+              label={en.kpis.minDscr.label}
+              value={ratio(k.minDscr)}
+              note={k.minDscr === null ? "No loan, so no debt service" : `In ${k.minDscrYear}; covenant ${ratio(i.financing.covenantDscr)}, P90 1-yr ${ratio(d.results.p90.kpis.minDscr)}`}
+              tone={b.validity.covenantBreach ? "critical" : undefined}
+            />
             <Kpi label={en.kpis.debt.label} value={meur(k.debt)} note={`${pct(k.gearing, 1)} of uses; equity ${meur(k.equity)}`} />
           </div>
           <Panel title="Key messages">
@@ -177,24 +209,27 @@ function SummarySlide({ d, meta }: SlideProps) {
                   <li key={g} className="flex items-center gap-2">
                     <StatusIcon level={level} />
                     <span className="flex-1">{en.checks.groups[g]}</span>
-                    <span className="tabular text-muted-foreground">{n} checks</span>
+                    <span className="tabular text-muted-foreground">
+                      {LEVEL_WORD[level]} · {n} checks
+                    </span>
                   </li>
                 );
               })}
             </ul>
             {notOk.length > 0 && (
               <ul className="mt-2 border-t border-border pt-2 text-[12px] leading-snug text-muted-foreground">
-                {notOk.map((c) => (
+                {notOk.slice(0, MAX_LISTED).map((c) => (
                   <li key={c.id} className="flex gap-1.5">
                     <StatusIcon level={c.severity === "error" ? "error" : "warning"} className="mt-px size-3.5" />
                     <span>
                       {en.checks.ids[c.id] ?? c.id} — not met
                       {c.id === "bookEquity" && d.facts.negativeBookYears.length
-                        ? ` in ${d.facts.negativeBookYears[0]}–${d.facts.negativeBookYears.at(-1)}: the legal limits on distributions could bite (§ 30 GmbHG, § 172 (4) HGB)`
+                        ? ` in ${d.facts.negativeBookYears[0]}–${d.facts.negativeBookYears.at(-1)} (slide 12)`
                         : ""}
                     </span>
                   </li>
                 ))}
+                {notOk.length > MAX_LISTED && <li className="pl-5">and {notOk.length - MAX_LISTED} more: see the checks in the calculator</li>}
               </ul>
             )}
           </Panel>
@@ -234,8 +269,12 @@ function TimelineSlide({ d, meta }: SlideProps) {
           rows={[
             { label: "Award valid (§ 36e EEG)", start: tl.awardNotice, end: tl.awardLapse, color: SERIES[3]!, light: true, note: "36 months" },
             { label: "Construction", start: tl.financialClose, end: tl.cod, color: SERIES[1]!, note: `${i.project.constructionMonths} months` },
-            { label: "Loan: grace years", start: tl.financialClose, end: tl.graceEnd, color: SERIES[0]!, light: true, note: "interest only" },
-            { label: "Loan: repayment", start: tl.graceEnd, end: tl.loanMaturity, color: SERIES[0]!, note: `${instalments} quarterly instalments` },
+            ...(k.debt > 0
+              ? [
+                  { label: "Loan: grace years", start: tl.financialClose, end: tl.graceEnd, color: SERIES[0]!, light: true, note: "interest only" },
+                  { label: "Loan: repayment", start: tl.graceEnd, end: tl.loanMaturity, color: SERIES[0]!, note: `${instalments} quarterly instalments` },
+                ]
+              : []),
             { label: "EEG support", start: tl.cod, end: tl.eegEnd, color: SERIES[2]!, note: `20 years + ${d.facts.extensionDays} days (§ 51a)` },
             { label: "Operation", start: tl.cod, end: tl.endOfLife, color: "var(--primary)", note: `${i.project.lifetimeYears} years` },
             { label: "Decommissioning reserve", start: reserveStart, end: tl.endOfLife, color: SERIES[4]!, note: `last ${i.opex.decommissioningReserveYears} years` },
@@ -247,8 +286,8 @@ function TimelineSlide({ d, meta }: SlideProps) {
           <Fact label="Site quality" value={`${pct(i.energy.siteQuality, 0)} → ${num(k.fullLoadHoursP50, 0)} h at P50`} />
           <Fact label="Award announced" value={`${dateLabel(tl.awardNotice)}; COD after ${monthsToCod} months`} />
           <Fact label="Financial close" value={`${dateLabel(tl.financialClose)} (valuation date)`} />
-          <Fact label="First instalment" value={tl.firstInstalment ? dateLabel(tl.firstInstalment) : "—"} />
-          <Fact label="Loan term" value={`${f.tenorYearsFromClose} years, ${f.graceYears} grace years`} />
+          <Fact label="First instalment" value={k.debt > 0 && tl.firstInstalment ? dateLabel(tl.firstInstalment) : "—"} />
+          <Fact label="Loan term" value={k.debt > 0 ? `${f.tenorYearsFromClose} years, ${f.graceYears} grace years` : "no loan"} />
           <Fact label="Legal form" value={en.options.legalForm?.[i.tax.legalForm] ?? i.tax.legalForm} />
           <Fact label="EEG support ends" value={dateLabel(tl.eegEnd)} />
         </div>
@@ -267,21 +306,6 @@ function Fact({ label, value }: { label: string; value: string }) {
 }
 
 // 4 ---------------------------------------------------------------------------------------------
-
-const ASSUMPTION_GROUPS: [string, string[]][][] = [
-  [
-    ["Project", ["turbines", "turbineMw", "lifetime", "fc", "construction"]],
-    ["Energy yield", ["refYield", "siteQuality", "availability", "degradation", "sigma1", "negOutput"]],
-  ],
-  [
-    ["Revenue", ["award", "ceiling", "futures", "ltPrice", "capture", "dv", "municipal", "trueUpLag"]],
-    ["Costs", ["capexTotal", "contingency", "opexTotal", "lease", "decomCost", "gridFee"]],
-  ],
-  [
-    ["Financing", ["rate", "tenor", "grace", "repayment", "dscrP50", "dscrP90", "maxGearing", "bankBasis", "dsra"]],
-    ["Tax and valuation", ["legalForm", "hebesatz", "depYears", "coe", "infLR", "waccReal"]],
-  ],
-];
 
 /** A field's value as the input panel shows it, with its unit. */
 function fieldText(f: FieldDef, d: ReportData): string {
@@ -412,6 +436,7 @@ function EegSlide({ d, meta }: SlideProps) {
   const years = a.map((x) => x.year);
   const perKwh = (value: number, sold: number) => (sold > 0 ? (value / sold) * 100 : 0);
   const unrounded = i.revenue.awardPriceCt * k.correctionFactor;
+  const twoSided = i.revenue.twoSidedPremium;
   return (
     <Slide
       meta={meta}
@@ -426,10 +451,17 @@ function EegSlide({ d, meta }: SlideProps) {
             width={660}
             height={318}
             years={years}
-            bars={[{ id: "mp", label: "Market premium per kWh sold", color: SERIES[1]!, values: a.map((x) => perKwh(x.revenuePremium, x.energySoldKwh)) }]}
+            bars={[
+              {
+                id: "mp",
+                label: twoSided ? "Premium per kWh sold (negative: paid back)" : "Market premium per kWh sold",
+                color: SERIES[1]!,
+                values: a.map((x) => perKwh(x.revenuePremium, x.energySoldKwh)),
+              },
+            ]}
             lines={[{ id: "jw", label: "Annual market value of wind (JW)", color: SERIES[0]!, values: a.map((x) => x.marketValueEurKwh * 100) }]}
             refLines={[{ label: `AW ${num(k.awCt, 2)}`, value: k.awCt, labelAt: "right-below" }]}
-            yMin={0}
+            yMin={twoSided ? undefined : 0}
             format={(v) => `${num(v, 2)} ct`}
             axisFormat={(v) => num(v, 0)}
             ariaLabel="Annual market value of wind against the AW during the support period, ct/kWh"
@@ -443,7 +475,9 @@ function EegSlide({ d, meta }: SlideProps) {
                 { cells: [`Award price (tender of ${dateLabel(TENDER_FACTS.lastRoundDate)})`, ct(i.revenue.awardPriceCt)] },
                 { cells: [`× correction factor at ${pct(i.energy.siteQuality, 0)} site quality (§ 36h)`, num(k.correctionFactor, 3)] },
                 { cells: [`= AW, ${num(unrounded, 4)} rounded (§ 36h (5))`, ct(k.awCt)], bold: true, rule: true },
-                { cells: ["Premium = max(0, AW − annual market value)", "Anlage 1"] },
+                twoSided
+                  ? { cells: ["Two-sided: premium = AW − annual market value; paid back when negative", "stress"] }
+                  : { cells: ["Premium = max(0, AW − annual market value)", "Anlage 1"] },
                 { cells: [`No premium at negative prices: output share`, pct(i.energy.negativePriceOutputShare, 0)] },
                 { cells: [`Support: 20 years + § 51a extension`, `+${d.facts.extensionDays} days`] },
                 { cells: ["Support ends", dateLabel(b.timeline.eegEnd)] },
@@ -452,12 +486,12 @@ function EegSlide({ d, meta }: SlideProps) {
           </Panel>
           <Panel title="Premium by scenario">
             <Table
-              head={["", "Years paid", "Total", "AW from year 6"]}
+              head={["", twoSided ? "Years paid / paid back" : "Years paid", twoSided ? "Net total" : "Total", "AW from year 6"]}
               num={[1, 2, 3]}
               rows={SCENARIOS.map((s) => ({
                 cells: [
                   SCENARIO_LABEL[s],
-                  `${d.facts.premiumYears[s]} of ${d.facts.supportYears}`,
+                  twoSided ? `${d.facts.premiumYears[s]} / ${d.facts.paidBackYears[s]} of ${d.facts.supportYears}` : `${d.facts.premiumYears[s]} of ${d.facts.supportYears}`,
                   meur(d.facts.premiumTotal[s]),
                   ct((d.results[s].awPeriods[1] ?? d.results[s].awPeriods[0])!.awCt),
                 ],
@@ -559,6 +593,16 @@ function ConstructionSlide({ d, meta }: SlideProps) {
     other: "Other",
   };
   const U = en.overview.uses;
+  // Every table adds up as printed: lines rounded to their total (largest remainder).
+  const capexLines: [string, number][] = [
+    ...i.capex.items.map((it): [string, number] => [cx[it.key] ?? it.key, it.eurPerKw]),
+    [`Contingency ${pct(i.capex.contingencyPct, 0)}`, itemsTotal * i.capex.contingencyPct],
+  ];
+  const perKw = roundToTotal(capexLines.map(([, v]) => v), 0, b.kpis.capexPerKw);
+  const capexM = roundToTotal(capexLines.map(([, v]) => (v * capacityKw) / 1e6), 2, su.capex / 1e6);
+  const useKeys = ["capex", "upfrontFee", "commitmentFee", "interestDuringConstruction", "vatInterest", "dsraInitial", "workingCapitalInitial"] as const;
+  const usesK = roundToTotal(useKeys.map((key) => su[key] / 1000), 0, su.totalUses / 1000);
+  const sourcesK = roundToTotal([su.debt / 1000, su.equity / 1000], 0, su.totalSources / 1000);
   return (
     <Slide meta={meta} kicker={kicker("construction")} title={d.titles.construction} sources={d.cite("windguardCost2025", "kfw270Merkblatt", "ustg", "prospectuses")}>
       <div className="grid grid-cols-[520px_1fr_300px] gap-8">
@@ -588,10 +632,7 @@ function ConstructionSlide({ d, meta }: SlideProps) {
             head={["", "€/kW", "€m"]}
             num={[1, 2]}
             rows={[
-              ...i.capex.items.map((it) => ({ cells: [cx[it.key] ?? it.key, num(it.eurPerKw, 0), num((it.eurPerKw * capacityKw) / 1e6, 2)] })),
-              {
-                cells: [`Contingency ${pct(i.capex.contingencyPct, 0)}`, num(itemsTotal * i.capex.contingencyPct, 0), num((itemsTotal * i.capex.contingencyPct * capacityKw) / 1e6, 2)],
-              },
+              ...capexLines.map(([label], n) => ({ cells: [label, num(perKw[n]!, 0), num(capexM[n]!, 2)] })),
               { cells: ["Total capex", num(b.kpis.capexPerKw, 0), num(su.capex / 1e6, 2)], bold: true, rule: true },
             ]}
           />
@@ -601,12 +642,10 @@ function ConstructionSlide({ d, meta }: SlideProps) {
           <Table
             num={[1]}
             rows={[
-              ...(["capex", "upfrontFee", "commitmentFee", "interestDuringConstruction", "vatInterest", "dsraInitial", "workingCapitalInitial"] as const).map(
-                (key) => ({ cells: [U[key], keur(su[key])] }),
-              ),
+              ...useKeys.map((key, n) => ({ cells: [U[key], num(usesK[n]!, 0)] })),
               { cells: [U.totalUses, keur(su.totalUses)], bold: true, rule: true },
-              { cells: [U.debt, keur(su.debt)] },
-              { cells: [U.equity, keur(su.equity)] },
+              { cells: [U.debt, num(sourcesK[0]!, 0)] },
+              { cells: [U.equity, num(sourcesK[1]!, 0)] },
               { cells: [U.totalSources, keur(su.totalSources)], bold: true, rule: true },
             ]}
           />
@@ -641,6 +680,9 @@ function OpexSlide({ d, meta }: SlideProps) {
     [T.guaranteeFee!, y.guaranteeFee],
     [T.gridFee!, y.gridFee],
   ];
+  const shownLines = lines.filter(([, v]) => Math.abs(v) > 0.5);
+  const linesK = roundToTotal(shownLines.map(([, v]) => v / 1000), 0, y.opex / 1000);
+  const linesMwh = roundToTotal(shownLines.map(([, v]) => (v / y.energySoldKwh) * 1000), 2, (y.opex / y.energySoldKwh) * 1000);
   return (
     <Slide meta={meta} kicker={kicker("opex")} title={d.titles.opex} sources={d.cite("windguardCost2025", "leaseMarket", "hessenSecurity", "decommissioning", "prospectuses", "agnes", "eeg")}>
       <div className="grid grid-cols-[680px_1fr] gap-10">
@@ -671,7 +713,7 @@ function OpexSlide({ d, meta }: SlideProps) {
               head={["", "€ thousand", "€/MWh sold"]}
               num={[1, 2]}
               rows={[
-                ...lines.filter(([, v]) => Math.abs(v) > 0.5).map(([label, v]) => ({ cells: [label, keur(v), perMwh(v)] })),
+                ...shownLines.map(([label], n) => ({ cells: [label, num(linesK[n]!, 0), num(linesMwh[n]!, 2)] })),
                 { cells: ["Operating costs", keur(y.opex), perMwh(y.opex)], bold: true, rule: true },
                 { cells: [T.municipalRefund!, keur(y.municipalRefund), perMwh(y.municipalRefund)], muted: true },
               ]}
@@ -715,6 +757,9 @@ function FinancingSlide({ d, meta }: SlideProps) {
       <div className="grid grid-cols-[680px_1fr] gap-10">
         <div>
           <p className="mb-1 text-[13px] font-semibold">Lender’s case: revenue {basis}, € million</p>
+          {loanYears.length === 0 ? (
+            <NoLoan text={d.titles.financing} />
+          ) : (
           <YearChart
             width={680}
             height={300}
@@ -729,6 +774,7 @@ function FinancingSlide({ d, meta }: SlideProps) {
             axisFormat={axisM}
             ariaLabel="Lender's case: cash flow available for debt service at P50 and P90 against debt service, euro million"
           />
+          )}
           <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">
             The loan is the largest that keeps CFADS at least {ratio(f.targetDscrP50)} × debt service at P50 and {ratio(f.targetDscrP90)} × at P90 in
             every year of the lender’s case, and at most {pct(f.maxGearing, 0)} of uses. Taxes, fees and the reserve depend on the loan: the model iterates.
@@ -781,6 +827,9 @@ function DscrSlide({ d, meta }: SlideProps) {
       <div className="grid grid-cols-[680px_1fr] gap-10">
         <div>
           <p className="mb-1 text-[13px] font-semibold">DSCR by year, operating cases with the base-case loan</p>
+          {years.length === 0 ? (
+            <NoLoan text="No loan in this case: there is no debt service to cover, so no DSCR, covenant or lock-up." />
+          ) : (
           <YearChart
             width={680}
             height={300}
@@ -798,6 +847,7 @@ function DscrSlide({ d, meta }: SlideProps) {
             axisFormat={(v) => num(v, 1)}
             ariaLabel="Debt service cover ratio by year, base and one-year P90"
           />
+          )}
           <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">
             DSCR = CFADS ÷ (interest + principal); CFADS = EBITDA − change in working capital − taxes. Grace years carry interest only, so their
             DSCR is high.
@@ -845,6 +895,15 @@ function WaterfallSlide({ d, meta }: SlideProps) {
   const T = en.tables.rows;
   const kg = i.tax.legalForm === "KG";
   const neg = d.facts.negativeBookYears;
+  const r1 = (v: number) => Math.round(v * 10) / 10;
+  const M = (v: number) => v / 1e6;
+  const ebitda = r1(M(L.ebitda));
+  const cfads = r1(M(L.cfads));
+  const dist = r1(M(L.distribution));
+  const [rev, opexNet] = roundToTotal([M(L.revenue), -M(L.opex - L.municipalRefund)], 1, ebitda);
+  const [tax, wc] = roundToTotal([-M(L.taxes), -M(L.deltaWorkingCapital)], 1, cfads - ebitda);
+  const [int, prin, decom, rel] = roundToTotal([-M(L.interest), -M(L.principal), -M(L.decommissioning), M(L.reservesReleased)], 1, dist - cfads);
+  const one = (v: number) => num(v, 1);
   return (
     <Slide meta={meta} kicker={kicker("waterfall")} title={d.titles.waterfall} sources={d.cite("gewstg", "kstg", "estg", "bfhWindPark")}>
       <div className="grid grid-cols-[640px_1fr] gap-10">
@@ -877,17 +936,17 @@ function WaterfallSlide({ d, meta }: SlideProps) {
             <Table
               num={[1]}
               rows={[
-                { cells: [T.revenue!, num(L.revenue / 1e6, 1)] },
-                { cells: [`${T.opex!} net of the § 6 refund`, num(-(L.opex - L.municipalRefund) / 1e6, 1)] },
-                { cells: [T.ebitda!, num(L.ebitda / 1e6, 1)], bold: true, rule: true },
-                { cells: [T.taxes!, num(-L.taxes / 1e6, 1)] },
-                { cells: [T.deltaWorkingCapital!, num(-L.deltaWorkingCapital / 1e6, 1)] },
-                { cells: ["CFADS", num(L.cfads / 1e6, 1)], bold: true, rule: true },
-                { cells: [T.interest!, num(-L.interest / 1e6, 1)] },
-                { cells: [T.principal!, num(-L.principal / 1e6, 1)] },
-                { cells: [T.decommissioningPaid!, num(-L.decommissioning / 1e6, 1)] },
-                { cells: ["Reserves released (debt service reserve)", num(L.reservesReleased / 1e6, 1)] },
-                { cells: [T.distribution!, num(L.distribution / 1e6, 1)], bold: true, rule: true },
+                { cells: [T.revenue!, one(rev!)] },
+                { cells: [`${T.opex!} net of the § 6 refund`, one(opexNet!)] },
+                { cells: [T.ebitda!, one(ebitda)], bold: true, rule: true },
+                { cells: [T.taxes!, one(tax!)] },
+                { cells: [T.deltaWorkingCapital!, one(wc!)] },
+                { cells: ["CFADS", one(cfads)], bold: true, rule: true },
+                { cells: [T.interest!, one(int!)] },
+                { cells: [T.principal!, one(prin!)] },
+                { cells: [T.decommissioningPaid!, one(decom!)] },
+                { cells: ["Reserves released (debt service reserve)", one(rel!)] },
+                { cells: [T.distribution!, one(dist)], bold: true, rule: true },
                 { cells: ["Equity paid in during construction", num(-L.equityInvested / 1e6, 1)], muted: true },
               ]}
             />
@@ -947,9 +1006,13 @@ function ReturnsSlide({ d, meta }: SlideProps) {
           <Bullets
             className="text-[12.5px]"
             items={[
-              d.facts.negativeLeverage
-                ? `Negative leverage: the equity IRR (${irrText(b, 2)}) is below the project IRR after tax (${pct(k.projectIrrPostTax, 2)}) — the project earns less than the loan’s ${pct(i.financing.interestRate, 2)}.`
-                : `Positive leverage: the equity IRR (${irrText(b, 2)}) is above the project IRR after tax (${pct(k.projectIrrPostTax, 2)}).`,
+              !b.validity.returnsMeaningful
+                ? `The owners’ return is not meaningful: ${notMeaningfulReason(b)}. The project IRR after tax is ${pct(k.projectIrrPostTax, 2)}.`
+                : k.debt === 0
+                  ? `No loan: the owners earn the project’s return, ${irrText(b, 2)} (project IRR after tax ${pct(k.projectIrrPostTax, 2)}).`
+                  : d.facts.negativeLeverage
+                    ? `Negative leverage: the equity IRR (${irrText(b, 2)}) is below the project IRR after tax (${pct(k.projectIrrPostTax, 2)}) — the project earns less than the loan’s ${pct(i.financing.interestRate, 2)}.`
+                    : `Positive leverage: the equity IRR (${irrText(b, 2)}) is above the project IRR after tax (${pct(k.projectIrrPostTax, 2)}).`,
               k.lcoeRealCt > k.awCt
                 ? `The LCOE of ${ct(k.lcoeRealCt)} is above the AW of ${ct(k.awCt)}: the EEG floor alone does not cover the cost; the case relies on market prices.`
                 : `The LCOE of ${ct(k.lcoeRealCt)} is below the AW of ${ct(k.awCt)}: the EEG floor covers the cost.`,
@@ -989,9 +1052,12 @@ function ScenariosSlide({ d, meta }: SlideProps) {
           ]}
         />
         <div className="grid grid-cols-[1fr_300px] items-end gap-8">
+          {withDebt.length === 0 ? (
+            <NoLoan text="No loan in this case: there is no DSCR to compare across the scenarios." />
+          ) : (
           <YearChart
             width={840}
-            height={222}
+            height={212}
             years={withDebt.map((a) => a.year)}
             lines={SCENARIOS.map((s, n) => ({
               id: s,
@@ -1005,6 +1071,7 @@ function ScenariosSlide({ d, meta }: SlideProps) {
             axisFormat={(v) => num(v, 1)}
             ariaLabel="DSCR by year in the four scenarios"
           />
+          )}
           <p className="pb-6 text-[12px] leading-snug text-muted-foreground">
             DSCR by year in each scenario. {en.scenarios.note} Applying a P90 output to every year is a stress, not a 90% probability for the whole life.
           </p>
@@ -1018,6 +1085,7 @@ function ScenariosSlide({ d, meta }: SlideProps) {
 
 function SensitivitySlide({ d, meta }: SlideProps) {
   const bars = d.extras.tornado.equityIrr;
+  const meaningful = bars[0]?.base !== null && d.results.base.validity.returnsMeaningful;
   const base = bars[0]?.base ?? d.results.base.kpis.equityIrr ?? 0;
   const S = en.sensitivity;
   const settings = new Map(TORNADO_DRIVERS.map((x) => [x.id, x]));
@@ -1046,7 +1114,9 @@ function SensitivitySlide({ d, meta }: SlideProps) {
             ariaLabel="Tornado: equity IRR for the low and high value of each driver"
           />
           )}
-          <p className="mt-1 text-[11.5px] text-muted-foreground">Base: {pct(base, 2)}. Colour marks the side of the input (low / high), not better or worse.</p>
+          <p className="mt-1 text-[11.5px] text-muted-foreground">
+            Base: {meaningful ? pct(base, 2) : "not meaningful"}. Colour marks the side of the input (low / high), not better or worse.
+          </p>
         </div>
         <div className="flex flex-col gap-3">
           <Panel title="Settings">
@@ -1076,6 +1146,7 @@ function BidSlide({ d, meta }: SlideProps) {
   const shown = bid.feasible;
   const targetOnly = bid.target && bid.feasible && bid.target.awardPriceCt < bid.feasible.awardPriceCt - 1e-9 ? bid.target : null;
   const status = (ok: boolean | null): Level => (ok === null ? "info" : ok ? "ok" : "error");
+  const answer = (ok: boolean | null) => (ok === null ? "n/a" : ok ? "yes" : "no");
   return (
     <Slide meta={meta} kicker={kicker("bid")} title={d.titles.bid} sources={d.cite("bnetza2608", "bnetzaCeiling2026")}>
       <div className="grid grid-cols-[700px_1fr] gap-10">
@@ -1120,15 +1191,26 @@ function BidSlide({ d, meta }: SlideProps) {
             <ul className="mt-2 flex flex-col gap-1 text-[13px]">
               <li className="flex items-center gap-2">
                 <StatusIcon level={status(bid.target !== null)} />
-                {B.statusTarget}
+                <span>
+                  {B.statusTarget}: <span className="font-medium">{answer(bid.target !== null)}</span>
+                </span>
               </li>
               <li className="flex items-center gap-2">
                 <StatusIcon level={status(bid.feasible !== null)} />
-                {B.statusFinanceable}
+                <span>
+                  {B.statusFinanceable}: <span className="font-medium">{answer(bid.feasible !== null)}</span>
+                </span>
               </li>
               <li className="flex items-center gap-2">
                 <StatusIcon level={status(bid.admissible)} />
-                {bid.admissible === false ? B.aboveCeiling : B.statusAdmissible}
+                <span>
+                  {bid.admissible === false ? B.aboveCeiling : B.statusAdmissible}
+                  {bid.admissible !== false && (
+                    <>
+                      : <span className="font-medium">{answer(bid.admissible)}</span>
+                    </>
+                  )}
+                </span>
               </li>
             </ul>
             {targetOnly && <p className="mt-2 text-[12px] leading-snug text-muted-foreground">{B.targetOnly(ct(targetOnly.awardPriceCt))}</p>}
@@ -1143,7 +1225,8 @@ function BidSlide({ d, meta }: SlideProps) {
           />
           <p className="text-[11.5px] leading-snug text-muted-foreground">
             The IRR is not monotonic in the award price: a higher floor allows more debt at {pct(i.financing.interestRate, 2)}, which can lower the
-            equity return. The search therefore scans a 0.25 ct grid for the first qualifying price, then bisects.
+            equity return. The search therefore scans a 0.25 ct grid for the first qualifying price, bisects, and shows the lowest two-decimal price
+            that qualifies.
           </p>
         </div>
       </div>
@@ -1165,31 +1248,17 @@ function RisksSlide({ d, meta }: SlideProps) {
       <div className="grid grid-cols-2 gap-10">
         <Panel title="Risks the calculator lets you test">
           <Bullets
-            items={[
-              <><strong>Power price after the futures.</strong> The long-term price is the strongest assumption; the tornado shows its weight.</>,
-              <><strong>Wind resource.</strong> One-year and ten-year P90; a weaker site also re-sets the AW in the § 36h (2) reviews.</>,
-              <><strong>Negative prices.</strong> No premium in those periods (§ 51 EEG); more of them also lower the capture factor.</>,
-              <><strong>EEG 2027 draft.</strong> A two-sided premium is a switch — a simplified stress, not the draft’s calculation; 18 banks warned of financing risks (Sep 2026).</>,
-              <><strong>Interest rate and loan terms.</strong> KfW 270 at {pct(i.financing.interestRate, 2)}; DSCR targets, gearing and the revenue the bank counts on are inputs.</>,
-              <><strong>Timing.</strong> The award lapses 36 months after its announcement (§ 36e); a penalty applies after 30 months (§ 55). The checks flag late commissioning.</>,
-              <><strong>Generator grid fees.</strong> Proposed in the regulator’s AgNes process (4–7 €/kW a year); 0 in the base case, an input.</>,
-              <><strong>Distributions.</strong> Cash to equity is before § 30 GmbHG and § 172 (4) HGB; negative book equity is flagged.</>,
-            ]}
+            items={risksTested(i).map(([lead, rest]) => (
+              <>
+                <strong>{lead}</strong> {rest}
+              </>
+            ))}
             className="text-[13px]"
           />
         </Panel>
         <Panel title="What the model leaves out">
           <Bullets
-            items={[
-              "Operations are annual; output is spread evenly over the year (winter is in fact windier).",
-              "The farm’s capture price equals the market value of all onshore wind.",
-              "The partners’ income tax of a KG is not modelled; taxes are paid in the year they arise.",
-              "One senior loan: no tranches, shareholder loans, refinancing or cash sweep; instalments during construction are not supported.",
-              "Not modelled: the § 55 penalty for late commissioning, interest on § 36h paybacks, the interest barrier, and payments by the owners to cure a shortfall.",
-              "Uncompensated grid curtailment (a draft of the grid package) and generator grid fees are not in the base case; the fee is available as an input.",
-              "In the Excel workbook the loan, the total uses and the sculpted principal are solved on the website; the tornado and the bid calculator are included as values.",
-              "The wind farm is fictional and the results are illustrative.",
-            ]}
+            items={LEFT_OUT}
             className="text-[13px]"
           />
         </Panel>
@@ -1215,7 +1284,7 @@ function MethodologySlide({ d, meta }: SlideProps) {
               "Deterministic and nominal: the same inputs always give the same result. Construction runs monthly, operations by calendar year.",
               "Returns from dated cash flows (XIRR and XNPV, Actual/365). The loan is sized on the lender’s case and iterated until it changes by less than €0.50.",
               `${checks} checks in five groups on every run: calculation, funding, covenant, inputs and model scope.`,
-              "The Excel workbook rebuilds the model in formulas. Recalculated by Microsoft Excel in 25 variants, its roughly 26,000 formula cells agree with the engine: money to the cent.",
+              `The Excel workbook rebuilds the model in formulas. Recalculated by Microsoft Excel in ${VERIFIED_VARIANTS} variants, its roughly 26,000 formula cells agree with the engine: money to the cent.`,
               `Every input has a public source, checked on ${dateLabel(d.meta.dataAsOf)}, or is a documented assumption.`,
             ]}
           />

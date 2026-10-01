@@ -1,13 +1,15 @@
 {
   "file": "/wind-farm-calculator/wind-farm-report.pdf",
-  "bytes": 1516483,
-  "sha256": "abce439e736b29cf1215ede41168ebb9f85156fd53e5ece0c6038af0d6e794dc",
+  "bytes": 838193,
+  "sha256": "3bda2ef9618adc54f990bd48a8cdaf7f937c490f2788756af831fcdf3c289cab",
   "pages": 18,
   "tagged": true,
   "outline": true,
   "engineVersion": "2.1.0",
   "dataAsOf": "2026-09-30",
   "inputHash": "388d9b67b9e5fe67",
-  "dependencyHash": "01dd5d4e4fba8501619e57b6461d1a66dd805be14c0b371fd03ea8a4690ce4bb",
-  "dependencies": 31
+  "dependencyHash": "210e5e98f2b3ed4e0d2921e1c5ef2981d1c951f15a7ad79bac6f2047c7c5de15",
+  "dependencies": 39,
+  "contentHash": "2ec681f738226c3bff672df040a9a6ffd7acfb1479269d5d52fac663e7849284",
+  "browser": "Microsoft Edge 154.0.4258.37"
 }

@@ -6,6 +6,7 @@ import { CORRECTION_FACTOR_TABLE, DATA_AS_OF, P90_Z, SCENARIOS, TORNADO_DRIVERS 
 import { ct, dateLabel, eurCompact, meur, num, pct, ratio } from "@/lib/format";
 import { pageMetadata } from "@/lib/metadata";
 import { absoluteUrl, breadcrumbJsonLd, CALCULATOR_ID, graph, PATHS, PERSON_ID, SITE } from "@/lib/site";
+import { VERIFIED_VARIANTS } from "@/lib/workbook/verification";
 import { en } from "@/messages/en";
 
 const TITLE = "How the wind farm model works";
@@ -754,12 +755,14 @@ Solidarity    = 5.5% × corporate tax`}</pre>
             </li>
             <li>
               The <a href={PATHS.workbook}>Excel workbook</a> is a second implementation of the model in spreadsheet
-              formulas. Its copy without stored results was recalculated by Microsoft Excel alone. In 25 variants that
-              cover every switch — legal form, repayment profile, lender’s basis, two-sided stress, PPA, equity first,
-              declining-balance depreciation, Südregion, dates and lags — all of its roughly 26,000 formula cells agree
-              with the engine: money to the cent, rates and ratios to 10⁻⁷. In a negative control, a trade-tax
-              multiplier of 410 % instead of 400 % moves the tax lines and the equity IRR but not revenue, the loan or
-              capex.
+              formulas. Its copy without stored results was recalculated by Microsoft Excel alone. In{" "}
+              {VERIFIED_VARIANTS} variants — every switch (legal form, repayment profile, lender’s basis, two-sided
+              stress, PPA, equity first, declining-balance depreciation, Südregion, dates and lags) and the edge cases
+              of the reviews (no loan, no cash, negative returns, a lapsed award, inputs outside the usual range) — all
+              of its roughly 26,000 formula cells agree with the engine: money to the cent, rates and ratios to 10⁻⁷.
+              Two edits made in the file behave as described: a new cost of equity matches the engine in every cell; a
+              new award price shows no error and asks for a re-solve. In a negative control, a trade-tax multiplier of
+              410 % instead of 400 % moves the tax lines and the equity IRR but not revenue, the loan or capex.
             </li>
             <li>
               The workbook takes three results from the website as pasted values: the loan, the total uses and, for a

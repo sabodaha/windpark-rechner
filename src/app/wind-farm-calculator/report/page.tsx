@@ -1,3 +1,4 @@
+import localFont from "next/font/local";
 import { ReportView } from "@/components/report/ReportView";
 import { BASE_CASE } from "@/engine";
 import { modelExtras } from "@/lib/extras";
@@ -12,7 +13,24 @@ export const metadata = {
   robots: { index: false, follow: true },
 };
 
+// Static instances of Inter for this page only: printed to PDF, the site's variable font becomes Type 3 glyph
+// outlines, half of the file. See fonts/OFL.txt.
+const reportInter = localFont({
+  src: [
+    { path: "./fonts/Inter-Regular.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/Inter-Medium.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/Inter-SemiBold.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/Inter-Bold.woff2", weight: "700", style: "normal" },
+  ],
+  display: "swap",
+  fallback: ["system-ui", "Segoe UI", "sans-serif"],
+});
+
 export default function ReportPage() {
   // The tornado, bid calculator and IRR curve of the base case, computed once at build time.
-  return <ReportView baseExtras={modelExtras(BASE_CASE)} />;
+  return (
+    <div className={reportInter.className}>
+      <ReportView baseExtras={modelExtras(BASE_CASE)} />
+    </div>
+  );
 }

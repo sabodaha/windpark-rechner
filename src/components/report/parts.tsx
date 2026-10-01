@@ -75,12 +75,13 @@ export function Kpi({ label, value, note, tone }: { label: string; value: string
 
 export type Level = "ok" | "warning" | "error" | "info";
 
+/** Decorative: the status is always written next to the icon, so screen readers and the PDF tags get it as text. */
 export function StatusIcon({ level, className }: { level: Level; className?: string }) {
   const cls = cn("size-4 shrink-0", className);
-  if (level === "ok") return <CircleCheck className={cn(cls, "text-good-text")} aria-label="OK" />;
-  if (level === "warning") return <TriangleAlert className={cn(cls, "text-[#9a6700]")} aria-label="Warning" />;
-  if (level === "error") return <CircleAlert className={cn(cls, "text-critical")} aria-label="Error" />;
-  return <Info className={cn(cls, "text-muted-foreground")} aria-label="Info" />;
+  if (level === "ok") return <CircleCheck className={cn(cls, "text-good-text")} aria-hidden />;
+  if (level === "warning") return <TriangleAlert className={cn(cls, "text-[#9a6700]")} aria-hidden />;
+  if (level === "error") return <CircleAlert className={cn(cls, "text-critical")} aria-hidden />;
+  return <Info className={cn(cls, "text-muted-foreground")} aria-hidden />;
 }
 
 export interface Row {
@@ -227,7 +228,7 @@ export function Bridge({
   const hasUp = bars.some((b) => b.kind === "delta" && b.value > 0);
   const hasDown = bars.some((b) => b.kind === "delta" && b.value < 0);
   return (
-    <figure className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2">
       <ul className="flex gap-4 text-xs text-muted-foreground">
         {[
           { l: "Total", c: SERIES[0]!, show: true },
@@ -287,7 +288,7 @@ export function Bridge({
           );
         })}
       </svg>
-    </figure>
+    </div>
   );
 }
 

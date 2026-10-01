@@ -103,7 +103,7 @@ export function YearChart({ years, bars = [], lines = [], refLines = [], format,
   };
 
   return (
-    <figure className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2">
       {legend.length > 1 && <Legend items={legend} />}
       <div ref={ref} className="relative w-full">
         <svg
@@ -232,6 +232,6 @@ export function YearChart({ years, bars = [], lines = [], refLines = [], format,
           />
         )}
       </div>
-    </figure>
+    </div>
   );
 }

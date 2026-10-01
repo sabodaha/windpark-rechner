@@ -45,7 +45,7 @@ export function TornadoChart({ rows, base, format, lowName, highName, ariaLabel,
   const x = linear(ticks[0]!, ticks[ticks.length - 1]!, M.left, M.left + plotW);
 
   return (
-    <figure className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2">
       <Legend
         items={[
           { label: lowName, color: SERIES[0]!, kind: "bar" },
@@ -114,6 +114,6 @@ export function TornadoChart({ rows, base, format, lowName, highName, ariaLabel,
           />
         )}
       </div>
-    </figure>
+    </div>
   );
 }

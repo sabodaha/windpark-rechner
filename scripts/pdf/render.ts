@@ -4,23 +4,34 @@
 // Browser: $BROWSER, or Microsoft Edge at its default Windows path. No other dependencies.
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BASE_CASE, DATA_AS_OF, ENGINE_VERSION, hashInputs } from "../../src/engine";
-import { PATHS } from "../../src/lib/site";
-import { dependencyFiles, dependencyHash, inspectPdf, type PdfManifest } from "./deps";
+import { buildReportData } from "../../src/components/report/data";
+import { BASE_CASE, DATA_AS_OF, ENGINE_VERSION, hashInputs, runScenarios } from "../../src/engine";
+import { modelExtras } from "../../src/lib/extras";
+import { PATHS, SITE } from "../../src/lib/site";
+import { en } from "../../src/messages/en";
+import { dependencyFiles, dependencyHash, inspectPdf, reportFingerprint, setInfo, type PdfManifest } from "./deps";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const browser = process.env.BROWSER ?? "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 const port = Number(process.env.PDF_PORT ?? 3119);
 const target = join(root, "public", ...PATHS.reportPdf.split("/").filter(Boolean));
 const manifestPath = join(root, "scripts", "pdf", "manifest.json");
-const MAX_BYTES = 3 * 1024 * 1024;
+const MAX_BYTES = 1024 * 1024;
 const SLIDES = 18;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** "Microsoft Edge 154.0.3651.12": the newest version folder next to the browser executable. */
+function browserName(): string {
+  const versions = readdirSync(dirname(browser)).filter((n) => /^\d+(\.\d+){3}$/.test(n));
+  versions.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  const product = /msedge/i.test(basename(browser)) ? "Microsoft Edge" : basename(browser);
+  return `${product} ${versions.at(-1) ?? "(version unknown)"}`;
+}
 
 async function waitForServer(url: string): Promise<void> {
   for (let i = 0; i < 50; i++) {
@@ -77,18 +88,23 @@ async function main(): Promise<void> {
     }
     if (!existsSync(out)) throw new Error("the browser wrote no PDF");
 
-    const bytes = readFileSync(out);
+    // Chromium writes only the title; author, subject and keywords complete the document information.
+    const bytes = setInfo(readFileSync(out), {
+      Author: SITE.name,
+      Subject: `${en.report.title}: base case of the Wind Farm Investment Calculator. ${en.header.disclaimer}`,
+      Keywords: "wind farm, onshore wind, project finance, financial model, EEG, market premium, DSCR, LCOE, Germany",
+    });
     const info = inspectPdf(bytes);
     const problems = [
       info.pages !== SLIDES && `${info.pages} pages instead of ${SLIDES}: a slide overflows or the page size is wrong`,
-      bytes.length > MAX_BYTES && `${(bytes.length / 1e6).toFixed(2)} MB, above the 3 MB limit`,
+      bytes.length > MAX_BYTES && `${(bytes.length / 1e6).toFixed(2)} MB, above the 1 MB limit`,
       !info.tagged && "not tagged (no structure tree)",
       !info.outline && "no document outline",
     ].filter(Boolean);
     if (problems.length) throw new Error(`PDF rejected:\n  ${problems.join("\n  ")}`);
 
     mkdirSync(dirname(target), { recursive: true });
-    copyFileSync(out, target);
+    writeFileSync(target, bytes);
     const manifest: PdfManifest = {
       file: PATHS.reportPdf,
       bytes: bytes.length,
@@ -101,10 +117,12 @@ async function main(): Promise<void> {
       inputHash: hashInputs(BASE_CASE),
       dependencyHash: dependencyHash(root),
       dependencies: dependencyFiles(root).length,
+      contentHash: reportFingerprint(buildReportData(BASE_CASE, runScenarios(BASE_CASE), modelExtras(BASE_CASE), true)),
+      browser: browserName(),
     };
     writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
     console.log(`${PATHS.reportPdf}: ${info.pages} pages, ${(bytes.length / 1024).toFixed(0)} KB, tagged, with outline`);
-    console.log(`manifest: dependencies ${manifest.dependencies} files, hash ${manifest.dependencyHash.slice(0, 12)}…`);
+    console.log(`manifest: dependencies ${manifest.dependencies} files, hash ${manifest.dependencyHash.slice(0, 12)}…, content ${manifest.contentHash.slice(0, 12)}…, ${manifest.browser}`);
   } finally {
     server.kill();
     for (let i = 0; i < 20; i++) {
