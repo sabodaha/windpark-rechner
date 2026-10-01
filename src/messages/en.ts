@@ -9,7 +9,9 @@ export const en = {
   },
   header: {
     title: "Wind Farm Investment Calculator",
-    subtitle: "Fictional wind farm “Musterhöhe” · 5 × 6.3 MW · Hesse, Germany",
+    subtitle: (turbines: number, turbineMw: number) => `Fictional wind farm “Musterhöhe” · ${turbines} × ${turbineMw} MW · Hesse, Germany`,
+    ignored: (params: string) =>
+      `Not applied from the link — outside the allowed range or not an input: ${params}. The base case’s values are used instead.`,
     disclaimer: "Illustrative calculation — not investment, tax or legal advice. The wind farm is fictional.",
     dataAsOf: "Data as of",
     customInputs: "Custom inputs",

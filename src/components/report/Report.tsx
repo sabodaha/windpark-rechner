@@ -314,7 +314,7 @@ function fieldText(f: FieldDef, d: ReportData): string {
   if (f.kind === "select") return en.options[f.optionsKey ?? ""]?.[String(v)] ?? String(v);
   if (f.kind === "month") {
     const [y, mo] = String(v).split("-").map(Number);
-    return new Date(Date.UTC(y!, mo! - 1, 1)).toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
+    return new Date(Date.UTC(y!, mo! - 1, 1)).toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" }).replace("Sept", "Sep");
   }
   if (f.kind === "date") return dateLabel(String(v));
   const shown = num(Number(toDisplay(f, v)), f.decimals ?? 2);
@@ -330,7 +330,7 @@ function AssumptionsSlide({ d, meta }: SlideProps) {
     if (id === "futures") {
       const fut = d.inputs.revenue.futuresEurMwh;
       return {
-        cells: [`Futures ${fut[0]?.year}–${String(fut.at(-1)?.year).slice(2)}`, `${fut.map((x) => num(x.value, 0)).join(" / ")} €/MWh`, d.cite("futures")],
+        cells: [`Futures ${fut[0]?.year}–${String(fut.at(-1)?.year).slice(2)}`, `${fut.map((x) => num(x.value, 0)).join(" / ")} €/MWh`, d.cite("futures", "futures2029")],
       };
     }
     const f = FIELD_BY_ID.get(id);
@@ -340,7 +340,7 @@ function AssumptionsSlide({ d, meta }: SlideProps) {
     return { cells: [keep(en.fields[id]?.label ?? id), fieldText(f, d), src] };
   };
   const all = ASSUMPTION_GROUPS.flat().flatMap(([, ids]) => ids);
-  const keys = all.flatMap((id) => (id === "futures" ? ["futures"] : (FIELD_BY_ID.get(id)?.sources ?? [])));
+  const keys = all.flatMap((id) => (id === "futures" ? ["futures", "futures2029"] : (FIELD_BY_ID.get(id)?.sources ?? [])));
   return (
     <Slide meta={meta} kicker={kicker("assumptions")} title={d.titles.assumptions} sources={`${d.cite(...keys).split(", ").length} listed in the table`}>
       <div className="grid grid-cols-3 gap-7">
@@ -525,7 +525,7 @@ function PricesSlide({ d, meta }: SlideProps) {
       meta={meta}
       kicker={kicker("prices")}
       title={d.titles.prices}
-      sources={d.cite("futures", "priceScenarios", "netztransparenzMarketValues", "smard", "directMarketing", "ppa", "bundesbank", "ecb")}
+      sources={d.cite("futures", "futures2029", "priceScenarios", "netztransparenzMarketValues", "smard", "directMarketing", "ppa", "bundesbank", "ecb")}
     >
       <div className="grid grid-cols-[700px_1fr] gap-10">
         <div>

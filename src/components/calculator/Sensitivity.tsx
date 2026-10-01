@@ -1,5 +1,6 @@
 "use client";
 
+import { RadioGroup } from "@/components/ui/radio-group";
 import { useEffect, useState } from "react";
 import { tornado, type Inputs, type TornadoBar, type TornadoMetric } from "@/engine";
 import { TornadoChart } from "@/components/charts/TornadoChart";
@@ -40,20 +41,15 @@ export function Sensitivity({ inputs, t }: { inputs: Inputs; t: Messages }) {
           <CardTitle>{S.title}</CardTitle>
           <CardDescription>{S.subtitle}</CardDescription>
         </div>
-        <div role="radiogroup" aria-label={S.metric} className="inline-flex w-fit flex-wrap rounded-lg border border-border p-0.5">
-          {METRICS.map((m) => (
-            <button
-              key={m}
-              type="button"
-              role="radio"
-              aria-checked={metric === m}
-              onClick={() => setMetric(m)}
-              className={cn("rounded-md px-2.5 py-1 text-xs", metric === m ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-            >
-              {S.metrics[m]}
-            </button>
-          ))}
-        </div>
+        <RadioGroup
+          value={metric}
+          options={METRICS}
+          onChange={setMetric}
+          label={S.metric}
+          className="inline-flex w-fit flex-wrap rounded-lg border border-border p-0.5"
+          optionClassName={(checked) => cn("rounded-md px-2.5 py-1 text-xs", checked ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+          render={(m) => S.metrics[m]}
+        />
       </CardHeader>
       <CardContent className={cn("transition-opacity", busy && "opacity-50")}>
         {!bars ? (

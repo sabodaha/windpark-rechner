@@ -1,5 +1,4 @@
 // Site-wide facts: canonical address, author, pages and structured data (schema.org JSON-LD).
-import { DATA_AS_OF } from "@/engine";
 
 export const SITE = {
   url: "https://igorsabodakha.com",
@@ -21,7 +20,8 @@ export const SITE = {
     googlePlay: "https://play.google.com/store/apps/details?id=com.dartim_media.storywell",
     website: "https://dartim-media.com/",
   },
-  updated: DATA_AS_OF,
+  /** Last content change of the site (sitemap lastmod, dateModified); the data date is DATA_AS_OF. */
+  updated: "2026-10-01",
 } as const;
 
 /**

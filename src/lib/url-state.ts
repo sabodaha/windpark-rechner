@@ -63,6 +63,29 @@ export function decodeInputs(query: string, base: Inputs): Inputs | null {
   return changed ? inputs : null;
 }
 
+/** Parameters that platforms add to shared links; they are not inputs and not worth a notice. */
+const TRACKING = /^(utm_\w+|fbclid|gclid|msclkid|trk|trkInfo|li_fat_id|mc_cid|mc_eid|igshid|ref|si)$/;
+
+/**
+ * Parameters of a link that were not applied: a value outside a field's range or options, or a name that is no
+ * input (a typo, an old link). The calculator and the report list them instead of dropping them silently.
+ */
+export function ignoredParams(query: string): string[] {
+  const byId = new Map(FIELDS.filter((f) => !f.virtual).map((f) => [f.id, f]));
+  const out: string[] = [];
+  for (const [key, raw] of new URLSearchParams(query)) {
+    if (TRACKING.test(key)) continue;
+    const f = byId.get(key);
+    if (!f || decodeValue(f, raw) === undefined) out.push(`${key}=${raw}`);
+  }
+  return out;
+}
+
+/** The link carries inputs (valid or not), not only tracking tags: it wins over the last session. */
+export function linkHasInputs(query: string): boolean {
+  return [...new URLSearchParams(query).keys()].some((key) => !TRACKING.test(key));
+}
+
 export function saveToStorage(query: string): void {
   try {
     if (query) window.localStorage.setItem(STORAGE_KEY, query);

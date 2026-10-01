@@ -1,5 +1,6 @@
 "use client";
 
+import { RadioGroup } from "@/components/ui/radio-group";
 import { useState, type ReactNode } from "react";
 import type { Inputs, ModelResult, ScenarioName } from "@/engine";
 import { SERIES } from "@/components/charts/core";
@@ -9,6 +10,8 @@ import { dateLabel, keur, meur, num, pct, ratio } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Messages } from "@/messages/en";
 import { YearTable, type TableRow } from "./YearTable";
+
+const DSCR_VIEWS = ["operating", "lender"] as const;
 
 interface Props {
   inputs: Inputs;
@@ -77,23 +80,17 @@ export function Overview({ inputs, results, scenario, t }: Props) {
           title={C.dscr.title}
           subtitle={dscrView === "operating" ? C.dscr.subtitle : C.dscr.lenderNote(basis)}
           controls={
-            <div role="radiogroup" aria-label={C.dscr.title} className="inline-flex rounded-md border border-border p-0.5">
-              {(["operating", "lender"] as const).map((view) => (
-                <button
-                  key={view}
-                  type="button"
-                  role="radio"
-                  aria-checked={dscrView === view}
-                  onClick={() => setDscrView(view)}
-                  className={cn(
-                    "whitespace-nowrap rounded px-2 py-0.5 text-[11px]",
-                    dscrView === view ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {C.dscr[view]}
-                </button>
-              ))}
-            </div>
+            <RadioGroup
+              value={dscrView}
+              options={DSCR_VIEWS}
+              onChange={setDscrView}
+              label={C.dscr.title}
+              className="inline-flex rounded-md border border-border p-0.5"
+              optionClassName={(checked) =>
+                cn("whitespace-nowrap rounded px-2 py-0.5 text-[11px]", checked ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
+              }
+              render={(view) => C.dscr[view]}
+            />
           }
           table={
             dscrView === "operating"

@@ -56,6 +56,8 @@ export function Actions({ snapshot, pending, t, isCustom, onReset }: Props) {
 
   // The base case has a published PDF; other inputs open the report page, which the browser prints to PDF.
   const query = encodeInputs(snapshot.inputs, BASE_CASE);
+  // While newer inputs are calculated the link is off for mouse and keyboard alike: no address, no tab stop.
+  const reportOff = pending || !snapshot.results;
   return (
     <div className="no-print flex flex-wrap gap-2">
       <Button variant="outline" size="sm" onClick={download} disabled={busy || pending || !snapshot.results}>
@@ -72,12 +74,16 @@ export function Actions({ snapshot, pending, t, isCustom, onReset }: Props) {
       ) : (
         <Button asChild variant="outline" size="sm">
           <a
-            href={`${PATHS.report}?${query}`}
+            href={reportOff ? undefined : `${PATHS.report}?${query}`}
+            role={reportOff ? "link" : undefined}
             target="_blank"
             rel="noopener"
             title={t.actions.reportPrintHint}
-            aria-disabled={pending || !snapshot.results}
-            className={pending || !snapshot.results ? "pointer-events-none opacity-50" : undefined}
+            aria-disabled={reportOff || undefined}
+            onClick={(e) => {
+              if (reportOff) e.preventDefault();
+            }}
+            className={reportOff ? "pointer-events-none opacity-50" : undefined}
           >
             <FileText aria-hidden />
             {t.actions.reportPrint}

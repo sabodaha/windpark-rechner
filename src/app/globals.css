@@ -64,7 +64,7 @@
   --chart-axis: #c3c2b7;
   --chart-ink: #16181d;
   --chart-ink-2: #52514e;
-  --chart-muted: #898781;
+  --chart-muted: #706e68; /* 5.1:1 on the card, 4.7:1 on the page: chart labels pass WCAG AA (4.5:1) */
 }
 
 html {

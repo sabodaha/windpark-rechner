@@ -9,7 +9,10 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "out");
 const port = Number(process.env.PORT ?? 3109);
 
-/** `_headers`: an unindented path pattern, then indented "Name: value" lines. Host-specific rules are skipped. */
+/**
+ * `_headers`: an unindented path pattern, then indented "Name: value" lines ("! Name" removes a header). Host-specific
+ * rules are skipped.
+ */
 function parseHeaders(text) {
   const rules = [];
   let current = null;
@@ -19,6 +22,7 @@ function parseHeaders(text) {
       current = { pattern: line.trim(), headers: [] };
       rules.push(current);
     } else if (current) {
+      if (line.trim().startsWith("!")) continue; // "! Name" detaches a header Cloudflare adds; nothing to do here
       const i = line.indexOf(":");
       current.headers.push([line.slice(0, i).trim(), line.slice(i + 1).trim()]);
     }

@@ -60,12 +60,15 @@ export function ct(v: number | null | undefined, decimals = 2): string {
   return `${minus(nf(decimals, decimals).format(v))} ct/kWh`;
 }
 
+/** "30 Sep 2026": en-GB writes "Sept" for September; the texts use "Sep" throughout. */
 export function dateLabel(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
-  return new Date(Date.UTC(y!, m! - 1, d!)).toLocaleDateString(LOCALE, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+  return new Date(Date.UTC(y!, m! - 1, d!))
+    .toLocaleDateString(LOCALE, {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    })
+    .replace("Sept", "Sep");
 }

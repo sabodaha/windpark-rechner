@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { BASE_CASE, validateInputs } from "../src/engine";
 import { FIELDS, FIELD_BY_ID, sameValue, withField } from "../src/lib/fields";
-import { ct, keur, meur, num, pct, ratio } from "../src/lib/format";
-import { decodeInputs, encodeInputs } from "../src/lib/url-state";
+import { ct, dateLabel, keur, meur, num, pct, ratio } from "../src/lib/format";
+import { decodeInputs, encodeInputs, ignoredParams, linkHasInputs } from "../src/lib/url-state";
 import { en } from "../src/messages/en";
 
 describe("fields", () => {
@@ -85,6 +85,27 @@ describe("url state", () => {
         expect(issues, `${f.id} = ${shown}`).toEqual([]);
       }
     }
+  });
+});
+
+describe("link parameters that are not applied (R29)", () => {
+  it("lists values outside a field's range and unknown names, not tracking tags", () => {
+    expect(ignoredParams("gridFee=50&ltPrice=45&twoSided=1")).toEqual(["gridFee=50"]);
+    expect(ignoredParams("gridfee=5&repayment=balloon&utm_source=linkedin&fbclid=x")).toEqual(["gridfee=5", "repayment=balloon"]);
+    expect(ignoredParams(encodeInputs(withField(BASE_CASE, FIELD_BY_ID.get("award")!, 6), BASE_CASE))).toEqual([]);
+  });
+
+  it("a link with inputs, even unreadable ones, is not replaced by the last session", () => {
+    expect(linkHasInputs("gridFee=50")).toBe(true);
+    expect(linkHasInputs("utm_source=linkedin&fbclid=x")).toBe(false);
+    expect(linkHasInputs("")).toBe(false);
+  });
+});
+
+describe("dates", () => {
+  it("write September as Sep, like the hand-written texts", () => {
+    expect(dateLabel("2026-09-30")).toBe("30 Sep 2026");
+    expect(dateLabel("2026-10-01")).toBe("1 Oct 2026");
   });
 });
 

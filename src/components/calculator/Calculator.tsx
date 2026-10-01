@@ -27,7 +27,7 @@ const t = en;
 type Tab = keyof typeof en.tabs;
 
 export function Calculator() {
-  const { inputs, snapshot, pending, setField, reset, isCustom, restored } = useCalculator();
+  const { inputs, snapshot, pending, setField, reset, isCustom, restored, ignored } = useCalculator();
   const [scenario, setScenario] = useState<ScenarioName>("base");
   const [tab, setTab] = useState<Tab>("overview");
   const L = t.tables.rows;
@@ -42,7 +42,12 @@ export function Calculator() {
           <Badge variant={isCustom ? "neutral" : "outline"}>{isCustom ? t.header.customInputs : t.header.baseCase}</Badge>
           {restored && <span className="text-xs text-muted-foreground">{t.header.restored}</span>}
         </div>
-        <p className="text-sm text-muted-foreground">{t.header.subtitle}</p>
+        <p className="text-sm text-muted-foreground">{t.header.subtitle(inputs.project.turbines, Number(inputs.project.turbineMw.toFixed(2)))}</p>
+        {ignored.length > 0 && (
+          <p role="status" className="w-fit rounded-md border border-border bg-card px-2.5 py-1.5 text-xs">
+            {t.header.ignored(ignored.join(", "))}
+          </p>
+        )}
         <p className="text-xs text-muted-foreground">
           {t.header.disclaimer} {t.header.dataAsOf} {dateLabel(DATA_AS_OF)}.
         </p>

@@ -39,7 +39,9 @@ export default function PrivacyPage() {
         <p>
           This site sets no cookies, uses no analytics or tracking and loads no content from third parties; its fonts are
           served from this site. There is no contact form. The <Link href={PATHS.calculator}>calculator</Link> runs
-          entirely in your browser: your inputs are not sent to the server.
+          entirely in your browser: what you enter is calculated there and not sent to the server. Only when an address
+          that contains inputs is loaded — when you open, reload or share a calculator link with inputs after the “?” —
+          does that address, inputs included, reach the server like any page address (see “Hosting and server logs”).
         </p>
 
         <h2 id="en-controller">Controller</h2>
@@ -49,7 +51,8 @@ export default function PrivacyPage() {
         <p>
           The site is hosted by Cloudflare, Inc., 101 Townsend St, San Francisco, CA 94107, USA (Cloudflare Pages). To
           deliver the pages and protect them against attacks, Cloudflare processes technical data of every request: IP
-          address, date and time, the page requested, the referring page, browser and operating system.
+          address, date and time, the page requested (its full address, including any inputs in a calculator link), the
+          referring page, browser and operating system.
         </p>
         <p>
           Legal basis: Art. 6 (1) (f) GDPR — the legitimate interest in delivering the site securely and reliably.
@@ -68,7 +71,8 @@ export default function PrivacyPage() {
 
         <h2 id="en-downloads">Downloads and links</h2>
         <p>
-          The Excel file is created in your browser; no data is transmitted. Links to other websites, for example to
+          The Excel file is created in your browser; no data is transmitted. The report of your own inputs opens as a
+          page whose address contains them; you save it as a PDF in your browser. Links to other websites, for example to
           sources, take you to other providers, whose privacy policies apply.
         </p>
 
@@ -86,7 +90,7 @@ export default function PrivacyPage() {
           also lodge a complaint with a supervisory authority (Art. 77 GDPR), for example the{" "}
           <a href={HESSEN_DPA}>Hessian Commissioner for Data Protection and Freedom of Information</a>.
         </p>
-        <p>There is no automated decision-making or profiling. As of September 2026.</p>
+        <p>There is no automated decision-making or profiling. As of October 2026.</p>
       </section>
 
       <section lang="de" aria-labelledby="de">
@@ -95,7 +99,10 @@ export default function PrivacyPage() {
         <p>
           Diese Website setzt keine Cookies, nutzt keine Analyse- oder Tracking-Dienste und lädt keine Inhalte von
           Dritten; die Schriften werden von dieser Website geladen. Es gibt kein Kontaktformular. Der Rechner läuft
-          vollständig in Ihrem Browser: Ihre Eingaben werden nicht an den Server übertragen.
+          vollständig in Ihrem Browser: Ihre Eingaben werden dort berechnet und nicht an den Server übertragen. Nur wenn
+          eine Adresse mit Eingaben aufgerufen wird – wenn Sie einen Rechner-Link mit Eingaben nach dem „?“ öffnen, neu
+          laden oder weitergeben –, erreicht diese Adresse samt Eingaben den Server wie jede Seitenadresse (siehe
+          „Hosting und Server-Logfiles“).
         </p>
 
         <h3>Verantwortlicher</h3>
@@ -105,7 +112,8 @@ export default function PrivacyPage() {
         <p>
           Die Website wird bei Cloudflare, Inc., 101 Townsend St, San Francisco, CA 94107, USA (Cloudflare Pages)
           gehostet. Um die Seiten auszuliefern und vor Angriffen zu schützen, verarbeitet Cloudflare bei jedem Aufruf
-          technische Daten: IP-Adresse, Datum und Uhrzeit, aufgerufene Seite, verweisende Seite, Browser und
+          technische Daten: IP-Adresse, Datum und Uhrzeit, aufgerufene Seite (die vollständige Adresse, einschließlich
+          etwaiger Eingaben in einem Rechner-Link), verweisende Seite, Browser und
           Betriebssystem.
         </p>
         <p>
@@ -126,7 +134,9 @@ export default function PrivacyPage() {
 
         <h3>Downloads und Links</h3>
         <p>
-          Die Excel-Datei wird in Ihrem Browser erzeugt; dabei werden keine Daten übertragen. Links auf andere Websites,
+          Die Excel-Datei wird in Ihrem Browser erzeugt; dabei werden keine Daten übertragen. Der Bericht zu Ihren
+          eigenen Eingaben öffnet sich als Seite, deren Adresse diese Eingaben enthält; als PDF speichern Sie ihn in
+          Ihrem Browser. Links auf andere Websites,
           etwa auf Quellen, führen zu anderen Anbietern, deren Datenschutzerklärungen gelten.
         </p>
 
@@ -144,7 +154,7 @@ export default function PrivacyPage() {
           oben genannte Adresse. Sie können sich außerdem bei einer Aufsichtsbehörde beschweren (Art. 77 DSGVO), zum
           Beispiel beim <a href={HESSEN_DPA}>Hessischen Beauftragten für Datenschutz und Informationsfreiheit</a>.
         </p>
-        <p>Eine automatisierte Entscheidungsfindung oder ein Profiling findet nicht statt. Stand: September 2026.</p>
+        <p>Eine automatisierte Entscheidungsfindung oder ein Profiling findet nicht statt. Stand: Oktober 2026.</p>
       </section>
     </article>
   );

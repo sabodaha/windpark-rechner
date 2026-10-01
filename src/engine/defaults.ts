@@ -183,7 +183,7 @@ export const SOURCES: Record<string, Source> = {
     date: "2026-09-30",
   },
   futures: {
-    title: "EEX Phelix-DE baseload futures (via Tacto, 25 Sep 2026; power2market, 31 Aug 2026)",
+    title: "EEX Phelix-DE baseload futures Cal-27 and Cal-28 (via Tacto, 25 Sep 2026)",
     url: "https://www.tacto.ai/en/energy/electricity-price",
     date: "2026-09-25",
   },
@@ -302,5 +302,10 @@ export const SOURCES: Record<string, Source> = {
     title: "Solarserver (17 Sep 2026): generator grid fees under BNetzA AgNes, corridor 4–7 €/kW/yr",
     url: "https://www.solarserver.de/2026/09/17/eeg-2027-banken-fordern-uebergangsfristen-vor-bundestags-lesung",
     date: "2026-09-17",
+  },
+  futures2029: {
+    title: "EEX Phelix-DE baseload futures Cal-29 (power2market, 31 Aug 2026)",
+    url: "https://www.power2market.com/de/markets/de/termin",
+    date: "2026-08-31",
   },
 };

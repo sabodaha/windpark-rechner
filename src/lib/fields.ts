@@ -136,7 +136,7 @@ export const FIELDS: FieldDef[] = [
     get: (i) => i.revenue.longTermBaseEurMwh2026, set: (i, v) => void (i.revenue.longTermBaseEurMwh2026 = n(v)) },
   { id: "f2027", group: "revenue", kind: "number", unit: "€/MWh", decimals: 2, min: 0, max: 500, step: 0.5, sources: ["futures"], ...future(2027) },
   { id: "f2028", group: "revenue", kind: "number", unit: "€/MWh", decimals: 2, min: 0, max: 500, step: 0.5, sources: ["futures"], ...future(2028) },
-  { id: "f2029", group: "revenue", kind: "number", unit: "€/MWh", decimals: 2, min: 0, max: 500, step: 0.5, sources: ["futures"], ...future(2029) },
+  { id: "f2029", group: "revenue", kind: "number", unit: "€/MWh", decimals: 2, min: 0, max: 500, step: 0.5, sources: ["futures2029"], ...future(2029) },
   { id: "capture", group: "revenue", kind: "number", decimals: 2, min: 0.3, max: 1.2, usual: [0.7, 0.9], step: 0.01, sources: ["netztransparenzMarketValues", "assumption"],
     get: (i) => i.revenue.captureFactor, set: (i, v) => void (i.revenue.captureFactor = n(v)) },
   { id: "dv", group: "revenue", kind: "number", unit: "ct/kWh", decimals: 2, min: 0, max: 2, usual: [0.1, 0.4], step: 0.01, sources: ["windguardCost2025", "directMarketing", "assumption"],

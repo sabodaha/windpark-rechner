@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { BASE_CASE, InvalidInputsError, runScenarios, type Inputs, type ModelResult, type ScenarioName } from "@/engine";
 import { modelExtras, type ModelExtras } from "@/lib/extras";
 import { PATHS } from "@/lib/site";
-import { decodeInputs, encodeInputs } from "@/lib/url-state";
+import { decodeInputs, encodeInputs, ignoredParams } from "@/lib/url-state";
 import { en } from "@/messages/en";
 import { buildReportData } from "./data";
 import { SLIDE_W } from "./parts";
@@ -37,6 +37,8 @@ export function ReportView({ baseExtras }: { baseExtras: ModelExtras }) {
       setNotice(T.invalidLink);
       return;
     }
+    const ignored = ignoredParams(raw);
+    if (ignored.length) setNotice(en.header.ignored(ignored.join(", ")));
     const q = encodeInputs(inputs, BASE_CASE);
     if (!q) return;
     setQuery(q);

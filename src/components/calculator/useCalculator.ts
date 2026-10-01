@@ -13,7 +13,7 @@ import {
   type ScenarioName,
 } from "@/engine";
 import { type FieldDef, type FieldValue, withField } from "@/lib/fields";
-import { decodeInputs, encodeInputs, loadFromStorage, saveToStorage } from "@/lib/url-state";
+import { decodeInputs, encodeInputs, ignoredParams, linkHasInputs, loadFromStorage, saveToStorage } from "@/lib/url-state";
 
 /**
  * One completed calculation: the inputs and the results that belong to them. Everything shown or exported —
@@ -41,15 +41,20 @@ function calculate(inputs: Inputs): Snapshot {
 export function useCalculator() {
   const [inputs, setInputs] = useState<Inputs>(BASE_CASE);
   const [restored, setRestored] = useState(false);
+  /** Parameters of the opening link that were not applied, until the inputs are changed. */
+  const [ignored, setIgnored] = useState<string[]>([]);
   const deferred = useDeferredValue(inputs);
   const snapshot = useMemo(() => calculate(deferred), [deferred]);
   const pending = deferred !== inputs;
 
   useEffect(() => {
     const query = window.location.search.slice(1);
-    const fromUrl = query ? decodeInputs(query, BASE_CASE) : null;
-    if (fromUrl) {
-      setInputs(fromUrl);
+    // A link with inputs is what the visitor asked for — even if none of them can be read, the last session does
+    // not replace it: the base case plus the valid values, and a list of the rest.
+    if (linkHasInputs(query)) {
+      setIgnored(ignoredParams(query));
+      const fromUrl = decodeInputs(query, BASE_CASE);
+      if (fromUrl) setInputs(fromUrl);
       return;
     }
     const stored = loadFromStorage();
@@ -75,14 +80,16 @@ export function useCalculator() {
   const setField = useCallback((f: FieldDef, v: FieldValue) => {
     setInputs((prev) => withField(prev, f, v));
     setRestored(false);
+    setIgnored([]);
   }, []);
 
   const reset = useCallback(() => {
     setInputs(BASE_CASE);
     setRestored(false);
+    setIgnored([]);
   }, []);
 
   const isCustom = useMemo(() => encodeInputs(inputs, BASE_CASE) !== "", [inputs]);
 
-  return { inputs, snapshot, pending, setField, reset, isCustom, restored };
+  return { inputs, snapshot, pending, setField, reset, isCustom, restored, ignored };
 }

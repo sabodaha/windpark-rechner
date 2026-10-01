@@ -22,7 +22,7 @@ const GROUPS: { title: string; keys: string[] }[] = [
   },
   {
     title: "Power prices and market values",
-    keys: ["futures", "priceScenarios", "netztransparenzMarketValues", "smard", "directMarketing", "ppa"],
+    keys: ["futures", "futures2029", "priceScenarios", "netztransparenzMarketValues", "smard", "directMarketing", "ppa"],
   },
   {
     title: "Costs, site and energy yield",

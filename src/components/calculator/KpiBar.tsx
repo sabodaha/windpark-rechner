@@ -21,11 +21,12 @@ export function KpiBar({ results, inputs, scenario, t, pending, onChecks }: Prop
   const k = r.kpis;
   const v = r.validity;
   const nm = !v.returnsMeaningful;
-  const tiles: { key: keyof Messages["kpis"]; value: string; sub?: string; tone?: "bad"; hint?: string }[] = [
+  // critical (red): not meaningful, or the covenant is breached.
+  const tiles: { key: keyof Messages["kpis"]; value: string; sub?: string; tone?: "critical"; hint?: string }[] = [
     {
       key: "equityIrr",
       value: nm ? t.kpis.notMeaningful : pct(k.equityIrr, 2),
-      tone: nm || (k.equityIrr ?? 0) < 0 ? "bad" : undefined,
+      tone: nm ? "critical" : undefined,
       hint: nm ? t.kpis.notMeaningfulHint : undefined,
     },
     { key: "projectIrr", value: pct(k.projectIrrPostTax, 2) },
@@ -34,13 +35,13 @@ export function KpiBar({ results, inputs, scenario, t, pending, onChecks }: Prop
       key: "minDscr",
       value: ratio(k.minDscr),
       sub: scenario === "base" ? `${t.scenarios.p90}: ${ratio(results.p90.kpis.minDscr)}` : undefined,
-      tone: v.covenantBreach ? "bad" : undefined,
+      tone: v.covenantBreach ? "critical" : undefined,
     },
     { key: "debt", value: meur(k.debt), sub: `${pct(k.gearing, 0)} ${t.kpis.gearing}` },
     {
       key: "npv",
       value: nm ? t.kpis.notMeaningful : meur(k.npvEquity),
-      tone: nm || k.npvEquity < 0 ? "bad" : undefined,
+      tone: nm ? "critical" : undefined,
       hint: nm ? t.kpis.notMeaningfulHint : undefined,
     },
   ];
@@ -52,7 +53,7 @@ export function KpiBar({ results, inputs, scenario, t, pending, onChecks }: Prop
           <Popover key={tile.key}>
             <PopoverTrigger className="rounded-lg border border-border bg-card px-3 py-2 text-left transition-colors hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <div className="text-xs text-muted-foreground">{meta.label}</div>
-              <div className={cn("text-lg font-semibold leading-tight", tile.tone === "bad" && tile.value === t.kpis.notMeaningful && "text-critical")}>
+              <div className={cn("text-lg font-semibold leading-tight", tile.tone === "critical" && "text-critical")}>
                 {tile.value}
               </div>
               <div className="h-4 text-[11px] text-muted-foreground">{tile.sub ?? ""}</div>

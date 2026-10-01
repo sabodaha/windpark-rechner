@@ -1,5 +1,6 @@
 "use client";
 
+import { RadioGroup } from "@/components/ui/radio-group";
 import { Info, RotateCcw, TriangleAlert } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { SOURCES, type Inputs } from "@/engine";
@@ -83,7 +84,7 @@ export function FieldControl({ field: f, inputs, base, onChange, t }: Props) {
   return (
     <div className="py-2">
       <div className="flex items-center gap-1.5">
-        <label htmlFor={id} className="min-w-0 flex-1 truncate text-[13px] text-foreground">
+        <label id={`${id}-label`} htmlFor={id} className="min-w-0 flex-1 truncate text-[13px] text-foreground">
           {label}
         </label>
         <FieldHelp field={f} t={t} label={label} />
@@ -104,23 +105,20 @@ export function FieldControl({ field: f, inputs, base, onChange, t }: Props) {
       </div>
       {f.kind === "number" && <NumberInput id={id} field={f} value={Number(value)} onChange={onChange} t={t} changed={changed} />}
       {f.kind === "select" && (
-        <div className="mt-1.5 flex flex-wrap gap-1" role="radiogroup" aria-labelledby={id}>
-          {(f.options ?? []).map((o) => (
-            <button
-              key={o}
-              type="button"
-              role="radio"
-              aria-checked={value === o}
-              onClick={() => onChange(f, o)}
-              className={cn(
-                "rounded-md border px-2.5 py-1 text-xs transition-colors",
-                value === o ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card hover:bg-secondary",
-              )}
-            >
-              {t.options[f.optionsKey ?? ""]?.[o] ?? o}
-            </button>
-          ))}
-        </div>
+        <RadioGroup
+          value={String(value)}
+          options={f.options ?? []}
+          onChange={(o) => onChange(f, o)}
+          labelledBy={`${id}-label`}
+          className="mt-1.5 flex flex-wrap gap-1"
+          optionClassName={(checked) =>
+            cn(
+              "rounded-md border px-2.5 py-1 text-xs transition-colors",
+              checked ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card hover:bg-secondary",
+            )
+          }
+          render={(o) => t.options[f.optionsKey ?? ""]?.[o] ?? o}
+        />
       )}
       {(f.kind === "month" || f.kind === "date") && (
         <input
