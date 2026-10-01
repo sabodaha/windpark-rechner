@@ -4,8 +4,8 @@
 export type Locale = "en" | "de";
 export const LOCALES: readonly Locale[] = ["en", "de"];
 
-/** Locales whose pages are built and linked (language switcher, hreflang, sitemap). German joins at its launch. */
-export const PUBLISHED_LOCALES: readonly Locale[] = ["en"];
+/** Locales whose pages are built and linked (language switcher, hreflang, sitemap). */
+export const PUBLISHED_LOCALES: readonly Locale[] = ["en", "de"];
 
 /** Number and date formats: en-GB for English, de-DE for German. */
 export const INTL_LOCALE: Record<Locale, string> = { en: "en-GB", de: "de-DE" };

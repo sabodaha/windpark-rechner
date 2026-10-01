@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { JsonLd } from "@/components/site/JsonLd";
-import { BASE, BASE_CASE, BID_AT_COST_OF_EQUITY, premiumYears, TENDER_FACTS } from "@/content/baseCase";
+import { ProseTable as Table } from "@/components/site/ProseTable";
+import { BASE, TENDER_FACTS } from "@/content/baseCase";
+import { methodologyFacts, yearSpan } from "@/content/methodology";
 import { CORRECTION_FACTOR_TABLE, DATA_AS_OF, P90_Z, SCENARIOS, TORNADO_DRIVERS } from "@/engine";
 import { ct, dateLabel, eurCompact, meur, num, pct, ratio } from "@/lib/format";
 import { pageMetadata } from "@/lib/metadata";
@@ -37,70 +39,33 @@ function H2({ id, children }: { id: (typeof SECTIONS)[number][0]; children: Reac
   return <h2 id={id}>{children}</h2>;
 }
 
-function Table({ head, rows, num: numeric = [] }: { head: string[]; rows: ReactNode[][]; num?: number[] }) {
-  return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            {head.map((h, i) => (
-              <th key={h} scope="col" className={numeric.includes(i) ? "num" : undefined}>
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i}>
-              {r.map((c, j) => (
-                <td key={j} className={numeric.includes(j) ? "num" : undefined}>
-                  {c}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-/** "2043–2050" for a run of years, "2044" for one. */
-function yearSpan(years: number[]): string {
-  if (years.length === 0) return "";
-  return years.length === 1 ? String(years[0]) : `${years[0]}–${years.at(-1)}`;
-}
-
 export default function MethodologyPage() {
-  const b = BASE.base;
-  const k = b.kpis;
-  const tl = b.timeline;
-  const i = BASE_CASE;
-  const f = i.financing;
-  const su = b.sourcesUses;
-  const p90share = 1 - P90_Z * i.energy.sigma1y;
-  const p90share10 = 1 - P90_Z * i.energy.sigma10y;
-  const siteYield = i.energy.siteQuality * i.energy.referenceYieldHours;
-  const mv = (year: number) => (b.annual.find((a) => a.year === year)?.marketValueEurKwh ?? NaN) * 1000;
-  const instalments = 4 * (f.tenorYearsFromClose - f.graceYears);
-  const firstRepaymentYear = b.annual.find((a) => a.principal > 0)?.year;
-  const financing = su.upfrontFee + su.commitmentFee + su.interestDuringConstruction + su.vatInterest;
-  const bid = BID_AT_COST_OF_EQUITY;
-  const basePremium = premiumYears("base");
-  const downsidePremium = premiumYears("downside");
-  const reviewed = BASE.resource.awPeriods[1];
-  const negativeBook = b.annual.filter((a) => a.bookEquity < -1).map((a) => a.year);
-  const codMonths = Math.round(
-    (Date.parse(tl.cod) - Date.parse(i.revenue.awardNoticeDate)) / (1000 * 60 * 60 * 24 * 30.4375),
-  );
-  const unrounded = i.revenue.awardPriceCt * k.correctionFactor;
+  const {
+    b,
+    k,
+    tl,
+    i,
+    f,
+    su,
+    p90share,
+    p90share10,
+    siteYield,
+    mv,
+    instalments,
+    firstRepaymentYear,
+    financing,
+    bid,
+    basePremium,
+    downsidePremium,
+    reviewed,
+    negativeBook,
+    codMonths,
+    unrounded,
+    itemsTotal,
+    checkGroups,
+  } = methodologyFacts();
   const basis = en.overview.basis[b.sizing.bankPriceBasis] ?? "";
   const capexItems = i.capex.items;
-  const itemsTotal = capexItems.reduce((s, it) => s + it.eurPerKw, 0);
-  const checkGroups = (["integrity", "funding", "covenant", "inputs", "scope"] as const).map(
-    (g) => [g, b.checks.filter((c) => c.group === g)] as const,
-  );
   const capexLabel: Record<string, string> = {
     turbine: "Turbine incl. transport and installation",
     foundation: "Foundation",

@@ -1,4 +1,4 @@
-// Renders the social-sharing image (public/og.png) and the Apple touch icon (src/app/apple-icon.png) from
+// Renders the social-sharing images (public/og.png, German public/og-de.png) and the Apple touch icon (src/app/apple-icon.png) from
 // the HTML templates next to this file, with a local Chromium browser in headless mode. Run after a
 // build, which provides the self-hosted Inter font:  npm run build && node scripts/images/render.mjs
 // Browser: $BROWSER, or Microsoft Edge at its default Windows path.
@@ -69,4 +69,5 @@ async function render(template, out, width, height, font) {
 }
 
 await render("og.html", join(root, "public", "og.png"), 1200, 630, latinInter());
+await render("og.de.html", join(root, "public", "og-de.png"), 1200, 630, latinInter());
 await render("apple-icon.html", join(root, "src", "app", "apple-icon.png"), 180, 180);

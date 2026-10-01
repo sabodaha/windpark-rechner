@@ -14,8 +14,9 @@ export function SheetContent({
   className,
   children,
   title,
+  closeLabel = "Close",
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content> & { title: string }) {
+}: React.ComponentProps<typeof DialogPrimitive.Content> & { title: string; closeLabel?: string }) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/30 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
@@ -29,7 +30,7 @@ export function SheetContent({
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <DialogPrimitive.Title className="text-sm font-semibold">{title}</DialogPrimitive.Title>
-          <DialogPrimitive.Close className="rounded-md p-1 text-muted-foreground hover:bg-secondary" aria-label="Close">
+          <DialogPrimitive.Close className="rounded-md p-1 text-muted-foreground hover:bg-secondary" aria-label={closeLabel}>
             <X className="size-4" />
           </DialogPrimitive.Close>
         </div>

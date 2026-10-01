@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { Fragment } from "react";
 import { JsonLd } from "@/components/site/JsonLd";
+import { assumptionsByGroup, inputsCiting, sourceGroups, type SourceGroupId } from "@/content/sources";
 import { DATA_AS_OF, SOURCES } from "@/engine";
 import { dateLabel } from "@/lib/format";
-import { FIELDS, type FieldDef } from "@/lib/fields";
 import { pageMetadata } from "@/lib/metadata";
 import { absoluteUrl, breadcrumbJsonLd, graph, PATHS, PERSON_ID, SITE } from "@/lib/site";
 import { en } from "@/messages/en";
@@ -15,63 +15,21 @@ const DESCRIPTION =
 
 export const metadata = pageMetadata({ title: "Wind farm model sources", description: DESCRIPTION, path: PATHS.sources });
 
-const GROUPS: { title: string; keys: string[] }[] = [
-  {
-    title: "Tenders and the EEG",
-    keys: ["bnetza2608", "bnetzaCeiling2026", "eeg", "eegSettlement", "eegAwardDeadlines", "eeg2027Draft"],
-  },
-  {
-    title: "Power prices and market values",
-    keys: ["futures", "futures2029", "priceScenarios", "netztransparenzMarketValues", "smard", "directMarketing", "ppa"],
-  },
-  {
-    title: "Costs, site and energy yield",
-    keys: [
-      "windguardCost2025",
-      "fawsSiteQuality",
-      "fawsStatusH1",
-      "leeFullLoad",
-      "degradation",
-      "uncertainty",
-      "leaseMarket",
-      "decommissioning",
-      "hessenSecurity",
-      "agnes",
-    ],
-  },
-  { title: "Financing", keys: ["kfw270", "kfw270Merkblatt", "prospectuses", "gearing", "bankLetter"] },
-  { title: "Tax and VAT", keys: ["gewstg", "kstg", "estg", "bfhWindPark", "ustg"] },
-  { title: "Inflation and valuation", keys: ["bundesbank", "ecb", "ise2024"] },
-];
+const GROUP_TITLES: Record<SourceGroupId, string> = {
+  tenders: "Tenders and the EEG",
+  prices: "Power prices and market values",
+  costs: "Costs, site and energy yield",
+  financing: "Financing",
+  tax: "Tax and VAT",
+  valuation: "Inflation and valuation",
+  other: "Other",
+};
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-/** Input label as on the panel; generic labels ("Other") get their group so they stand alone on this page. */
-function fieldLabel(f: FieldDef, withDecade = true): string {
-  const base = f.opexCell ? en.inputs.opexItems[f.opexCell.item]! : (en.fields[f.id]?.label ?? f.id);
-  const label = base === "Other" ? `Other ${en.groups[f.group]?.toLowerCase()}` : base;
-  return f.opexCell && withDecade ? `${label} (${en.inputs.decade[f.opexCell.decade]?.toLowerCase()})` : label;
-}
-
-/** Inputs that cite a source, in the order of the input panel; opex cells collapse to one entry per item. */
-function inputsCiting(key: string): string[] {
-  return [...new Set(FIELDS.filter((f) => f.sources?.includes(key)).map((f) => fieldLabel(f, false)))];
-}
-
 export default function SourcesPage() {
-  const grouped = new Set(GROUPS.flatMap((g) => g.keys));
-  const groups = [
-    ...GROUPS.map((g) => ({ ...g, keys: g.keys.filter((k) => SOURCES[k]) })),
-    { title: "Other", keys: Object.keys(SOURCES).filter((k) => !grouped.has(k)) },
-  ].filter((g) => g.keys.length > 0);
-  // Assumptions by input group, in panel order.
-  const assumptions: [string, string[]][] = [];
-  for (const f of FIELDS.filter((x) => x.sources?.includes("assumption"))) {
-    const label = fieldLabel(f);
-    const entry = assumptions.find(([g]) => g === f.group);
-    if (!entry) assumptions.push([f.group, [label]]);
-    else if (!entry[1].includes(label)) entry[1].push(label);
-  }
+  const groups = sourceGroups().map((g) => ({ ...g, title: GROUP_TITLES[g.id] }));
+  const assumptions = assumptionsByGroup("en");
   const total = Object.keys(SOURCES).length;
 
   return (
@@ -116,7 +74,7 @@ export default function SourcesPage() {
             <ul className="!list-none !pl-0">
               {g.keys.map((key) => {
                 const s = SOURCES[key]!;
-                const used = inputsCiting(key);
+                const used = inputsCiting("en", key);
                 return (
                   <li key={key} className="border-b border-border py-3">
                     <a href={s.url} className="font-medium">

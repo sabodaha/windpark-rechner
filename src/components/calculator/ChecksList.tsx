@@ -7,10 +7,14 @@ import { useFormat } from "@/components/site/LocaleProvider";
 import type { Messages } from "@/messages";
 
 const ORDER: CheckGroup[] = ["integrity", "funding", "covenant", "inputs", "scope"];
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function ChecksList({ result, t }: { result: ModelResult; t: Messages }) {
   const f = useFormat();
   const C = t.checks;
+  /** Numbers and dates in the page's format; words ("one-sided") translated. */
+  const shown = (v: number | string) =>
+    typeof v === "number" ? f.num(v, Math.abs(v) < 100 ? 3 : 0) : ISO_DATE.test(v) ? f.dateLabel(v) : (C.values[v] ?? v);
   return (
     <Card>
       <CardHeader>
@@ -37,7 +41,7 @@ export function ChecksList({ result, t }: { result: ModelResult; t: Messages }) 
                         <div>{C.ids[c.id] ?? c.id}</div>
                         <div className="text-xs text-muted-foreground">
                           {status}
-                          {c.value !== null && ` · ${C.value}: ${typeof c.value === "number" ? f.num(c.value, Math.abs(c.value) < 100 ? 3 : 0) : c.value}`}
+                          {c.value !== null && ` · ${C.value}: ${shown(c.value)}`}
                         </div>
                       </div>
                     </li>

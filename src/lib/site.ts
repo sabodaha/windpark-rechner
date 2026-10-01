@@ -4,7 +4,6 @@ import { PUBLISHED_LOCALES, type Locale } from "./i18n";
 export const SITE = {
   url: "https://igorsabodakha.com",
   name: "Igor Sabodakha",
-  locale: "en_GB",
   jobTitle: "Finance professional",
   city: "Wiesbaden",
   countryCode: "DE",
@@ -63,12 +62,25 @@ export const PAGE_PATHS: Record<Locale, Record<PageId, string>> = {
   },
 };
 
-/** Every address of the site for one language: its pages and the downloads. */
+const PAGE_IDS = Object.keys(PAGE_PATHS.en) as PageId[];
+
+/**
+ * The pages built in each language. The German report's print view follows with the German report (DE5); until
+ * then its links lead to the English one.
+ */
+export const LOCALE_PAGES: Record<Locale, readonly PageId[]> = {
+  en: PAGE_IDS,
+  de: ["home", "calculator", "methodology", "sources", "about", "impressum", "privacy"],
+};
+
+export const hasPage = (locale: Locale, page: PageId) => LOCALE_PAGES[locale].includes(page);
+
+/** Every address of the site for one language: its pages (the English one where it has none yet) and the downloads. */
 export function paths(locale: Locale) {
+  const pages = Object.fromEntries(PAGE_IDS.map((id) => [id, PAGE_PATHS[hasPage(locale, id) ? locale : "en"][id]])) as Record<PageId, string>;
   return {
-    ...PAGE_PATHS[locale],
-    // The print view and the downloads stay English until the German report and workbook exist (phases DE5–DE6).
-    report: PAGE_PATHS.en.report,
+    ...pages,
+    // The workbook and the PDF stay English until the German ones exist (phases DE5–DE6).
     workbook: "/wind-farm-calculator/wind-farm-model.xlsx",
     /** The base case as a PDF, printed from the report page and committed to public/ (npm run report:pdf). */
     reportPdf: "/wind-farm-calculator/wind-farm-report.pdf",
@@ -97,11 +109,12 @@ export const SITEMAP: { page: PageId; priority: number }[] = [
   { page: "privacy", priority: 0.2 },
 ];
 
-/** hreflang alternates of a page across the published languages (none while only English is published). */
+/** hreflang alternates of a page across the published languages that have it (none while only one has it). */
 export function alternates(page: PageId): Record<string, string> | undefined {
-  if (PUBLISHED_LOCALES.length < 2) return undefined;
+  const locales = PUBLISHED_LOCALES.filter((l) => hasPage(l, page));
+  if (locales.length < 2) return undefined;
   const languages: Record<string, string> = {};
-  for (const locale of PUBLISHED_LOCALES) languages[locale] = PAGE_PATHS[locale][page];
+  for (const locale of locales) languages[locale] = PAGE_PATHS[locale][page];
   languages["x-default"] = PAGE_PATHS.en[page];
   return languages;
 }
@@ -112,15 +125,24 @@ export const PERSON_ID = `${SITE.url}/#person`;
 export const WEBSITE_ID = `${SITE.url}/#website`;
 export const CALCULATOR_ID = `${absoluteUrl(PATHS.calculator)}#app`;
 
-export function personJsonLd() {
+/** The person in the words of one language; the same @id on every page. */
+const PERSON_TEXT: Record<Locale, { jobTitle: string; knowsAbout: string[] }> = {
+  en: { jobTitle: SITE.jobTitle, knowsAbout: ["Financial modelling", "Project finance", "Business valuation", "Due diligence", "Audit"] },
+  de: {
+    jobTitle: "Finanzexperte",
+    knowsAbout: ["Finanzmodellierung", "Projektfinanzierung", "Unternehmensbewertung", "Due Diligence", "Wirtschaftsprüfung"],
+  },
+};
+
+export function personJsonLd(locale: Locale = "en") {
   return {
     "@type": "Person",
     "@id": PERSON_ID,
     name: SITE.name,
-    url: absoluteUrl(PATHS.about),
-    jobTitle: SITE.jobTitle,
+    url: absoluteUrl(PAGE_PATHS[locale].about),
+    jobTitle: PERSON_TEXT[locale].jobTitle,
     address: { "@type": "PostalAddress", addressLocality: SITE.city, addressCountry: SITE.countryCode },
-    knowsAbout: ["Financial modelling", "Project finance", "Business valuation", "Due diligence", "Audit"],
+    knowsAbout: PERSON_TEXT[locale].knowsAbout,
     sameAs: [...SITE.sameAs],
   };
 }

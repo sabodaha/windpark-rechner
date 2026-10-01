@@ -24,6 +24,8 @@ interface Props {
 
 const ROW = 30;
 const BAR = 12;
+/** Room between the driver labels and the plot, for the value label of a bar that reaches the left end. */
+const GAP = 44;
 
 /**
  * Horizontal bars from the base value: one bar for the low setting of each driver, one for the high
@@ -38,11 +40,11 @@ export function TornadoChart({ rows, base, format, lowName, highName, ariaLabel,
   const fit = Math.floor((labelW - 16) / 6);
   const short = (s: string) => (s.length > fit ? `${s.slice(0, Math.max(1, fit - 1)).trimEnd()}…` : s);
   const M = { top: 8, right: 56, bottom: 22, left: labelW };
-  const plotW = Math.max(40, width - M.left - M.right);
+  const plotW = Math.max(40, width - M.left - M.right - GAP);
   const height = rows.length * ROW;
   const values = rows.flatMap((r) => [r.low, r.high]).filter((v): v is number => v !== null && Number.isFinite(v));
   const ticks = niceTicks(Math.min(base, ...values), Math.max(base, ...values), 4);
-  const x = linear(ticks[0]!, ticks[ticks.length - 1]!, M.left, M.left + plotW);
+  const x = linear(ticks[0]!, ticks[ticks.length - 1]!, M.left + GAP, M.left + GAP + plotW);
 
   return (
     <div className="flex flex-col gap-2">
@@ -104,7 +106,7 @@ export function TornadoChart({ rows, base, format, lowName, highName, ariaLabel,
         {hover !== null && rows[hover] && (
           <Tooltip
             title={rows[hover].label}
-            x={M.left + plotW / 2}
+            x={M.left + GAP + plotW / 2}
             y={M.top + hover * ROW + ROW}
             containerWidth={width}
             rows={[

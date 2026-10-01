@@ -19,23 +19,23 @@ export function SiteHeader({ locale }: { locale: Locale }) {
       ]}
     />
   );
+  // Up to tablets: the name and the language switch share the first line, the menu has the second to itself. Wider
+  // screens: one line, the switch after the menu.
   return (
     <header className="no-print border-b border-border bg-card/60">
-      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-1 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
+      <div className="mx-auto flex w-full max-w-[1400px] flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 sm:px-6 md:flex-nowrap md:gap-x-4">
         <Link
           href={P.home}
-          className="w-fit rounded-md text-base font-semibold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="w-fit shrink-0 whitespace-nowrap rounded-md text-base font-semibold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {t.name}
         </Link>
-        {PUBLISHED_LOCALES.length > 1 ? (
-          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-            {nav}
+        {PUBLISHED_LOCALES.length > 1 && (
+          <div className="ml-auto md:order-last md:ml-0">
             <LanguageSwitch locale={locale} />
           </div>
-        ) : (
-          nav
         )}
+        <div className="w-full min-w-0 md:ml-auto md:w-auto">{nav}</div>
       </div>
     </header>
   );

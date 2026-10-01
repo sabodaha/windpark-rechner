@@ -32,6 +32,7 @@ function parseNumber(text: string): number | null {
 }
 
 export function SourcesNote({ field, t }: { field: FieldDef; t: Messages }) {
+  const f = useFormat();
   const keys = field.sources ?? [];
   if (keys.length === 0) return null;
   return (
@@ -46,9 +47,9 @@ export function SourcesNote({ field, t }: { field: FieldDef; t: Messages }) {
           ) : SOURCES[k] ? (
             <li key={k}>
               <a href={SOURCES[k].url} target="_blank" rel="noreferrer noopener" className="text-link hover:underline">
-                {SOURCES[k].title}
+                {t.sourceTitles[k] ?? SOURCES[k].title}
               </a>
-              <span className="text-muted-foreground"> · {SOURCES[k].date}</span>
+              <span className="text-muted-foreground"> · {f.dateLabel(SOURCES[k].date)}</span>
             </li>
           ) : null,
         )}
@@ -63,7 +64,7 @@ export function FieldHelp({ field, t, label }: { field: FieldDef; t: Messages; l
     <Popover>
       <PopoverTrigger
         className="rounded p-0.5 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        aria-label={`${label}: info and sources`}
+        aria-label={t.inputs.help(label)}
       >
         <Info className="size-3.5" />
       </PopoverTrigger>
@@ -175,8 +176,9 @@ function NumberInput({
 
   const [uMin, uMax] = f.usual ?? [NaN, NaN];
   const outside = f.usual !== undefined && (shown < uMin - 1e-9 || shown > uMax + 1e-9);
+  const unit = f.unit === undefined ? undefined : (t.units[f.unit] ?? f.unit);
   // A long unit ("% of revenue", "€ per turbine") needs a wider box, or the number itself gets cut off.
-  const box = !f.usual ? "w-full" : (f.unit?.length ?? 0) > 8 ? "w-40 shrink-0" : "w-28 shrink-0";
+  const box = !f.usual ? "w-full" : (unit?.length ?? 0) > 8 ? "w-40 shrink-0" : "w-28 shrink-0";
 
   return (
     <div className="mt-1.5 flex items-center gap-2">
@@ -221,7 +223,7 @@ function NumberInput({
           }}
           className="h-full min-w-0 flex-1 bg-transparent px-2 text-right text-sm tabular outline-none"
         />
-        {f.unit && <span className="shrink-0 pr-2 text-xs text-muted-foreground">{f.unit}</span>}
+        {unit && <span className="shrink-0 pr-2 text-xs text-muted-foreground">{unit}</span>}
       </div>
       {outside && (
         <span title={t.inputs.outsideUsual} className="text-warning" aria-label={t.inputs.outsideUsual}>

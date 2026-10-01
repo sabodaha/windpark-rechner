@@ -79,7 +79,7 @@ export function Calculator() {
                 {t.actions.editInputs}
               </Button>
             </SheetTrigger>
-            <SheetContent title={t.inputs.title}>
+            <SheetContent title={t.inputs.title} closeLabel={t.actions.closePanel}>
               <div className="overflow-y-auto px-4 pb-6">{panel}</div>
             </SheetContent>
           </Sheet>
@@ -183,7 +183,7 @@ function InvalidInputs({ issues, onReset, t }: { issues: InputIssue[]; onReset: 
           {issues.map((i) => (
             <li key={`${i.path}:${i.message}`}>
               {i.path && <span className="font-medium">{t.fields[PATH_FIELD[i.path] ?? ""]?.label ?? i.path}:</span>}{" "}
-              {i.message}
+              {t.invalid.issue[i.code](i)}
             </li>
           ))}
         </ul>

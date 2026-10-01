@@ -1,16 +1,17 @@
 "use client";
 
-// EN | DE: the same page in the other language. The calculator keeps its inputs: the link carries the current query.
+// EN | DE: the same page in the other language, or its home page where that language has no such page yet. The
+// calculator keeps its inputs: the link carries the current query.
 import { usePathname } from "next/navigation";
 import type { MouseEvent } from "react";
 import { LANGUAGE_NAME, PUBLISHED_LOCALES, type Locale } from "@/lib/i18n";
-import { PAGE_PATHS, pageOf } from "@/lib/site";
+import { hasPage, PAGE_PATHS, pageOf } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
 export function LanguageSwitch({ locale }: { locale: Locale }) {
   const pathname = usePathname();
   const here = pageOf(pathname);
-  const target = (other: Locale) => PAGE_PATHS[other][here?.page ?? "home"];
+  const target = (other: Locale) => PAGE_PATHS[other][here && hasPage(other, here.page) ? here.page : "home"];
   // The pages of the two languages have different root layouts: a full page load, with the calculator's inputs.
   const go = (e: MouseEvent<HTMLAnchorElement>, other: Locale) => {
     if (here?.page !== "calculator" || !window.location.search) return;

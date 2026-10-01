@@ -1,4 +1,5 @@
-// English UI texts. The German version will be a second object of the same type.
+// English UI texts. The German dictionary (de.ts) is a second object of the same type.
+import type { InputIssue, IssueCode } from "@/engine/validate";
 
 export const en = {
   meta: {
@@ -57,6 +58,20 @@ export const en = {
     title: "These inputs cannot be calculated",
     intro: "Change the inputs listed below or reset to the base case.",
     reset: "Reset to base case",
+    /** Each problem the engine reports, as text after the input's label. */
+    issue: {
+      notNumber: () => "is not a number",
+      notInteger: () => "must be a whole number",
+      outOfRange: ({ params }) => `must lie between ${params?.min} and ${params?.max}`,
+      notDate: () => "is not a valid date (YYYY-MM-DD)",
+      notFirstOfMonth: () => "must be the first day of a month",
+      missing: () => "is missing",
+      needsThreeValues: () => "needs three values",
+      graceNotShorterThanTenor: () => "the grace period must be shorter than the loan term",
+      repaymentBeforeCommissioning: ({ params }) =>
+        `repayment would start before commissioning; instalments during construction are not modelled — use at least ${params?.needed} grace years`,
+      error: ({ message }) => message,
+    } satisfies Record<IssueCode, (issue: InputIssue) => string>,
   },
   checks: {
     allPassed: "All checks passed",
@@ -98,6 +113,8 @@ export const en = {
     } as Record<string, string>,
     severity: { error: "Error", warning: "Warning", info: "Info" },
     value: "Value",
+    /** Text values of checks. */
+    values: { "one-sided": "one-sided", "two-sided": "two-sided" } as Record<string, string>,
     status: "Status",
     ok: "OK",
   },
@@ -121,8 +138,14 @@ export const en = {
     reset: "Reset to base case",
     outsideUsual: "Outside the usual range",
     decade: ["Years 1–10", "Years 11–20", "Years 21+"],
+    decadeShort: ["1–10", "11–20", "21+"],
     opexItems: { om: "Maintenance", mg: "Management", in: "Insurance", ot: "Other" } as Record<string, string>,
+    opexGrid: "Fixed opex (€/kW/yr)",
+    opexByDecade: "Opex by decade",
+    help: (label: string) => `${label}: info and sources`,
   },
+  /** Units of the input fields as shown, where they differ from the units in lib/fields.ts. */
+  units: {} as Record<string, string>,
   fields: {
     turbines: { label: "Number of turbines", hint: "Wind turbines in the park." },
     turbineMw: { label: "Turbine rating", hint: "Rated power per turbine. Base: the 6 MW class of the Deutsche WindGuard cost study." },
@@ -238,6 +261,7 @@ export const en = {
     } as Record<string, string>,
     basis: { floor: "on the EEG floor", base: "at base prices" } as Record<string, string>,
     sourcesUses: "Sources & uses of funds",
+    unitKeur: "€ thousand",
     uses: {
       capex: "Capex",
       upfrontFee: "Upfront fee",
@@ -344,6 +368,7 @@ export const en = {
     base: "Base",
     calculating: "Calculating…",
     notMeaningful: "No value for this measure in this case: the company runs out of cash, or a calculation check fails. The other measures still work.",
+    units: { pp: "pp", years: "yrs" },
     drivers: {
       siteQuality: "Site quality",
       longTermPrice: "Long-term power price",
@@ -393,6 +418,7 @@ export const en = {
     reset: "Reset",
     editInputs: "Edit assumptions",
     close: "Show results",
+    closePanel: "Close",
   },
   report: {
     title: "Wind farm model report",
@@ -415,6 +441,8 @@ export const en = {
     sourcesNote: "Every input has a public source or is a documented assumption.",
     version: (engine: string, hash: string) => `Engine ${engine} · inputs ${hash}`,
   },
+  /** Titles of the sources (engine/defaults.ts) where this language words them differently; the rest as there. */
+  sourceTitles: {} as Record<string, string>,
   site: {
     name: "Igor Sabodakha",
     skip: "Skip to content",

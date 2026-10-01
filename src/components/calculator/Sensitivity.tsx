@@ -2,21 +2,18 @@
 
 import { RadioGroup } from "@/components/ui/radio-group";
 import { useEffect, useState } from "react";
-import { tornado, type Inputs, type TornadoBar, type TornadoMetric } from "@/engine";
+import { tornado, TORNADO_DRIVERS, type Inputs, type TornadoBar, type TornadoMetric } from "@/engine";
 import { TornadoChart } from "@/components/charts/TornadoChart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FORMAT, type Format } from "@/lib/format";
+import { formatMetric, settingLabel } from "@/lib/tornado";
 import { useFormat } from "@/components/site/LocaleProvider";
 import { cn } from "@/lib/utils";
 import type { Messages } from "@/messages";
 
 const METRICS: TornadoMetric[] = ["equityIrr", "projectIrrPostTax", "minDscr", "lcoeRealCt"];
 
-export function formatMetric(metric: TornadoMetric, v: number, f: Format = FORMAT.en): string {
-  if (metric === "minDscr") return f.ratio(v);
-  if (metric === "lcoeRealCt") return f.ct(v);
-  return f.pct(v, 1);
-}
+
+const SETTINGS = new Map(TORNADO_DRIVERS.map((d) => [d.id, d.setting]));
 
 export function Sensitivity({ inputs, t }: { inputs: Inputs; t: Messages }) {
   const f = useFormat();
@@ -36,6 +33,10 @@ export function Sensitivity({ inputs, t }: { inputs: Inputs; t: Messages }) {
 
   const S = t.sensitivity;
   const base = bars?.[0]?.base ?? null;
+  const label = (b: TornadoBar, side: "low" | "high") => {
+    const s = SETTINGS.get(b.id);
+    return s ? settingLabel(s, side, f, S.units) : side === "low" ? b.lowLabel : b.highLabel;
+  };
   return (
     <Card>
       <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -61,7 +62,7 @@ export function Sensitivity({ inputs, t }: { inputs: Inputs; t: Messages }) {
         ) : (
           <>
             <TornadoChart
-              rows={bars.map((b) => ({ label: S.drivers[b.id] ?? b.id, lowLabel: b.lowLabel, highLabel: b.highLabel, low: b.low, high: b.high }))}
+              rows={bars.map((b) => ({ label: S.drivers[b.id] ?? b.id, lowLabel: label(b, "low"), highLabel: label(b, "high"), low: b.low, high: b.high }))}
               base={base}
               format={(v) => formatMetric(metric, v, f)}
               lowName={S.low}
@@ -86,9 +87,9 @@ export function Sensitivity({ inputs, t }: { inputs: Inputs; t: Messages }) {
                   {bars.map((b) => (
                     <tr key={b.id} className="border-b border-border last:border-0">
                       <td className="py-1">{S.drivers[b.id] ?? b.id}</td>
-                      <td className="py-1 text-right text-muted-foreground">{b.lowLabel}</td>
+                      <td className="py-1 text-right text-muted-foreground">{label(b, "low")}</td>
                       <td className="py-1 text-right">{b.low === null ? "—" : formatMetric(metric, b.low, f)}</td>
-                      <td className="py-1 text-right text-muted-foreground">{b.highLabel}</td>
+                      <td className="py-1 text-right text-muted-foreground">{label(b, "high")}</td>
                       <td className="py-1 text-right">{b.high === null ? "—" : formatMetric(metric, b.high, f)}</td>
                     </tr>
                   ))}

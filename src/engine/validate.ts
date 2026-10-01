@@ -3,9 +3,27 @@
 import { addMonths, addYears, isIsoDate, toDay } from "./dates";
 import type { Inputs } from "./types";
 
+/** What is wrong with an input; the interface turns it into text in the page's language. */
+export type IssueCode =
+  | "notNumber"
+  | "notInteger"
+  | "outOfRange"
+  | "notDate"
+  | "notFirstOfMonth"
+  | "missing"
+  | "needsThreeValues"
+  | "graceNotShorterThanTenor"
+  | "repaymentBeforeCommissioning"
+  /** Any other failure of a run; the message carries the error. */
+  | "error";
+
 export interface InputIssue {
   /** Path of the input, e.g. "project.financialClose". */
   path: string;
+  code: IssueCode;
+  /** Bounds of "outOfRange" (numbers, or ISO dates), grace years needed for "repaymentBeforeCommissioning". */
+  params?: { min?: number | string; max?: number | string; needed?: number };
+  /** The issue in English, for errors and logs. */
   message: string;
 }
 
@@ -85,18 +103,20 @@ const RULES: Rule[] = [
 ];
 
 function checkNumber(issues: InputIssue[], path: string, v: unknown, min: number, max: number, integer = false) {
-  if (typeof v !== "number" || !Number.isFinite(v)) issues.push({ path, message: "is not a number" });
-  else if (integer && !Number.isInteger(v)) issues.push({ path, message: "must be a whole number" });
-  else if (v < min - 1e-12 || v > max + 1e-12) issues.push({ path, message: `must lie between ${min} and ${max}` });
+  if (typeof v !== "number" || !Number.isFinite(v)) issues.push({ path, code: "notNumber", message: "is not a number" });
+  else if (integer && !Number.isInteger(v)) issues.push({ path, code: "notInteger", message: "must be a whole number" });
+  else if (v < min - 1e-12 || v > max + 1e-12) {
+    issues.push({ path, code: "outOfRange", params: { min, max }, message: `must lie between ${min} and ${max}` });
+  }
 }
 
 function checkDate(issues: InputIssue[], path: string, v: unknown, min: string, max: string, firstOfMonth = false) {
   if (typeof v !== "string" || !isIsoDate(v)) {
-    issues.push({ path, message: "is not a valid date (YYYY-MM-DD)" });
+    issues.push({ path, code: "notDate", message: "is not a valid date (YYYY-MM-DD)" });
     return false;
   }
-  if (firstOfMonth && !v.endsWith("-01")) issues.push({ path, message: "must be the first day of a month" });
-  if (v < min || v > max) issues.push({ path, message: `must lie between ${min} and ${max}` });
+  if (firstOfMonth && !v.endsWith("-01")) issues.push({ path, code: "notFirstOfMonth", message: "must be the first day of a month" });
+  if (v < min || v > max) issues.push({ path, code: "outOfRange", params: { min, max }, message: `must lie between ${min} and ${max}` });
   return true;
 }
 
@@ -108,7 +128,7 @@ export function validateInputs(i: Inputs): InputIssue[] {
     try {
       v = get(i);
     } catch {
-      issues.push({ path, message: "is missing" });
+      issues.push({ path, code: "missing", message: "is missing" });
       continue;
     }
     checkNumber(issues, path, v, min, max, integer);
@@ -124,7 +144,7 @@ export function validateInputs(i: Inputs): InputIssue[] {
   checkDate(issues, "revenue.awardNoticeDate", i.revenue?.awardNoticeDate, DATE_LIMITS.awardNoticeMin, DATE_LIMITS.awardNoticeMax);
 
   const list = <T,>(path: string, items: T[] | undefined, fn: (item: T, k: number) => void) => {
-    if (!Array.isArray(items)) issues.push({ path, message: "is missing" });
+    if (!Array.isArray(items)) issues.push({ path, code: "missing", message: "is missing" });
     else items.forEach(fn);
   };
   list("capex.items", i.capex?.items, (it, k) => checkNumber(issues, `capex.items[${k}].eurPerKw`, it.eurPerKw, 0, 10_000));
@@ -138,7 +158,7 @@ export function validateInputs(i: Inputs): InputIssue[] {
   });
   for (const key of ["maintenancePerKw", "managementPerKw", "insurancePerKw", "otherPerKw"] as const) {
     const t = i.opex?.[key];
-    if (!Array.isArray(t) || t.length !== 3) issues.push({ path: `opex.${key}`, message: "needs three values" });
+    if (!Array.isArray(t) || t.length !== 3) issues.push({ path: `opex.${key}`, code: "needsThreeValues", message: "needs three values" });
     else t.forEach((v, k) => checkNumber(issues, `opex.${key}[${k}]`, v, 0, 500));
   }
   if (issues.length > 0) return issues;
@@ -146,7 +166,11 @@ export function validateInputs(i: Inputs): InputIssue[] {
   // Cross-field rules.
   const f = i.financing;
   if (f.graceYears >= f.tenorYearsFromClose) {
-    issues.push({ path: "financing.graceYears", message: "the grace period must be shorter than the loan term" });
+    issues.push({
+      path: "financing.graceYears",
+      code: "graceNotShorterThanTenor",
+      message: "the grace period must be shorter than the loan term",
+    });
   }
   if (fcOk) {
     const fc = toDay(i.project.financialClose);
@@ -155,6 +179,8 @@ export function validateInputs(i: Inputs): InputIssue[] {
       const needed = Math.ceil(i.project.constructionMonths / 12);
       issues.push({
         path: "financing.graceYears",
+        code: "repaymentBeforeCommissioning",
+        params: { needed },
         message: `repayment would start before commissioning; instalments during construction are not modelled — use at least ${needed} grace years`,
       });
     }

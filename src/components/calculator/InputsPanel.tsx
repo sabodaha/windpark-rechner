@@ -4,6 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { type Inputs } from "@/engine";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useFormat } from "@/components/site/LocaleProvider";
 import { FIELDS, type FieldDef, type FieldValue, GROUPS, type GroupId, fromDisplay, sameValue, toDisplay } from "@/lib/fields";
 import { cn } from "@/lib/utils";
 import type { Messages } from "@/messages";
@@ -79,14 +80,14 @@ function OpexGrid({ cells, inputs, onChange, t }: { cells: FieldDef[]; inputs: I
   return (
     <div className="py-2">
       <div className="mb-1 flex items-center gap-1.5 text-[13px]">
-        <span className="flex-1">{t.fields.opexTotal?.label.replace(", years 1–10", "")} (€/kW/yr)</span>
-        {first && <FieldHelp field={first} t={t} label="Opex by decade" />}
+        <span className="flex-1">{t.inputs.opexGrid}</span>
+        {first && <FieldHelp field={first} t={t} label={t.inputs.opexByDecade} />}
       </div>
       <div className="grid grid-cols-[1fr_repeat(3,3.6rem)] items-center gap-1 text-xs">
         <span />
-        {t.inputs.decade.map((d) => (
+        {t.inputs.decadeShort.map((d) => (
           <span key={d} className="text-center text-[11px] text-muted-foreground">
-            {d.replace("Years ", "")}
+            {d}
           </span>
         ))}
         {items.map((item) => (
@@ -98,6 +99,7 @@ function OpexGrid({ cells, inputs, onChange, t }: { cells: FieldDef[]; inputs: I
 }
 
 function OpexRow({ item, cells, inputs, onChange, t }: { item: "om" | "mg" | "in" | "ot"; cells: FieldDef[]; inputs: Inputs; onChange: Props["onChange"]; t: Messages }) {
+  const shown = new Intl.NumberFormat(useFormat().intl, { maximumFractionDigits: 1, useGrouping: false });
   return (
     <>
       <span className="text-muted-foreground">{t.inputs.opexItems[item]}</span>
@@ -110,7 +112,7 @@ function OpexRow({ item, cells, inputs, onChange, t }: { item: "om" | "mg" | "in
             key={`${item}-${d}-${v}`}
             type="text"
             inputMode="decimal"
-            defaultValue={String(Math.round(v * 10) / 10)}
+            defaultValue={shown.format(Math.round(v * 10) / 10)}
             aria-label={`${t.inputs.opexItems[item]}, ${t.inputs.decade[d]}`}
             onBlur={(e) => {
               const x = Number(e.target.value.replace(",", "."));

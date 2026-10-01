@@ -50,9 +50,23 @@ export type TornadoMetric = "equityIrr" | "projectIrrPostTax" | "minDscr" | "lco
 
 export interface TornadoDriver {
   id: string;
+  /** The low and high settings in English ("60%", "25 yrs"), as the report and the workbook show them. */
   lowLabel: string;
   highLabel: string;
+  /** The same settings as numbers, for pages that format them in their own language. */
+  setting: TornadoSetting;
   apply: (inputs: Inputs, side: "low" | "high") => Inputs;
+}
+
+/**
+ * pct: a share or rate (0.6 → 60%); change: a relative change (−0.1 → −10%); pp: a change in percentage points
+ * (0.005 → +0.5 pp); eurMwh, ct, years: amounts in that unit; factor: a plain number.
+ */
+export interface TornadoSetting {
+  low: number;
+  high: number;
+  unit: "pct" | "change" | "pp" | "eurMwh" | "ct" | "years" | "factor";
+  decimals: number;
 }
 
 const scaleTuple = (t: [number, number, number], k: number): [number, number, number] => [t[0] * k, t[1] * k, t[2] * k];
@@ -69,30 +83,35 @@ export const TORNADO_DRIVERS: TornadoDriver[] = [
     id: "siteQuality",
     lowLabel: "60%",
     highLabel: "76%",
+    setting: { low: 0.6, high: 0.76, unit: "pct", decimals: 0 },
     apply: (i, s) => edit(i, (c) => void (c.energy.siteQuality = s === "low" ? 0.6 : 0.76)),
   },
   {
     id: "longTermPrice",
     lowLabel: "60 €/MWh",
     highLabel: "90 €/MWh",
+    setting: { low: 60, high: 90, unit: "eurMwh", decimals: 0 },
     apply: (i, s) => edit(i, (c) => void (c.revenue.longTermBaseEurMwh2026 = s === "low" ? 60 : 90)),
   },
   {
     id: "captureFactor",
     lowLabel: "0.72",
     highLabel: "0.86",
+    setting: { low: 0.72, high: 0.86, unit: "factor", decimals: 2 },
     apply: (i, s) => edit(i, (c) => void (c.revenue.captureFactor = s === "low" ? 0.72 : 0.86)),
   },
   {
     id: "awardPrice",
     lowLabel: "4.49 ct",
     highLabel: "6.06 ct",
+    setting: { low: 4.49, high: 6.06, unit: "ct", decimals: 2 },
     apply: (i, s) => edit(i, (c) => void (c.revenue.awardPriceCt = s === "low" ? 4.49 : 6.06)),
   },
   {
     id: "capex",
     lowLabel: "−10%",
     highLabel: "+10%",
+    setting: { low: -0.1, high: 0.1, unit: "change", decimals: 0 },
     apply: (i, s) =>
       edit(i, (c) => {
         const k = s === "low" ? 0.9 : 1.1;
@@ -103,6 +122,7 @@ export const TORNADO_DRIVERS: TornadoDriver[] = [
     id: "opex",
     lowLabel: "−10%",
     highLabel: "+10%",
+    setting: { low: -0.1, high: 0.1, unit: "change", decimals: 0 },
     apply: (i, s) =>
       edit(i, (c) => {
         const k = s === "low" ? 0.9 : 1.1;
@@ -116,12 +136,14 @@ export const TORNADO_DRIVERS: TornadoDriver[] = [
     id: "interestRate",
     lowLabel: "4.40%",
     highLabel: "6.05%",
+    setting: { low: 0.044, high: 0.0605, unit: "pct", decimals: 2 },
     apply: (i, s) => edit(i, (c) => void (c.financing.interestRate = s === "low" ? 0.044 : 0.0605)),
   },
   {
     id: "inflation",
     lowLabel: "−0.5 pp",
     highLabel: "+0.5 pp",
+    setting: { low: -0.005, high: 0.005, unit: "pp", decimals: 1 },
     apply: (i, s) =>
       edit(i, (c) => {
         const d = s === "low" ? -0.005 : 0.005;
@@ -135,6 +157,7 @@ export const TORNADO_DRIVERS: TornadoDriver[] = [
     id: "negativePrices",
     lowLabel: "3%",
     highLabel: "9%",
+    setting: { low: 0.03, high: 0.09, unit: "pct", decimals: 0 },
     apply: (i, s) =>
       edit(i, (c) => {
         const share = s === "low" ? 0.03 : 0.09;
@@ -147,18 +170,21 @@ export const TORNADO_DRIVERS: TornadoDriver[] = [
     id: "lease",
     lowLabel: "6%",
     highLabel: "14%",
+    setting: { low: 0.06, high: 0.14, unit: "pct", decimals: 0 },
     apply: (i, s) => edit(i, (c) => void (c.opex.leaseShareOfRevenue = s === "low" ? 0.06 : 0.14)),
   },
   {
     id: "hebesatz",
     lowLabel: "320%",
     highLabel: "450%",
+    setting: { low: 3.2, high: 4.5, unit: "pct", decimals: 0 },
     apply: (i, s) => edit(i, (c) => void (c.tax.hebesatz = s === "low" ? 3.2 : 4.5)),
   },
   {
     id: "lifetime",
     lowLabel: "25 yrs",
     highLabel: "30 yrs",
+    setting: { low: 25, high: 30, unit: "years", decimals: 0 },
     apply: (i, s) => edit(i, (c) => void (c.project.lifetimeYears = s === "low" ? 25 : 30)),
   },
 ];

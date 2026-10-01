@@ -41,10 +41,12 @@ export function createFormat(locale: Locale): Format {
   };
   const de = locale === "de";
   const na = de ? "k. A." : "n/a";
+  // German keeps a number and its unit on one line: no-break spaces, as Intl puts before "%".
+  const sp = de ? "\u00a0" : " ";
   const millions = (v: number, decimals: number) => {
     const sign = v < 0 ? "−" : "";
     const x = nf(decimals, decimals).format(Math.abs(v) / 1e6);
-    return de ? `${sign}${x} Mio. €` : `${sign}€${x}m`;
+    return de ? `${sign}${x}${sp}Mio.${sp}€` : `${sign}€${x}m`;
   };
   return {
     locale,
@@ -59,11 +61,11 @@ export function createFormat(locale: Locale): Format {
       if (a >= 999_500) return millions(v, 1);
       const sign = v < 0 ? "−" : "";
       const k = nf(0, 0).format(Math.round(a / 1000));
-      return de ? `${sign}${k} Tsd. €` : `${sign}€${k}k`;
+      return de ? `${sign}${k}${sp}Tsd.${sp}€` : `${sign}€${k}k`;
     },
     keur: (v) => (finite(v) ? minus(nf(0, 0).format(Math.round(v / 1000))) : na),
     ratio: (v, decimals = 2) => (finite(v) ? `${minus(nf(decimals, decimals).format(v))}x` : na),
-    ct: (v, decimals = 2) => (finite(v) ? `${minus(nf(decimals, decimals).format(v))} ct/kWh` : na),
+    ct: (v, decimals = 2) => (finite(v) ? `${minus(nf(decimals, decimals).format(v))}${sp}ct/kWh` : na),
     dateLabel: (iso) => {
       const [y, m, d] = iso.split("-").map(Number);
       const date = new Date(Date.UTC(y!, m! - 1, d!));

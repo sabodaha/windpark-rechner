@@ -32,7 +32,7 @@ function calculate(inputs: Inputs): Snapshot {
     return { inputs: model.inputs, inputHash: model.inputHash, engineVersion: model.engineVersion, results: model.scenarios, issues: null };
   } catch (e) {
     if (e instanceof InvalidInputsError) return { ...id, results: null, issues: e.issues };
-    return { ...id, results: null, issues: [{ path: "", message: e instanceof Error ? e.message : String(e) }] };
+    return { ...id, results: null, issues: [{ path: "", code: "error", message: e instanceof Error ? e.message : String(e) }] };
   }
 }
 

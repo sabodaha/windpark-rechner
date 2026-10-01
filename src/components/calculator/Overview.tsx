@@ -24,7 +24,8 @@ const m = (v: number) => v / 1e6;
 
 export function Overview({ inputs, results, scenario, t }: Props) {
   const fm = useFormat();
-  const fmtM = (v: number) => fm.num(v, 2);
+  /** A chart value in € million as money: "€21.46m" / "21,46 Mio. €". */
+  const fmtM = (v: number) => fm.meur(v * 1e6, 2);
   const fmtAxisM = (v: number) => fm.num(v, Math.abs(v) < 10 && v % 1 !== 0 ? 1 : 0);
   const fmtRatio = (v: number | null) => (v === null ? "—" : fm.ratio(v));
   const r = results[scenario];
@@ -71,7 +72,7 @@ export function Overview({ inputs, results, scenario, t }: Props) {
               { id: "ds", label: C.cashflow.debtService, color: SERIES[3]!, values: a.map((x) => -m(x.debtService)) },
             ]}
             lines={[{ id: "dist", label: C.cashflow.distribution, color: SERIES[4]!, values: a.map((x) => m(x.distribution)) }]}
-            format={(v) => `€${fmtM(v)}m`}
+            format={fmtM}
             axisFormat={fmtAxisM}
             ariaLabel={`${C.cashflow.title}, ${C.cashflow.subtitle}`}
           />
@@ -195,7 +196,7 @@ export function Overview({ inputs, results, scenario, t }: Props) {
               { id: "int", label: C.debtService.interest, color: SERIES[0]!, values: a.map((x) => m(x.interest)) },
               { id: "prin", label: C.debtService.principal, color: SERIES[1]!, values: a.map((x) => m(x.principal)) },
             ]}
-            format={(v) => `€${fmtM(v)}m`}
+            format={fmtM}
             axisFormat={fmtAxisM}
             ariaLabel={`${C.debtService.title}, ${C.debtService.subtitle}`}
           />
@@ -234,7 +235,7 @@ export function Overview({ inputs, results, scenario, t }: Props) {
           <CardHeader>
             <CardTitle>{t.overview.sourcesUses}</CardTitle>
             <CardDescription>
-              € thousand · {fm.pct(k.gearing, 1)} {t.kpis.gearing}
+              {t.overview.unitKeur} · {fm.pct(k.gearing, 1)} {t.kpis.gearing}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -266,7 +267,7 @@ export function Overview({ inputs, results, scenario, t }: Props) {
               </tbody>
             </table>
             <p className="mt-2 text-xs text-muted-foreground">
-              {t.kpis.debt.label}: {fm.meur(k.debt)} · Equity: {fm.meur(k.equity)}
+              {t.kpis.debt.label}: {fm.meur(k.debt)} · {t.overview.uses.equity}: {fm.meur(k.equity)}
             </p>
           </CardContent>
         </Card>
