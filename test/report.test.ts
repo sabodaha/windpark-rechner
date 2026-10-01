@@ -20,7 +20,9 @@ import {
 } from "../src/components/report/data";
 import { BASE_CASE, DATA_AS_OF, ENGINE_VERSION, hashInputs, runScenarios, SOURCES, type Inputs, type ModelResult, type ScenarioName } from "../src/engine";
 import { modelExtras, type ModelExtras } from "../src/lib/extras";
+import { pageMetadata } from "../src/lib/metadata";
 import { PATHS, SITE } from "../src/lib/site";
+import { en } from "../src/messages/en";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const results = runScenarios(BASE_CASE);
@@ -203,6 +205,15 @@ describe("report tables", () => {
   });
 });
 
+describe("page titles (mutation M17)", () => {
+  it("social cards carry the same title as the page: the layout's template", () => {
+    const m = pageMetadata({ title: en.report.title, description: "x", path: PATHS.report });
+    expect(m.title).toBe(en.report.title);
+    expect((m.openGraph as { title?: string }).title).toBe(`${en.report.title} — ${SITE.name}`);
+    expect((m.twitter as { title?: string }).title).toBe(`${en.report.title} — ${SITE.name}`);
+  });
+});
+
 describe("published PDF", () => {
   const manifest = JSON.parse(readFileSync(join(root, "scripts", "pdf", "manifest.json"), "utf8")) as PdfManifest;
   const file = join(root, "public", ...PATHS.reportPdf.split("/").filter(Boolean));
@@ -220,7 +231,8 @@ describe("published PDF", () => {
   it("names its author, subject and keywords, and embeds real fonts", () => {
     const bytes = readFileSync(file);
     const info = readInfo(bytes);
-    expect(info.Title).toContain(SITE.name);
+    // The page title as the layout's template writes it ("%s — Igor Sabodakha").
+    expect(info.Title).toBe(`${en.report.title} — ${SITE.name}`);
     expect(info.Author).toBe(SITE.name);
     expect(info.Subject).toMatch(/not investment, tax or legal advice/);
     expect(info.Keywords).toMatch(/project finance/);

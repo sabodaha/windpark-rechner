@@ -115,7 +115,10 @@ export function buildFormulaWorkbook(
   return { bytes, manifest, scalars, snapshot };
 }
 
-/** Everything the download button needs: canonical inputs → snapshot → extras → workbook. */
+/**
+ * Everything the download button needs: canonical inputs → snapshot (with the trace) → extras → workbook. The
+ * export boundary: inputs are rounded to what the workbook stores, so its formulas reproduce the snapshot to the cent.
+ */
 export function workbookForInputs(inputs: Inputs, t: Messages, pageUrl: string): FormulaWorkbook {
   const canonical = canonicalInputs(inputs);
   return buildFormulaWorkbook(buildSnapshot(canonical), workbookExtras(canonical), t, pageUrl);

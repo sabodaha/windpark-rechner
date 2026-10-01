@@ -5,6 +5,8 @@ param([Parameter(Mandatory = $true)][string]$Dir)
 $excel = New-Object -ComObject Excel.Application
 $excel.Visible = $false
 $excel.DisplayAlerts = $false
+# The Excel that recalculated: verify.ts archive puts it into verification/excel-run.json.
+"Microsoft Excel $($excel.Version) (build $($excel.Build))" | Set-Content -Path (Join-Path $Dir "excel-version.txt") -Encoding utf8
 try {
     Get-ChildItem -Path $Dir -Filter "*.nocache.xlsx" | ForEach-Object {
         $target = Join-Path $_.DirectoryName ($_.Name -replace "\.nocache\.xlsx$", ".recalc.xlsx")

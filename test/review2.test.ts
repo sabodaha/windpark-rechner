@@ -1,6 +1,6 @@
 // Cases found by the second external review (1 Oct 2026). Each was a real defect; each test pins its fix.
 import { describe, expect, it } from "vitest";
-import { BASE_CASE, runModel, solveAwardPrice, tornado, TORNADO_DRIVERS, type Inputs, type ModelResult } from "../src/engine";
+import { BASE_CASE, runModel, runScenarios, solveAwardPrice, tornado, TORNADO_DRIVERS, type Inputs, type ModelResult } from "../src/engine";
 import { decodeInputs } from "../src/lib/url-state";
 
 const edit = (fn: (c: Inputs) => void, from: Inputs = BASE_CASE): Inputs => {
@@ -176,3 +176,35 @@ describe("date boundaries (R07–R09)", () => {
     expect(y.receivablesPremium).toBeCloseTo(y.revenuePremium - y.premiumAdvance + y.municipalRefund, 6);
   });
 });
+
+// Mutations that survived the reviewer's test run (Opus, T-1): each test below fails if the bug comes back.
+describe("waterfall order and lock-up (mutations M03, M05)", () => {
+  it("cash held back under the lock-up covers a shortfall before the debt service reserve", () => {
+    const i = edit((c) => {
+      c.revenue.longTermBaseEurMwh2026 = 80;
+      c.financing.lockupDscr = 1.2;
+      c.revenue.bankPriceBasis = "base";
+    });
+    const r = runScenarios(i, { trace: true }).downside;
+    const w = r.trace!.waterfall;
+    const used = r.annual.map((a, y) => ({ year: a.year, used: w.trappedUsed[y]!, open: w.dsraOpen[y]!, draw: w.dsraDraw[y]!, trapped: w.trappedClose[y]! }));
+    // The fixture: in 2031 the held-back cash pays the shortfall and the reserve is not touched.
+    const y2031 = used.find((u) => u.year === 2031)!;
+    expect(y2031.used).toBeGreaterThan(1);
+    expect(y2031.open).toBeGreaterThan(1);
+    expect(y2031.draw).toBe(0);
+    // In general: the reserve is drawn only once the held-back cash is gone.
+    for (const u of used) if (u.draw > 0) expect(u.trapped, `${u.year}`).toBe(0);
+  });
+
+  it("the lock-up applies in the year the loan matures", () => {
+    // A threshold above every DSCR of the case locks every year with debt service, the maturity year included.
+    const top = Math.max(...runModel(BASE_CASE).annual.map((a) => a.dscr ?? 0));
+    const r = runModel(edit((c) => void (c.financing.lockupDscr = Math.ceil(top) + 1)));
+    const maturityYear = Number(r.timeline.loanMaturity.slice(0, 4));
+    const withDebtService = r.annual.filter((a) => a.debtService >= 1).map((a) => a.year);
+    expect(withDebtService).toContain(maturityYear);
+    expect(r.validity.lockUpYears).toEqual(withDebtService);
+  });
+});
+

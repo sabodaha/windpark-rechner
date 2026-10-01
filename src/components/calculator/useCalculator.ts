@@ -3,10 +3,10 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   BASE_CASE,
+  buildSnapshot,
   ENGINE_VERSION,
   hashInputs,
   InvalidInputsError,
-  runScenarios,
   type InputIssue,
   type Inputs,
   type ModelResult,
@@ -24,10 +24,12 @@ export type Snapshot = { inputs: Inputs; inputHash: string; engineVersion: strin
   | { results: null; issues: InputIssue[] }
 );
 
+/** The engine's ModelSnapshot (without the trace), or the reasons the inputs cannot be calculated. */
 function calculate(inputs: Inputs): Snapshot {
   const id = { inputs, inputHash: hashInputs(inputs), engineVersion: ENGINE_VERSION };
   try {
-    return { ...id, results: runScenarios(inputs), issues: null };
+    const model = buildSnapshot(inputs, { trace: false });
+    return { inputs: model.inputs, inputHash: model.inputHash, engineVersion: model.engineVersion, results: model.scenarios, issues: null };
   } catch (e) {
     if (e instanceof InvalidInputsError) return { ...id, results: null, issues: e.issues };
     return { ...id, results: null, issues: [{ path: "", message: e instanceof Error ? e.message : String(e) }] };

@@ -760,9 +760,12 @@ Solidarity    = 5.5% × corporate tax`}</pre>
               stress, PPA, equity first, declining-balance depreciation, Südregion, dates and lags) and the edge cases
               of the reviews (no loan, no cash, negative returns, a lapsed award, inputs outside the usual range) — all
               of its roughly 26,000 formula cells agree with the engine: money to the cent, rates and ratios to 10⁻⁷.
-              Two edits made in the file behave as described: a new cost of equity matches the engine in every cell; a
-              new award price shows no error and asks for a re-solve. In a negative control, a trade-tax multiplier of
-              410 % instead of 400 % moves the tax lines and the equity IRR but not revenue, the loan or capex.
+              Every pair of switch values meets in at least one variant. Two edits made in the file behave as described:
+              a new cost of equity matches the engine in every cell; a new award price shows no error and asks for a
+              re-solve. Two negative controls prove the comparison can fail: a trade-tax multiplier of 410 % instead of
+              400 %, and a corrupted trade-tax formula, each move the tax lines and the equity IRR but not revenue, the
+              loan or capex. The last run is archived with the Excel version in the repository
+              (verification/excel-run.json); a test fails as soon as the workbook changes, until Excel checks it again.
             </li>
             <li>
               The workbook takes three results from the website as pasted values: the loan, the total uses and, for a

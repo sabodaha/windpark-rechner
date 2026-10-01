@@ -1,52 +1,92 @@
-// Verification of the formula workbook against the engine.
-//   npx tsx scripts/workbook/verify.ts build <dir> [variant…]   write <variant>.xlsx (with cached results),
-//                                                            <variant>.nocache.xlsx and <variant>.manifest.json
-//   npx tsx scripts/workbook/verify.ts compare <dir> [variant…] compare <variant>.recalc.xlsx (the no-cache copy
-//                                                            after a forced recalculation in a spreadsheet
-//                                                            application) with the manifest and with the caches
-// Recalculate with scripts/workbook/recalc.ps1 (Microsoft Excel via COM) between the two steps.
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+// Verification of the formula workbook against the engine, recalculated by Microsoft Excel:
+//   npx tsx scripts/workbook/verify.ts build <dir> [variant…]    the workbooks of the variants (scripts/workbook/
+//                                                                 variants.ts); with "base", also the edits made in
+//                                                                 the file and the two negative controls
+//   powershell -File scripts/workbook/recalc.ps1 -Dir <dir>       Excel recalculates every formula-only copy
+//   npx tsx scripts/workbook/verify.ts compare <dir> [variant…]   every formula cell against the engine
+//   npx tsx scripts/workbook/verify.ts archive <dir>              after a full run: verification/excel-run.json, which a
+//                                                                 test checks against the current workbook
+// Tolerances are absolute: money to the cent, everything else (rates, ratios, factors, dates) to 1e-7.
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
-import { buildSnapshot } from "../../src/engine";
-import { buildFormulaWorkbook, canonicalInputs, workbookExtras } from "../../src/lib/workbook/build";
+import { ENGINE_VERSION } from "../../src/engine";
 import type { ManifestEntry } from "../../src/lib/workbook/grid";
-import { en } from "../../src/messages/en";
-import { USER_EDITS, VARIANTS } from "./variants";
+import { variantWorkbooks, workbookDigest, type ExcelRun } from "./digest";
+import { pairCoverage, USER_EDITS, VARIANTS } from "./variants";
+
+const TOLERANCE = { money: 0.01, other: 1e-7 };
+const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const archivePath = join(root, "verification", "excel-run.json");
+
+/**
+ * Negative controls on the base workbook: Excel must disagree with the engine where the file was spoiled, and only
+ * there. "input" raises the trade-tax multiplier from 400 % to 410 %; "formula" corrupts the trade-tax formula.
+ */
+const CONTROLS = ["negInput", "negFormula"] as const;
 
 function build(dir: string, names: string[]) {
   mkdirSync(dir, { recursive: true });
   for (const name of names) {
-    const inputs = canonicalInputs(VARIANTS[name]!);
-    const snap = buildSnapshot(inputs);
-    const extras = workbookExtras(inputs);
-    const url = "https://igorsabodakha.com/wind-farm-calculator/";
-    const full = buildFormulaWorkbook(snap, extras, en, url);
-    const bare = buildFormulaWorkbook(snap, extras, en, url, { withoutCache: true });
+    const { full, bare } = variantWorkbooks(VARIANTS[name]!);
     writeFileSync(join(dir, `${name}.xlsx`), full.bytes);
     writeFileSync(join(dir, `${name}.nocache.xlsx`), bare.bytes);
     writeFileSync(join(dir, `${name}.manifest.json`), JSON.stringify(full.manifest));
     writeFileSync(join(dir, `${name}.cells.json`), JSON.stringify(full.scalars));
     console.log(`${name}: ${full.manifest.length} formula cells, ${(full.bytes.length / 1024).toFixed(0)} KB`);
   }
-  if (names.includes("base")) for (const [name, ed] of Object.entries(USER_EDITS)) patchInput(dir, "base", name, ed.id, ed.value);
+  if (!names.includes("base")) return;
+  for (const [name, ed] of Object.entries(USER_EDITS)) patchInput(dir, name, ed.id, ed.value);
+  const hebesatz = JSON.parse(readFileSync(join(dir, "base.cells.json"), "utf8"))["in.hebesatz"] as string;
+  patchInput(dir, "negInput", "in.hebesatz", Number(cellValue(dir, hebesatz)) + 0.1);
+  corruptFormulas(dir, "negFormula", /^tx\.base\.tradeTax\[/);
 }
 
-/** Copies <from>.nocache.xlsx to <name>.nocache.xlsx with the value of one input cell replaced. */
-function patchInput(dir: string, from: string, name: string, id: string, value: number) {
-  const cells = JSON.parse(readFileSync(join(dir, `${from}.cells.json`), "utf8")) as Record<string, string>;
-  const [sheet, ref] = cells[id]!.split("!") as [string, string];
-  const files = unzipSync(new Uint8Array(readFileSync(join(dir, `${from}.nocache.xlsx`))));
+function sheetPath(files: Record<string, Uint8Array>, sheet: string): string {
   const wb = strFromU8(files["xl/workbook.xml"]!);
   const sheets = [...wb.matchAll(/<sheet [^>]*name="([^"]+)"/g)].map((m) => m[1]);
-  const path = `xl/worksheets/sheet${sheets.indexOf(sheet) + 1}.xml`;
+  return `xl/worksheets/sheet${sheets.indexOf(sheet) + 1}.xml`;
+}
+
+function cellValue(dir: string, address: string): string {
+  const [sheet, ref] = address.split("!") as [string, string];
+  const files = unzipSync(new Uint8Array(readFileSync(join(dir, "base.nocache.xlsx"))));
+  const m = new RegExp(`<c r="${ref}"[^>]*><v>([^<]*)</v>`).exec(strFromU8(files[sheetPath(files, sheet)]!));
+  if (!m) throw new Error(`cell ${address} not found`);
+  return m[1]!;
+}
+
+/** Copies base.nocache.xlsx to <name>.nocache.xlsx with the value of one input cell replaced. */
+function patchInput(dir: string, name: string, id: string, value: number) {
+  const cells = JSON.parse(readFileSync(join(dir, "base.cells.json"), "utf8")) as Record<string, string>;
+  const [sheet, ref] = cells[id]!.split("!") as [string, string];
+  const files = unzipSync(new Uint8Array(readFileSync(join(dir, "base.nocache.xlsx"))));
+  const path = sheetPath(files, sheet);
   const re = new RegExp(`(<c r="${ref}"[^>]*>)<v>([^<]*)</v>`);
   const xml = strFromU8(files[path]!);
   const m = re.exec(xml);
   if (!m) throw new Error(`cell ${ref} not found`);
   files[path] = strToU8(xml.replace(re, `$1<v>${value}</v>`));
   writeFileSync(join(dir, `${name}.nocache.xlsx`), zipSync(files));
-  console.log(`${name}: ${from} with ${id} (${sheet}!${ref}) ${m[2]} → ${value}`);
+  console.log(`${name}: base with ${id} (${sheet}!${ref}) ${m[2]} → ${value}`);
+}
+
+/** Copies base.nocache.xlsx to <name>.nocache.xlsx with the formulas of the matching rows multiplied by 1.01. */
+function corruptFormulas(dir: string, name: string, ids: RegExp) {
+  const manifest = JSON.parse(readFileSync(join(dir, "base.manifest.json"), "utf8")) as ManifestEntry[];
+  const files = unzipSync(new Uint8Array(readFileSync(join(dir, "base.nocache.xlsx"))));
+  let count = 0;
+  for (const m of manifest.filter((x) => ids.test(x.id))) {
+    const path = sheetPath(files, m.sheet);
+    const re = new RegExp(`(<c r="${m.cell}"[^>]*>)<f>([^<]*)</f>`);
+    const xml = strFromU8(files[path]!);
+    if (!re.test(xml)) throw new Error(`formula ${m.sheet}!${m.cell} not found`);
+    files[path] = strToU8(xml.replace(re, `$1<f>($2)*1.01</f>`));
+    count++;
+  }
+  writeFileSync(join(dir, `${name}.nocache.xlsx`), zipSync(files));
+  console.log(`${name}: base with ${count} formulas of ${ids.source} multiplied by 1.01`);
 }
 
 /** Values of every cell of a workbook, by "Sheet!A1". */
@@ -87,50 +127,42 @@ function decode(s: string): string {
   return s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
 }
 
-/** Money to the cent (plus a relative term for large sums); ratios, rates and factors to 1e-7; exact otherwise. */
+/** Absolute tolerances: money (whole-euro format) to the cent, every other number to 1e-7; text exactly. */
 function close(expected: unknown, actual: unknown, entry: ManifestEntry): boolean {
   if (expected === null || expected === "") return actual === undefined || actual === "" || actual === null;
   if (typeof expected === "number") {
     if (typeof actual === "boolean") return expected === (actual ? 1 : 0);
     if (typeof actual !== "number") return false;
-    // Money (whole-euro format) to the cent; everything else — rates, ratios, factors, years, dates — to 1e-7.
-    const tol = entry.fmt === "int" ? 0.01 + 1e-10 * Math.abs(expected) : 1e-7 + 1e-9 * Math.abs(expected);
-    return Math.abs(actual - expected) <= tol;
+    return Math.abs(actual - expected) <= (entry.fmt === "int" ? TOLERANCE.money : TOLERANCE.other);
   }
   if (typeof expected === "boolean") return actual === expected || actual === (expected ? 1 : 0);
   return String(actual) === String(expected);
 }
 
-function compare(dir: string, names: string[]): boolean {
-  let allOk = true;
-  for (const name of names) {
-    const ed = USER_EDITS[name];
-    if (ed && !ed.same) {
-      allOk &&= compareMovedEdit(dir, name);
-      continue;
-    }
-    const source = ed?.same ?? name;
-    const manifest = JSON.parse(readFileSync(join(dir, `${source}.manifest.json`), "utf8")) as ManifestEntry[];
-    const recalc = readValues(join(dir, `${name}.recalc.xlsx`));
-    const cached = readValues(join(dir, `${source}.xlsx`));
-    const wrong: string[] = [];
-    let cacheWrong = 0;
-    for (const m of manifest) {
-      const key = `${m.sheet}!${m.cell}`;
-      const got = recalc.get(key);
-      if (!close(m.expected, got, m)) wrong.push(`${key} ${m.id}: engine ${JSON.stringify(m.expected)} ≠ spreadsheet ${JSON.stringify(got)}`);
-      if (got !== undefined && !close(got, cached.get(key), m)) cacheWrong++;
-    }
-    const ok = wrong.length === 0 && cacheWrong === 0;
-    allOk &&= ok;
-    console.log(`${ok ? "OK  " : "FAIL"} ${name}: ${manifest.length} cells, ${wrong.length} differ from the engine, ${cacheWrong} caches differ from the recalculation`);
-    for (const w of wrong.slice(0, Number(process.env.SHOW ?? 25))) console.log(`     ${w}`);
+type Results = Pick<ExcelRun, "variants" | "edits" | "negativeControls">;
+
+function compareVariant(dir: string, name: string, manifestOf: string, cachedOf: string, results: Results): boolean {
+  const manifest = JSON.parse(readFileSync(join(dir, `${manifestOf}.manifest.json`), "utf8")) as ManifestEntry[];
+  const recalc = readValues(join(dir, `${name}.recalc.xlsx`));
+  const cached = readValues(join(dir, `${cachedOf}.xlsx`));
+  const wrong: string[] = [];
+  let cacheWrong = 0;
+  for (const m of manifest) {
+    const key = `${m.sheet}!${m.cell}`;
+    const got = recalc.get(key);
+    if (!close(m.expected, got, m)) wrong.push(`${key} ${m.id}: engine ${JSON.stringify(m.expected)} ≠ spreadsheet ${JSON.stringify(got)}`);
+    if (got !== undefined && !close(got, cached.get(key), m)) cacheWrong++;
   }
-  return allOk;
+  const ok = wrong.length === 0 && cacheWrong === 0;
+  if (name in VARIANTS) results.variants[name] = { cells: manifest.length, differ: wrong.length, cachesDiffer: cacheWrong };
+  else results.edits[name] = { ok, note: `${manifest.length} cells as the engine for ${manifestOf}` };
+  console.log(`${ok ? "OK  " : "FAIL"} ${name}: ${manifest.length} cells, ${wrong.length} differ from the engine, ${cacheWrong} caches differ from the recalculation`);
+  for (const w of wrong.slice(0, Number(process.env.SHOW ?? 25))) console.log(`     ${w}`);
+  return ok;
 }
 
 /** An edit that moves the loan: no formula shows an error, and the Checks sheet asks for a re-solve. */
-function compareMovedEdit(dir: string, name: string): boolean {
+function compareMovedEdit(dir: string, name: string, results: Results): boolean {
   const manifest = JSON.parse(readFileSync(join(dir, "base.manifest.json"), "utf8")) as ManifestEntry[];
   const cells = JSON.parse(readFileSync(join(dir, "base.cells.json"), "utf8")) as Record<string, string>;
   const recalc = readValues(join(dir, `${name}.recalc.xlsx`));
@@ -138,58 +170,75 @@ function compareMovedEdit(dir: string, name: string): boolean {
   const at = (id: string) => recalc.get(cells[id]!);
   const asks = at("chk.loan") === "Re-solve the financing on the website" || at("chk.usesBase") === "Re-solve the financing on the website";
   const ok = errors.length === 0 && asks && at("chk.master") === "See the checks above";
-  console.log(`${ok ? "OK  " : "FAIL"} ${name}: ${errors.length} error values; loan ${JSON.stringify(at("chk.loan"))}, uses ${JSON.stringify(at("chk.usesBase"))}, all checks ${JSON.stringify(at("chk.master"))}`);
+  const note = `${errors.length} error values; loan ${JSON.stringify(at("chk.loan"))}, uses ${JSON.stringify(at("chk.usesBase"))}, all checks ${JSON.stringify(at("chk.master"))}`;
+  results.edits[name] = { ok, note };
+  console.log(`${ok ? "OK  " : "FAIL"} ${name}: ${note}`);
   for (const m of errors.slice(0, 10)) console.log(`     ${m.sheet}!${m.cell} ${m.id}: ${String(recalc.get(`${m.sheet}!${m.cell}`))}`);
   return ok;
 }
 
-/**
- * Negative control: the base workbook with the trade-tax multiplier raised from 400 % to 410 % in the file. After a
- * recalculation the tax lines — and everything that depends on them — must differ from the engine, while lines that
- * do not depend on tax (revenue, the loan, capex) must still match. Proves the spreadsheet computes by itself.
- */
-function negativeControl(dir: string) {
-  const cells = JSON.parse(readFileSync(join(dir, "base.cells.json"), "utf8")) as Record<string, string>;
-  const [sheet, ref] = cells["in.hebesatz"]!.split("!") as [string, string];
-  const files = unzipSync(new Uint8Array(readFileSync(join(dir, "base.nocache.xlsx"))));
-  const wb = strFromU8(files["xl/workbook.xml"]!);
-  const names = [...wb.matchAll(/<sheet [^>]*name="([^"]+)"/g)].map((m) => m[1]);
-  const path = `xl/worksheets/sheet${names.indexOf(sheet) + 1}.xml`;
-  const xml = strFromU8(files[path]!);
-  const re = new RegExp(`(<c r="${ref}"[^>]*>)<v>([^<]*)</v>`);
-  const m = re.exec(xml);
-  if (!m) throw new Error(`cell ${ref} not found`);
-  const patched = xml.replace(re, `$1<v>${Number(m[2]) + 0.1}</v>`);
-  files[path] = strToU8(patched);
-  writeFileSync(join(dir, "negctl.nocache.xlsx"), zipSync(files));
-  writeFileSync(join(dir, "negctl.manifest.json"), readFileSync(join(dir, "base.manifest.json")));
-  writeFileSync(join(dir, "negctl.xlsx"), readFileSync(join(dir, "base.xlsx")));
-  console.log(`negative control written: ${sheet}!${ref} ${m[2]} → ${Number(m[2]) + 0.1}`);
-}
-
-function checkNegativeControl(dir: string): boolean {
-  const manifest = JSON.parse(readFileSync(join(dir, "negctl.manifest.json"), "utf8")) as ManifestEntry[];
-  const recalc = readValues(join(dir, "negctl.recalc.xlsx"));
+/** A spoiled base workbook: trade tax and the equity IRR must move; revenue, the loan and capex must not. */
+function compareControl(dir: string, name: string, results: Results): boolean {
+  const manifest = JSON.parse(readFileSync(join(dir, "base.manifest.json"), "utf8")) as ManifestEntry[];
+  const recalc = readValues(join(dir, `${name}.recalc.xlsx`));
   const differ = (pattern: RegExp) => manifest.filter((m) => pattern.test(m.id) && !close(m.expected, recalc.get(`${m.sheet}!${m.cell}`), m)).length;
   const count = (pattern: RegExp) => manifest.filter((m) => pattern.test(m.id)).length;
-  const taxMoved = differ(/^tx\.base\.tradeTax\[/);
-  const taxAll = count(/^tx\.base\.tradeTax\[/);
-  const revenueMoved = differ(/^o\.base\.revenue\[/);
-  const loanMoved = differ(/^d\.(interest|principal)\[/);
-  const capexMoved = differ(/^c\.base\.capex\[/);
-  const irrMoved = differ(/^r\.base\.irr$/);
-  console.log(`negative control: trade tax differs in ${taxMoved} of ${taxAll} years (taxed years only), equity IRR ${irrMoved ? "differs" : "unchanged"};`);
-  console.log(`                  revenue ${revenueMoved}, loan ${loanMoved}, capex ${capexMoved} cells differ (must be 0)`);
-  return taxMoved > 0 && irrMoved === 1 && revenueMoved === 0 && loanMoved === 0 && capexMoved === 0;
+  const tax = differ(/^tx\.base\.tradeTax\[/);
+  const irr = differ(/^r\.base\.irr$/);
+  const untouched = differ(/^o\.base\.revenue\[/) + differ(/^d\.(interest|principal)\[/) + differ(/^c\.base\.capex\[/);
+  const ok = tax > 0 && irr === 1 && untouched === 0;
+  const note = `trade tax differs in ${tax} of ${count(/^tx\.base\.tradeTax\[/)} years, equity IRR ${irr ? "differs" : "unchanged"}, revenue/loan/capex cells that differ: ${untouched}`;
+  results.negativeControls[name] = { ok, note };
+  console.log(`${ok ? "OK  " : "FAIL"} ${name} (negative control): ${note}`);
+  return ok;
+}
+
+function compare(dir: string, names: string[]): boolean {
+  const results: Results = { variants: {}, edits: {}, negativeControls: {} };
+  let allOk = true;
+  for (const name of names) {
+    const ed = USER_EDITS[name];
+    if ((CONTROLS as readonly string[]).includes(name)) allOk = compareControl(dir, name, results) && allOk;
+    else if (ed && !ed.same) allOk = compareMovedEdit(dir, name, results) && allOk;
+    else allOk = compareVariant(dir, name, ed?.same ?? name, ed?.same ?? name, results) && allOk;
+  }
+  writeFileSync(join(dir, "results.json"), JSON.stringify(results, null, 2));
+  return allOk;
+}
+
+/** Writes verification/excel-run.json from a complete, passing run. */
+function archive(dir: string) {
+  const results = JSON.parse(readFileSync(join(dir, "results.json"), "utf8")) as Results;
+  const missing = Object.keys(VARIANTS).filter((n) => !results.variants[n]);
+  const failed = [
+    ...Object.entries(results.variants).filter(([, v]) => v.differ || v.cachesDiffer).map(([n]) => n),
+    ...Object.entries(results.edits).filter(([, v]) => !v.ok).map(([n]) => n),
+    ...Object.entries(results.negativeControls).filter(([, v]) => !v.ok).map(([n]) => n),
+  ];
+  if (missing.length || failed.length || Object.keys(results.negativeControls).length !== CONTROLS.length) {
+    throw new Error(`not a complete passing run: missing ${missing.join(", ") || "-"}; failed ${failed.join(", ") || "-"}`);
+  }
+  const versionFile = join(dir, "excel-version.txt");
+  const run: ExcelRun = {
+    date: new Date().toISOString().slice(0, 10),
+    excel: existsSync(versionFile) ? readFileSync(versionFile, "utf8").trim() : "unknown",
+    engineVersion: ENGINE_VERSION,
+    baseWorkbookDigest: workbookDigest(new Uint8Array(readFileSync(join(dir, "base.nocache.xlsx")))),
+    tolerance: TOLERANCE,
+    ...results,
+    pairs: (({ pairs, missing: m }) => ({ total: pairs, missing: m }))(pairCoverage(Object.values(VARIANTS))),
+  };
+  mkdirSync(dirname(archivePath), { recursive: true });
+  writeFileSync(archivePath, `${JSON.stringify(run, null, 2)}\n`);
+  console.log(`archived: ${archivePath} (${Object.keys(run.variants).length} variants, ${run.excel})`);
 }
 
 const [, , cmd, dir, ...rest] = process.argv;
-const names = rest.length ? rest : Object.keys(VARIANTS);
-if (cmd === "build") build(dir!, names);
-else if (cmd === "compare") process.exit(compare(dir!, rest.length ? rest : [...names, ...Object.keys(USER_EDITS)]) ? 0 : 1);
-else if (cmd === "negctl") negativeControl(dir!);
-else if (cmd === "negctl-check") process.exit(checkNegativeControl(dir!) ? 0 : 1);
+const all = [...Object.keys(VARIANTS), ...Object.keys(USER_EDITS), ...CONTROLS];
+if (cmd === "build") build(dir!, rest.length ? rest : Object.keys(VARIANTS));
+else if (cmd === "compare") process.exit(compare(dir!, rest.length ? rest : all) ? 0 : 1);
+else if (cmd === "archive") archive(dir!);
 else {
-  console.error("usage: verify.ts build|compare <dir> [variant…]");
+  console.error("usage: verify.ts build|compare|archive <dir> [variant…]");
   process.exit(2);
 }

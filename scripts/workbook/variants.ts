@@ -9,6 +9,18 @@ const edit = (fn: (c: Inputs) => void): Inputs => {
   return c;
 };
 
+function allSwitched(c: Inputs, repayment: "annuity" | "sculpted"): void {
+  c.tax.legalForm = "GmbH";
+  c.financing.repayment = repayment;
+  c.revenue.bankPriceBasis = "base";
+  c.revenue.postEeg = "ppa";
+  c.revenue.twoSidedPremium = true;
+  c.revenue.municipalAfterEeg = false;
+  c.financing.equityFirst = true;
+  c.tax.degressive = true;
+  c.energy.southRegion = true;
+}
+
 /** Switch variants: every value of every switch at least once, and the cases the reviews asked for. */
 export const VARIANTS: Record<string, Inputs> = {
   base: BASE_CASE,
@@ -122,6 +134,10 @@ export const VARIANTS: Record<string, Inputs> = {
     c.financing.tenorYearsFromClose = 22;
   }),
   coe9: edit((c) => (c.macro.costOfEquity = 0.09)),
+  // Every switch away from the base case at once, with each non-linear repayment: together with the single-switch
+  // variants above, every pair of switch values meets in some workbook (pairCoverage).
+  pairsAnnuity: edit((c) => allSwitched(c, "annuity")),
+  pairsSculpted: edit((c) => allSwitched(c, "sculpted")),
 };
 
 /**
@@ -133,3 +149,36 @@ export const USER_EDITS: Record<string, { id: string; value: number; same?: stri
   editCoe: { id: "in.coe", value: 0.09, same: "coe9" },
   editAward: { id: "in.award", value: 5.5 },
 };
+
+/** The switches of the model and their values: every pair of values of two switches should meet in some variant. */
+export const SWITCHES: { id: string; get: (i: Inputs) => string; values: string[] }[] = [
+  { id: "legalForm", get: (i) => i.tax.legalForm, values: ["KG", "GmbH"] },
+  { id: "repayment", get: (i) => i.financing.repayment, values: ["linear", "annuity", "sculpted"] },
+  { id: "bankBasis", get: (i) => i.revenue.bankPriceBasis, values: ["floor", "base"] },
+  { id: "postEeg", get: (i) => i.revenue.postEeg, values: ["market", "ppa"] },
+  { id: "twoSided", get: (i) => String(i.revenue.twoSidedPremium), values: ["false", "true"] },
+  { id: "municipalAfter", get: (i) => String(i.revenue.municipalAfterEeg), values: ["true", "false"] },
+  { id: "equityFirst", get: (i) => String(i.financing.equityFirst), values: ["false", "true"] },
+  { id: "degressive", get: (i) => String(i.tax.degressive), values: ["false", "true"] },
+  { id: "south", get: (i) => String(i.energy.southRegion), values: ["false", "true"] },
+];
+
+/** Pairs of switch values that no variant combines ("legalForm=GmbH & postEeg=ppa"), and how many pairs exist. */
+export function pairCoverage(variants: Inputs[]): { pairs: number; missing: string[] } {
+  const missing: string[] = [];
+  let pairs = 0;
+  for (let a = 0; a < SWITCHES.length; a++) {
+    for (let b = a + 1; b < SWITCHES.length; b++) {
+      const A = SWITCHES[a]!;
+      const B = SWITCHES[b]!;
+      for (const va of A.values) {
+        for (const vb of B.values) {
+          pairs++;
+          if (!variants.some((v) => A.get(v) === va && B.get(v) === vb)) missing.push(`${A.id}=${va} & ${B.id}=${vb}`);
+        }
+      }
+    }
+  }
+  return { pairs, missing };
+}
+

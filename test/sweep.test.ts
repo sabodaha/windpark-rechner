@@ -80,6 +80,8 @@ describe("wide sweep of 1,000 input sets", () => {
     const rnd = sampler(20261001);
     const set = (id: string, v: number | string | boolean, inp: Inputs) => FIELD_BY_ID.get(id)!.set(inp, v);
     const failures: string[] = [];
+    // What the sweep reaches: each path must occur, or the sweep proves nothing about it.
+    const reached = { baseLockUp: 0, shortfall: 0, sculpted: 0, twoSided: 0, covenantBreach: 0 };
     for (let n = 0; n < 1000; n++) {
       const inp = randomInputs(rnd);
       const pick = (lo: number, hi: number) => lo + rnd() * (hi - lo);
@@ -90,6 +92,11 @@ describe("wide sweep of 1,000 input sets", () => {
       if (rnd() < 0.3) inp.revenue.twoSidedPremium = true;
       if (rnd() < 0.3) inp.financing.repayment = "sculpted";
       const s = runScenarios(inp);
+      if (s.base.validity.lockUpYears.length > 0) reached.baseLockUp++;
+      if (inp.financing.repayment === "sculpted") reached.sculpted++;
+      if (inp.revenue.twoSidedPremium) reached.twoSided++;
+      if (Object.values(s).some((r) => r.validity.shortfall)) reached.shortfall++;
+      if (Object.values(s).some((r) => r.validity.covenantBreach)) reached.covenantBreach++;
       for (const k of ["base", "p90", "resource", "downside"] as const) {
         const r = s[k];
         if (r.validity.integrity === "error") {
@@ -103,5 +110,6 @@ describe("wide sweep of 1,000 input sets", () => {
       }
     }
     expect(failures).toEqual([]);
+    for (const [path, count] of Object.entries(reached)) expect(count, path).toBeGreaterThan(0);
   });
 });

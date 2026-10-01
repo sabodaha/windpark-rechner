@@ -56,14 +56,18 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
-/** Runs every scenario with its trace and freezes the result. */
-export function buildSnapshot(inputs: Inputs): ModelSnapshot {
+/**
+ * Runs every scenario and freezes the result: the one contract the calculator, the report and the workbook read.
+ * The workbook needs the trace (every intermediate line); the calculator and the report run without it, which
+ * changes no number.
+ */
+export function buildSnapshot(inputs: Inputs, { trace = true }: { trace?: boolean } = {}): ModelSnapshot {
   const copy = structuredClone(inputs);
   return deepFreeze({
     engineVersion: ENGINE_VERSION,
     dataAsOf: DATA_AS_OF,
     inputHash: hashInputs(copy),
     inputs: copy,
-    scenarios: runScenarios(copy, { trace: true }),
+    scenarios: runScenarios(copy, { trace }),
   });
 }

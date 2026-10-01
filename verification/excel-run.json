@@ -1,0 +1,236 @@
+{
+  "date": "2026-10-01",
+  "excel": "Microsoft Excel 16.0 (build 17932)",
+  "engineVersion": "2.1.0",
+  "baseWorkbookDigest": "6c8a87f022394fa4e35e8fb42d7bd0c439f833797506cff47531071feb5b3f54",
+  "tolerance": {
+    "money": 0.01,
+    "other": 1e-7
+  },
+  "variants": {
+    "base": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "gmbh": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "annuity": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "sculpted": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "bankBase": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "twoSided": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "ppa": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "noMunicipalAfter": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "equityFirst": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "degressive": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "south": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "lowPrice": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "lockup": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "gearingCap": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "grace2": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "fcJuly": {
+      "cells": 25549,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "construction12": {
+      "cells": 25015,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "construction24": {
+      "cells": 26083,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "life30": {
+      "cells": 30739,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "vatLag0": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "vatLag6": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "dsra6": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "lag15": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "depYears30": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "mixed": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "gmbhSculpted": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "zeroDebt": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "noCashDebt": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "closureGap": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "unfundedTwoSided": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "negativeIrr": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "sculptedEdge": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "lapsed": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "unusual": {
+      "cells": 25454,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "penaltyLong": {
+      "cells": 26990,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "interestBarrier": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "construction40": {
+      "cells": 28564,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "coe9": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "pairsAnnuity": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    },
+    "pairsSculpted": {
+      "cells": 26414,
+      "differ": 0,
+      "cachesDiffer": 0
+    }
+  },
+  "edits": {
+    "editCoe": {
+      "ok": true,
+      "note": "26414 cells as the engine for coe9"
+    },
+    "editAward": {
+      "ok": true,
+      "note": "0 error values; loan \"Re-solve the financing on the website\", uses \"OK\", all checks \"See the checks above\""
+    }
+  },
+  "negativeControls": {
+    "negInput": {
+      "ok": true,
+      "note": "trade tax differs in 10 of 26 years, equity IRR differs, revenue/loan/capex cells that differ: 0"
+    },
+    "negFormula": {
+      "ok": true,
+      "note": "trade tax differs in 10 of 26 years, equity IRR differs, revenue/loan/capex cells that differ: 0"
+    }
+  },
+  "pairs": {
+    "total": 160,
+    "missing": []
+  }
+}

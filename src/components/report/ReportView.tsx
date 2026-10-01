@@ -4,7 +4,7 @@ import { ArrowLeft, Download, Printer } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { BASE_CASE, InvalidInputsError, runScenarios, type Inputs, type ModelResult, type ScenarioName } from "@/engine";
+import { BASE_CASE, buildSnapshot, InvalidInputsError, type Inputs, type ModelResult, type ScenarioName } from "@/engine";
 import { modelExtras, type ModelExtras } from "@/lib/extras";
 import { PATHS } from "@/lib/site";
 import { decodeInputs, encodeInputs, ignoredParams } from "@/lib/url-state";
@@ -23,7 +23,8 @@ type State =
  * query — are calculated after loading, and the browser's print dialog saves them as a PDF.
  */
 export function ReportView({ baseExtras }: { baseExtras: ModelExtras }) {
-  const baseResults = useMemo(() => runScenarios(BASE_CASE), []);
+  // The calculator's contract: the engine's snapshot without the trace (the workbook adds it at its own export).
+  const baseResults = useMemo(() => buildSnapshot(BASE_CASE, { trace: false }).scenarios, []);
   const [state, setState] = useState<State>({ kind: "ready", inputs: BASE_CASE, results: baseResults, extras: baseExtras, isBase: true });
   const [notice, setNotice] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -46,7 +47,7 @@ export function ReportView({ baseExtras }: { baseExtras: ModelExtras }) {
     // Let the page paint first: the scenarios, tornado and bid calculator take a second or two.
     const id = window.setTimeout(() => {
       try {
-        setState({ kind: "ready", inputs, results: runScenarios(inputs), extras: modelExtras(inputs), isBase: false });
+        setState({ kind: "ready", inputs, results: buildSnapshot(inputs, { trace: false }).scenarios, extras: modelExtras(inputs), isBase: false });
       } catch (e) {
         const message = e instanceof InvalidInputsError ? e.issues.map((x) => x.message).join(" ") : e instanceof Error ? e.message : String(e);
         setState({ kind: "error", message });
