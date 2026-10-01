@@ -768,6 +768,11 @@ Solidarity    = 5.5% × corporate tax`}</pre>
               (verification/excel-run.json); a test fails as soon as the workbook changes, until Excel checks it again.
             </li>
             <li>
+              On 1 October 2026 the base-case workbook was also opened in Google Sheets: its results match the
+              website’s, no formula shows an error, the switches accept only their listed values, and the two edits
+              made in the file behave as in Excel.
+            </li>
+            <li>
               The workbook takes three results from the website as pasted values: the loan, the total uses and, for a
               sculpted loan, the principal per year. They are the fixed points of the model’s circular links. Its
               Checks sheet recomputes the loan from the DSCR targets and the gearing cap and says when the pasted
