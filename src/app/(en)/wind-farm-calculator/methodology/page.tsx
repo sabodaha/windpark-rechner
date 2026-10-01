@@ -242,7 +242,7 @@ export default function MethodologyPage() {
               the model does not cover instalments during construction.
             </li>
             <li>
-              KfW disburses a loan within 12 months of the commitment, extendable by up to 24 months. An{" "}
+              The KfW drawdown period is 12 months from the commitment and can be extended by up to 24 months. An{" "}
               {i.project.constructionMonths}-month construction needs such an extension, which the model assumes.
             </li>
           </ul>
@@ -266,7 +266,7 @@ P90               E_P90   = E_P50 × (1 − ${P90_Z} × σ)`}</pre>
             </li>
             <li>
               By law the site yield already excludes wake losses, up to 2% unavailability, electrical losses and
-              curtailment required by the permit. The model deducts only the availability below 98% (
+              curtailment required by the permit. The model deducts only the shortfall of availability below 98% (
               {pct(i.energy.availability, 0)} in the base case) and optional other losses: {num(k.fullLoadHoursP50, 0)}{" "}
               hours.
             </li>
@@ -324,8 +324,8 @@ After support              = E_y × JW_y, or E_sold × PPA price, × rest of the
               {i.revenue.futuresEurMwh[0]!.year}–{i.revenue.futuresEurMwh.at(-1)!.year}, then{" "}
               {num(i.revenue.longTermBaseEurMwh2026, 0)} €/MWh in 2026 money plus inflation, times a capture factor of{" "}
               {num(i.revenue.captureFactor, 2)}: a market value of {num(mv(2029), 1)} €/MWh in 2029 and{" "}
-              {num(mv(2035), 1)} €/MWh in 2035. The long-term price is the model’s strongest assumption; the tornado
-              shows its weight.
+              {num(mv(2035), 1)} €/MWh in 2035. The long-term price is the model’s most influential assumption; the
+              tornado shows its weight.
             </li>
             <li>
               <strong>The EEG as a floor.</strong>{" "}
@@ -515,8 +515,8 @@ Loan                            D      = min( D_DSCR, ${pct(f.maxGearing, 0)} ×
               <strong>Sizing target and covenant.</strong> The one-year P90 target of {ratio(f.targetDscrP90)} sits below
               the covenant of {ratio(f.covenantDscr)}. The target applies to the lender’s case at floor prices; the
               covenant is tested on the operating cash flows, where the one-year P90 stress in the base case still shows{" "}
-              {ratio(BASE.p90.kpis.minDscr)}. Neither threshold has a published market value; both are assumptions and
-              inputs.
+              {ratio(BASE.p90.kpis.minDscr)}. Neither threshold has a published market benchmark; both are assumptions
+              and inputs.
             </li>
             <li>
               <strong>No loan.</strong> If the lender’s case has a year without cash for debt service — CFADS at or
@@ -551,20 +551,20 @@ Solidarity    = 5.5% × corporate tax`}</pre>
               remain (§ 6 (1) Nr. 3a e) EStG). Its increase reduces taxable profit. The cash reserve is separate.
             </li>
             <li>
-              Taxes are not deductible (§ 4 (5b) EStG), so the tax calculation itself has no circularity. Taxes are paid
-              in the year they arise.
+              Taxes on profit are not deductible (trade tax: § 4 (5b) EStG; corporate tax and solidarity surcharge: § 10
+              no. 2 KStG), so the tax calculation itself has no circularity. Taxes are paid in the year they arise.
             </li>
             <li>
-              <strong>Legal form.</strong> A GmbH & Co. KG pays only trade tax; income tax falls on its partners and is
-              not modelled. The equity IRR of the KG is therefore before the partners’ taxes and is not directly
+              <strong>Legal form.</strong> On its profit, a GmbH & Co. KG pays only trade tax; its partners are taxed on
+              their shares of the profit, which is not modelled. The equity IRR of the KG is therefore before the partners’ taxes and is not directly
               comparable with the GmbH, which also pays corporate tax and the solidarity surcharge.
             </li>
             <li>
               Trade tax goes to the municipality of the turbines: for a wind farm, § 29 (1) Nr. 2 GewStG splits the tax
               base 9/10 by installed capacity and 1/10 by payroll, so with one site and no staff of its own the whole base
               goes there and one multiplier applies. The checks flag a multiplier below the legal minimum of 280% from
-              2027, and interest above the €3m threshold of the interest barrier (§ 4h EStG), which the model does not
-              calculate.
+              2027, and interest of €3m or more a year, at which the exemption limit of the interest barrier (§ 4h EStG)
+              no longer applies; the model does not calculate the barrier itself.
             </li>
           </ul>
 
@@ -596,7 +596,7 @@ Solidarity    = 5.5% × corporate tax`}</pre>
               {negativeBook.length > 0
                 ? `In the base case the model’s balance sheet shows negative book equity in ${yearSpan(negativeBook)} — a sign that such limits could bite, not a legal test.`
                 : "In the base case the model’s book equity stays positive."}{" "}
-              Shareholder loans, the usual remedy, are not modelled.
+              Shareholder loans, whose repayment is not a distribution, are not modelled.
             </li>
           </ul>
 
@@ -761,7 +761,7 @@ Solidarity    = 5.5% × corporate tax`}</pre>
           <ul>
             <li>Operations are annual; output is spread evenly over the year (winter is in fact windier).</li>
             <li>The farm’s capture price equals the market value of all onshore wind.</li>
-            <li>The partners’ income tax of a KG is not modelled; taxes are paid in the year they arise.</li>
+            <li>The taxes of a KG’s partners on their shares of the profit are not modelled; taxes are paid in the year they arise.</li>
             <li>
               One senior loan: no tranches, shareholder loans, refinancing or cash sweep; instalments during construction
               are not supported.

@@ -27,7 +27,7 @@ const EXPERIENCE: { period: string; role: string; org: string; text: string }[] 
     period: "2018 – 2021",
     role: "Finance & Operations Lead",
     org: "Tradelize, Fintech-Start-up",
-    text: "Leitung von Finanzen und Operations.",
+    text: "Leitung des Finanzbereichs und des operativen Geschäfts.",
   },
   {
     period: "2013 – 2018",
@@ -43,9 +43,9 @@ const EXPERIENCE: { period: string; role: string; org: string; text: string }[] 
   },
   {
     period: "2006 – 2011",
-    role: "Wirtschaftsprüfung, bis zum Manager",
+    role: "Wirtschaftsprüfung, zuletzt Manager",
     org: "Grant Thornton Ukraine, Assurance",
-    text: "Abschlussprüfungen, zuletzt auf der Ebene Manager.",
+    text: "Prüfungsmandate mit Aufstieg zum Manager.",
   },
 ];
 
@@ -77,16 +77,18 @@ export default function AboutPage() {
             Transaktionsberatung, Unternehmensbewertung und Finanzmodellierung.
           </p>
           <p>
-            Sieben Jahre war ich bei Grant Thornton Ukraine: zunächst in der Wirtschaftsprüfung bis zur Ebene Manager, dann
-            als Manager im Transaction Support – Due Diligence, Bewertungsmodelle und ein Informationsmemorandum für einen
+            Sieben Jahre war ich bei Grant Thornton Ukraine: zunächst in der Wirtschaftsprüfung, wo ich zum Manager
+            aufstieg, dann als Manager im Transaction Support – Due Diligence, Bewertungsmodelle und ein Informationsmemorandum für einen
             Börsengang. Als unabhängiger Berater habe ich Unternehmen bewertet und Finanzmodelle für Kreditfinanzierungen
-            erstellt. Danach habe ich Finanzen und Operations eines Fintech-Start-ups geleitet. Seit 2025 arbeite ich an
-            Storywell, einer App für Kinder, die ich allein konzipiert, entwickelt und veröffentlicht habe.
+            erstellt. Danach habe ich den Finanzbereich und das operative Geschäft eines Fintech-Start-ups geleitet. Seit
+            2025 habe ich Storywell, eine App für Kinder, allein konzipiert, entwickelt und veröffentlicht.
           </p>
           <p>
             Der <Link href={P.calculator}>Windpark-Investitionsrechner</Link> auf dieser Website zeigt, wie ich ein Modell
-            aufbaue: Jede Eingabe stammt aus einer öffentlichen Quelle mit Datum, die Mechanik folgt den Gesetzen und der
-            Praxis der Banken, und eine Reihe von Prüfungen muss bestanden sein, bevor eine Zahl angezeigt wird. Die{" "}
+            aufbaue: Jede Eingabe stammt aus einer datierten öffentlichen Quelle oder ist eine dokumentierte Annahme, die
+            Berechnungslogik folgt den gesetzlichen Vorgaben und der Praxis der Banken, die Eingaben werden vor jeder
+            Berechnung geprüft, und eine Reihe von Prüfungen kennzeichnet Finanzierungslücken und Covenant-Verletzungen.
+            Die{" "}
             <Link href={P.methodology}>Methodik</Link> und alle <Link href={P.sources}>Quellen</Link> sind veröffentlicht,
             sodass sich jedes Ergebnis nachvollziehen lässt.
           </p>

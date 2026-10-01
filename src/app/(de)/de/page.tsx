@@ -27,9 +27,9 @@ const FEATURES: { title: string; text: string }[] = [
       "Schalter ein vereinfachter Stresstest mit zweiseitiger Marktprämie.",
   },
   {
-    title: "Darlehen wie ein KfW-Projektkredit",
+    title: "Darlehensbemessung wie bei einem KfW-Projektkredit",
     text:
-      "KfW-Programm 270 zum aktuellen Zinssatz, vierteljährliche Raten nach den tilgungsfreien Jahren, DSCR-Ziele für P50 " +
+      "KfW-Programm 270 zum aktuellen Zinssatz, vierteljährliche Tilgungsraten nach den tilgungsfreien Jahren, DSCR-Ziele für P50 " +
       "und einjähriges P90 auf der EEG-Untergrenze – eine konservative Sicht der Bank –, eine Obergrenze für die " +
       "Fremdkapitalquote, eine Kapitaldienstreserve und eine Ausschüttungssperre.",
   },
@@ -49,7 +49,7 @@ const FEATURES: { title: string; text: string }[] = [
   {
     title: "Risikosichten",
     text:
-      "Der einjährige P90-Stresstest der Bank, ein zehnjähriges P90 und ein Downside-Fall mit unverändertem Darlehen, ein " +
+      "Der einjährige P90-Stresstest der Bank, ein Szenario mit zehnjährigem P90-Ertrag und ein Downside-Fall mit unverändertem Darlehen, ein " +
       "Tornado-Diagramm mit zwölf Treibern und ein Gebotsrechner, der prüft, ob ein Preis finanzierbar ist und den " +
       "Höchstwert einhält.",
   },
@@ -57,7 +57,7 @@ const FEATURES: { title: string; text: string }[] = [
     title: "Offen und geprüft",
     text:
       "Jede Eingabe hat eine Einheit, eine Erläuterung und eine datierte öffentliche Quelle oder eine dokumentierte " +
-      "Annahme. Prüfungen von Rechnung, Finanzierung, Covenant und Modellrahmen laufen bei jeder Neuberechnung, und das " +
+      "Annahme. Prüfungen der Berechnung, der Finanzierung, der Covenant-Einhaltung und des Modellrahmens laufen bei jeder Neuberechnung, und das " +
       "Modell lässt sich als Excel-Arbeitsmappe mit funktionierenden Formeln herunterladen (vorerst auf Englisch).",
   },
 ];
@@ -97,7 +97,7 @@ export default function Home() {
           )}
         </p>
         <p className="mt-3 max-w-2xl leading-relaxed text-muted-foreground">
-          Diese Website veröffentlicht ein offenes Projektfinanzierungsmodell eines Windparks an Land in Deutschland. Jede
+          Auf dieser Website veröffentliche ich ein offenes Projektfinanzierungsmodell eines Windparks an Land in Deutschland. Jede
           Eingabe hat eine öffentliche Quelle oder ist eine dokumentierte Annahme, jede Formel ist beschrieben, und die
           gesamte Rechnung läuft in Ihrem Browser.
         </p>

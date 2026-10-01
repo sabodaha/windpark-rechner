@@ -15,7 +15,7 @@ const { dateLabel } = FORMAT.de;
 const TITLE = "Quellen des Windparkmodells";
 const DESCRIPTION =
   "Alle öffentlichen Quellen des Windpark-Investitionsrechners – Ausschreibungen der Bundesnetzagentur, EEG 2023, " +
-  "Kosten der Deutschen WindGuard, KfW-Konditionen, Marktwerte, Steuerrecht – mit Datum und den Eingaben, die sie belegen.";
+  "Kostendaten der Deutschen WindGuard, KfW-Konditionen, Marktwerte, Steuerrecht – mit Datum und den Eingaben, für die sie herangezogen werden.";
 
 export const metadata = pageMetadata({ title: TITLE, description: DESCRIPTION, path: P.sources });
 
@@ -66,7 +66,7 @@ export default function QuellenPage() {
           <h1 className="!mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{TITLE}</h1>
           <p className="text-lg">
             Der Basisfall stützt sich auf {total} öffentliche Quellen, alle geprüft am {dateLabel(DATA_AS_OF)}. Jeder
-            Eintrag zeigt das Datum der Quelle und die Eingaben, die sie belegt. Wo es keinen aktuellen öffentlichen Wert
+            Eintrag zeigt das Datum der Quelle und die Eingaben, für die sie herangezogen wird. Wo es keinen aktuellen öffentlichen Wert
             gibt, ist die Eingabe eine dokumentierte Annahme – aufgeführt am Ende. Wie die Eingaben verwendet werden,
             beschreibt die <Link href={P.methodology}>Methodik</Link>.
           </p>
@@ -85,7 +85,7 @@ export default function QuellenPage() {
                       </a>
                       <span className="block text-sm text-muted-foreground">
                         Stand {dateLabel(s.date)}
-                        {used.length > 0 && <> · Belegt: {used.join("; ")}</>}
+                        {used.length > 0 && <> · Verwendet für: {used.join("; ")}</>}
                       </span>
                     </li>
                   );
@@ -98,7 +98,7 @@ export default function QuellenPage() {
           <p>
             Für diese Eingaben gibt es keinen aktuellen öffentlichen Wert, der zum Fall passt. Der Basisfall verwendet eine
             dokumentierte Annahme, oft neben einem öffentlichen Anhaltspunkt; das Tornado-Diagramm und die Szenarien zeigen,
-            wie viel jede einzelne ausmacht.
+            welchen Einfluss die einzelnen Annahmen auf das Ergebnis haben.
           </p>
           <dl>
             {assumptions.map(([group, labels]) => (

@@ -86,7 +86,7 @@ export function FieldControl({ field: f, inputs, base, onChange, t }: Props) {
   return (
     <div className="py-2">
       <div className="flex items-center gap-1.5">
-        <label id={`${id}-label`} htmlFor={id} className="min-w-0 flex-1 truncate text-[13px] text-foreground">
+        <label id={`${id}-label`} htmlFor={id} className="min-w-0 flex-1 text-[13px] leading-snug text-foreground">
           {label}
         </label>
         <FieldHelp field={f} t={t} label={label} />

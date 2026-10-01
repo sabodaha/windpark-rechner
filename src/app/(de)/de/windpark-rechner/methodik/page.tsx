@@ -86,9 +86,9 @@ export default function MethodikPage() {
     other: "Sonstiges",
   };
   const profileLabel: Record<string, string> = {
-    turbine: "10 % bei Financial Close, 70 % bei Lieferung (4–2 Monate vor Inbetriebnahme), 20 % bei Inbetriebnahme",
+    turbine: "10 % beim Financial Close, 70 % bei Lieferung (4–2 Monate vor Inbetriebnahme), 20 % bei Inbetriebnahme",
     thirds: "40 / 40 / 20 % über die Drittel der Bauzeit",
-    atStart: "bei Financial Close",
+    atStart: "beim Financial Close",
     linear: "gleichmäßig über die Bauzeit",
   };
   const scenarioText: Record<(typeof SCENARIOS)[number], string> = {
@@ -171,7 +171,7 @@ export default function MethodikPage() {
               <dt>Darlehen</dt>
               <dd>
                 KfW-Programm 270, {pct(f.interestRate, 2)} fest, {f.tenorYearsFromClose} Jahre ab Financial Close mit{" "}
-                {f.graceYears} tilgungsfreien Jahren, {instalments} gleiche vierteljährliche Raten vom{" "}
+                {f.graceYears} tilgungsfreien Jahren, {instalments} gleich hohe vierteljährliche Tilgungsraten vom{" "}
                 {tl.firstInstalment ? dateLabel(tl.firstInstalment) : "—"} bis {dateLabel(tl.loanMaturity)};{" "}
                 {meur(k.debt)} ({pct(k.gearing, 0)} der Mittelverwendung)
               </dd>
@@ -196,19 +196,19 @@ export default function MethodikPage() {
             <ul>
               <li>
                 <strong>Deterministisch und nominal.</strong> Gleiche Eingaben ergeben immer dasselbe Ergebnis. Beträge
-                sind nominale Euro; Stückpreise werden in Preisen von 2025 oder 2026 eingegeben und mit der Inflation
+                sind nominale Euro; Einheitspreise werden in Preisen von 2025 oder 2026 eingegeben und mit der Inflation
                 fortgeschrieben. Zwei Größen sind von Natur aus nominal: die Strom-Terminpreise und der AW, der nicht
                 indexiert wird (zu seinen Überprüfungen siehe Abschnitt 4).
               </li>
               <li>
                 <strong>Datierte Zahlungen.</strong> Die Bauphase läuft monatlich mit Zahlungen zum Monatsende, der Betrieb
                 in Kalenderjahren mit Zahlungen zum 31. Dezember. Das erste und das letzte Jahr zählen nur die Tage in
-                Betrieb. Das Darlehen läuft in einem Monatsraster mit vierteljährlichen Raten, summiert je Kalenderjahr.
+                Betrieb. Das Darlehen läuft in einem Monatsraster mit vierteljährlichen Tilgungsraten, summiert je Kalenderjahr.
               </li>
               <li>
-                <strong>Renditen aus Daten.</strong> IRR und Kapitalwert verwenden die genauen Daten mit der Zinskonvention
-                Actual/365, wie XINTZINSFUSS und XKAPITALWERT in Excel; so werden ein halbes erstes Jahr und die monatliche
-                Bauphase richtig gewichtet.
+                <strong>Renditen anhand der Zahlungstermine.</strong> IRR und Kapitalwert verwenden die genauen
+                Zahlungstermine mit der Zinskonvention Actual/365, wie XINTZINSFUSS und XKAPITALWERT in Excel; so werden ein
+                erstes Betriebsjahr von nur einem halben Jahr und die monatliche Bauphase richtig gewichtet.
               </li>
               <li>
                 <strong>Zwei Sichten.</strong> Die Projektsicht (ohne Fremdkapital) zeigt, was der Windpark verdient; die
@@ -232,8 +232,8 @@ export default function MethodikPage() {
               <li>
                 Der Zuschlag wurde am {dateLabel(tl.awardNotice)} bekanntgegeben. Er erlischt, wenn der Park 36 Monate
                 später, am {dateLabel(tl.awardLapse)}, nicht in Betrieb ist (§ 36e EEG), und eine Inbetriebnahme mehr als 30
-                Monate nach der Bekanntgabe löst eine Pönale aus (§ 55 EEG). Der Basisfall geht nach etwa {codMonths}{" "}
-                Monaten in Betrieb; spätere Termine markieren die Prüfungen.
+                Monate nach der Bekanntgabe löst eine Pönale aus (§ 55 EEG). Im Basisfall geht der Park nach etwa{" "}
+                {codMonths} Monaten in Betrieb; spätere Termine werden in den Prüfungen gekennzeichnet.
               </li>
               <li>
                 Die EEG-Förderung dauert 20 Jahre ab der Inbetriebnahme (§ 25 EEG; bei bezuschlagten Anlagen nicht bis zum
@@ -248,14 +248,14 @@ export default function MethodikPage() {
               </li>
               <li>
                 Das KfW-Darlehen läuft {f.tenorYearsFromClose} Jahre ab der Zusage, die das Modell auf den Financial Close
-                legt. {f.graceYears} Jahre lang werden nur Zinsen gezahlt; danach wird es in {instalments} gleichen
+                legt. {f.graceYears} Jahre lang werden nur Zinsen gezahlt; danach wird es in {instalments} gleich hohen
                 vierteljährlichen Raten getilgt, die erste am {tl.firstInstalment ? dateLabel(tl.firstInstalment) : "—"},
                 die letzte am {dateLabel(tl.loanMaturity)} (KfW-Merkblatt 270). Die tilgungsfreien Jahre müssen mindestens
-                bis zur Inbetriebnahme reichen: Raten während der Bauzeit bildet das Modell nicht ab.
+                bis zur Inbetriebnahme reichen: Tilgungsraten während der Bauzeit bildet das Modell nicht ab.
               </li>
               <li>
-                Die KfW zahlt ein Darlehen innerhalb von 12 Monaten nach der Zusage aus, verlängerbar um bis zu 24 Monate.
-                Eine Bauzeit von {i.project.constructionMonths} Monaten braucht eine solche Verlängerung; das Modell
+                Die Abruffrist für das KfW-Darlehen beträgt 12 Monate ab der Zusage und kann um bis zu 24 Monate verlängert
+                werden. Eine Bauzeit von {i.project.constructionMonths} Monaten braucht eine solche Verlängerung; das Modell
                 unterstellt sie.
               </li>
             </ul>
@@ -279,8 +279,9 @@ P90               E_P90   = E_P50 × (1 − ${num(P90_Z, 4)} × σ)`}</pre>
               </li>
               <li>
                 Nach dem Gesetz sind im Standortertrag Abschattungsverluste, bis zu 2 % Nichtverfügbarkeit, elektrische
-                Verluste und Abregelungen aus der Genehmigung bereits abgezogen. Das Modell zieht nur die Verfügbarkeit
-                unter 98 % ({pct(i.energy.availability, 0)} im Basisfall) und optionale sonstige Verluste ab:{" "}
+                Verluste und Abregelungen aus der Genehmigung bereits abgezogen. Das Modell zieht nur zusätzliche Verluste aus
+                einer Verfügbarkeit unter 98 % ({pct(i.energy.availability, 0)} im Basisfall) und optionale sonstige Verluste
+                ab:{" "}
                 {num(k.fullLoadHoursP50, 0)} Stunden.
               </li>
               <li>
@@ -301,9 +302,9 @@ P90               E_P90   = E_P50 × (1 − ${num(P90_Z, 4)} × σ)`}</pre>
             </ul>
 
             <H2 id="revenue">4. Erlöse</H2>
-            <pre>{`Korrekturfaktor     KF      = Tabelle nach § 36h EEG, linear dazwischen
+            <pre>{`Korrekturfaktor     KF      = Tabelle nach § 36h EEG, zwischen den Stützwerten linear interpoliert
 Anzulegender Wert   AW      = Zuschlagswert × KF, gerundet auf 2 Nachkommastellen in ct/kWh  (§ 36h Abs. 5)
-Base-Preis          B_y     = Strom-Terminpreise 2027–2029, danach langfristiger Preis (Preise 2026) × Preisindex
+Grundlastpreis      B_y     = Strom-Terminpreise 2027–2029, danach langfristiger Preis (Preise 2026) × Preisindex
 Marktwert           JW_y    = B_y × Marktwertfaktor Wind            (Jahresmarktwert Wind an Land)
 Marktprämie         MP_y    = max(0, AW − JW_y)                     (Anlage 1 Nr. 4 EEG)
 Markterlöse                 = E_y × JW_y × Förderanteil des Jahres
@@ -339,8 +340,8 @@ Nach der Förderung          = E_y × JW_y oder E_sold × PPA-Preis, × Rest des
                 {i.revenue.futuresEurMwh[0]!.year}–{i.revenue.futuresEurMwh.at(-1)!.year}, danach{" "}
                 {num(i.revenue.longTermBaseEurMwh2026, 0)} €/MWh in Preisen von 2026 zuzüglich Inflation, multipliziert mit
                 einem Marktwertfaktor von {num(i.revenue.captureFactor, 2)}: ein Marktwert von {num(mv(2029), 1)} €/MWh im
-                Jahr 2029 und {num(mv(2035), 1)} €/MWh im Jahr 2035. Der langfristige Preis ist die stärkste Annahme des
-                Modells; das Tornado-Diagramm zeigt ihr Gewicht.
+                Jahr 2029 und {num(mv(2035), 1)} €/MWh im Jahr 2035. Der langfristige Preis ist die einflussreichste Annahme
+                des Modells; das Tornado-Diagramm zeigt ihr Gewicht.
               </li>
               <li>
                 <strong>Das EEG als Untergrenze.</strong>{" "}
@@ -367,8 +368,8 @@ Nach der Förderung          = E_y × JW_y oder E_sold × PPA-Preis, × Rest des
                 Überprüfung an:{" "}
                 {reviewed ? (
                   <>
-                    Mit dem zehnjährigen P90-Ertrag beträgt die Standortgüte {pct(reviewed.siteQuality, 1)}, der AW wird ab
-                    dem {dateLabel(reviewed.start)} zu {ct(reviewed.awCt)}, und die ersten fünf Jahre werden zu diesem Wert
+                    Mit dem zehnjährigen P90-Ertrag beträgt die Standortgüte {pct(reviewed.siteQuality, 1)}, der AW beträgt
+                    ab dem {dateLabel(reviewed.start)} {ct(reviewed.awCt)}, und die ersten fünf Jahre werden zu diesem Wert
                     abgerechnet.
                   </>
                 ) : (
@@ -391,10 +392,10 @@ Nach der Förderung          = E_y × JW_y oder E_sold × PPA-Preis, × Rest des
               </li>
               <li>
                 <strong>Zweiseitige Marktprämie (Schalter).</strong> Ein vereinfachter Stresstest, nicht die Berechnung des
-                EEG-2027-Entwurfs, der weitere Regeln wie Viertelstunden-Anpassungen und einen Mindestbetrag für den
-                Betreiber vorsieht: Die Marktprämie wird negativ, wenn der Marktwert über dem AW liegt. Standardmäßig ist
-                sie aus – ein Zuschlag von 2026 fällt unter das EEG 2023, und ob der Entwurf für ihn gelten wird, ist
-                offen. Abschläge sind nie negativ; eine Rückzahlung wird mit der Endabrechnung verrechnet.
+                EEG-2027-Entwurfs, der weitere Regeln wie Viertelstunden-Anpassungen und einen Mindestbetrag vorsieht, der
+                beim Betreiber verbleibt: Die Marktprämie wird negativ, wenn der Marktwert über dem AW liegt. Der Schalter
+                ist standardmäßig aus – ein Zuschlag von 2026 fällt unter das EEG 2023, und ob der Entwurf für ihn gelten
+                wird, ist offen. Abschläge sind nie negativ; eine Rückzahlung wird mit der Endabrechnung verrechnet.
               </li>
               <li>
                 <strong>Nach der Förderung</strong> verkauft der Park zum Marktwert oder, per Schalter, über ein PPA zu
@@ -468,14 +469,14 @@ Einspeiseentgelt     = €/kW pro Jahr                          (${num(i.opex.gr
               <li>
                 Die Umsatzsteuer von {pct(i.capex.vatRate, 0)} wird mit jeder Rechnung gezahlt und{" "}
                 {i.capex.vatRefundLagMonths} Monate später erstattet. Ein Umsatzsteuerdarlehen zum Zinssatz des
-                Bankdarlehens plus {num(f.vatFacilitySpread * 100, 2)} Prozentpunkte überbrückt die Lücke; seine Zinsen,
+                vorrangigen Bankdarlehens plus {num(f.vatFacilitySpread * 100, 2)} Prozentpunkte überbrückt die Lücke; seine Zinsen,
                 einschließlich der Monate nach der Inbetriebnahme, gehören zur Mittelverwendung.
               </li>
               <li>
-                Finanzierungskosten in der Bauphase: ein Bearbeitungsentgelt von {pct(f.upfrontFeePct, 0)} des Darlehens bei
+                Finanzierungskosten in der Bauphase: ein Bearbeitungsentgelt von {pct(f.upfrontFeePct, 0)} des Darlehens beim
                 Financial Close; eine Bereitstellungsprovision von {pct(f.commitmentFeePerMonth, 2)} pro Monat auf den nicht
                 abgerufenen Betrag ab Monat {f.commitmentFeeStartMonth} (Regel der KfW); Zinsen auf das abgerufene
-                Darlehen. Die KfW berechnet in den tilgungsfreien Jahren nur Zinsen; diese Zinsen werden daher bar gezahlt
+                Darlehen. Die KfW berechnet in den tilgungsfreien Jahren nur Zinsen; diese Zinsen werden daher laufend gezahlt
                 und wie Investitionskosten finanziert, nicht dem Darlehen zugeschlagen.
               </li>
               <li>
@@ -484,13 +485,13 @@ Einspeiseentgelt     = €/kW pro Jahr                          (${num(i.opex.gr
               </li>
               <li>
                 Die Anlaufliquidität von {eurCompact(su.workingCapitalInitial)} finanziert die Forderungen des ersten
-                Betriebsjahres; die Verkäufe der ersten Monate brauchen so kein zusätzliches Geld.
+                Betriebsjahres; so entsteht aus den Verkäufen der ersten Monate kein zusätzlicher Liquiditätsbedarf.
               </li>
               <li>Fremd- und Eigenkapital werden jeden Monat anteilig abgerufen (Eigenkapital zuerst als Schalter).</li>
             </ul>
             <pre>{`Mittelverwendung = Investitionskosten + Bearbeitungsentgelt + Bereitstellungsprovision + Bauzeitzinsen
                    + Zinsen des Umsatzsteuerdarlehens + Erstdotierung DSRA + Anlaufliquidität
-Mittelherkunft   = Bankdarlehen + Eigenkapital          Prüfung: Mittelherkunft − Mittelverwendung = 0`}</pre>
+Mittelherkunft   = vorrangiges Bankdarlehen + Eigenkapital   Prüfung: Mittelherkunft − Mittelverwendung = 0`}</pre>
             <p>
               Im Basisfall beträgt die Mittelverwendung {meur(su.totalUses)}: Investitionskosten {meur(su.capex)},
               Finanzierungskosten {meur(financing)}, Erstdotierung der DSRA {meur(su.dsraInitial)} und Anlaufliquidität{" "}
@@ -504,11 +505,11 @@ Mittelherkunft   = Bankdarlehen + Eigenkapital          Prüfung: Mittelherkunft
               höchstens dem AW je verkaufter kWh. Das ist eine konservative Konvention des Modells, keine Aussage darüber,
               wie jede Bank rechnet. Marktprämie und Erstattung nach § 6 kommen zu denselben Zeitpunkten wie im
               Betriebsfall, einschließlich der Verzögerung nach § 26; nach der Förderung rechnet der Bankfall mit
-              Basispreisen (ein Schalter dimensioniert durchgehend mit Basispreisen). Der Cashflow für den Schuldendienst
-              hat eine Definition für Dimensionierung, Covenant und Ausschüttungssperre:
+              Basispreisen (ein Schalter dimensioniert durchgehend mit Basispreisen). Der für den Schuldendienst verfügbare
+              Cashflow (CFADS) ist für Dimensionierung, Covenant und Ausschüttungssperre einheitlich definiert:
             </p>
             <pre>{`CFADS_y   = EBITDA_y − Veränderung des Working Capital_y − Steuern_y
-Schuldendienst je Euro Darlehen   a_y    (vierteljährliche Raten und monatliche Zinsen, je Jahr summiert)
+Schuldendienst je Euro Darlehen   a_y    (vierteljährliche Tilgungsraten und monatliche Zinsen, je Jahr summiert)
 Darlehen aus den DSCR-Zielen      D_DSCR = min über y von  min( CFADS_y[Bank, P50] / (${num(f.targetDscrP50, 2)} × a_y),
                                                               CFADS_y[Bank, P90 1 Jahr] / (${num(f.targetDscrP90, 2)} × a_y) )
 Darlehen                          D      = min( D_DSCR, ${pct(f.maxGearing, 0)} × Mittelverwendung )`}</pre>
@@ -519,11 +520,11 @@ Darlehen                          D      = min( D_DSCR, ${pct(f.maxGearing, 0)} 
                 0,50 € ändert, rechnet dann beide Bankfälle mit dem endgültigen Darlehen neu und prüft beide Ziele erneut.
               </li>
               <li>
-                <strong>Varianten.</strong> Annuität und Sculpting sind übliche kommerzielle Profile, nicht KfW 270.
-                Annuität: gleiche vierteljährliche Zahlungen. Sculpting: Der Schuldendienst jedes Jahres ist der kleinere
-                Wert aus CFADS ÷ Ziel für P50 und P90; das Darlehen ist der Betrag, den diese Zahlungen bis zur Fälligkeit
-                genau tilgen – in geschlossener Form bestimmt, da die Salden linear im Darlehen sind –, und kleiner, wenn ein
-                schwaches Jahr sonst eine negative Rate bräuchte.
+                <strong>Varianten.</strong> Annuität und Sculpting sind allgemeine Tilgungsprofile kommerzieller Darlehen,
+                nicht KfW 270. Annuität: gleiche vierteljährliche Zahlungen. Sculpting: Der Schuldendienst jedes Jahres ist
+                der kleinere Wert aus CFADS ÷ Ziel für P50 und P90; das Darlehen ist der Betrag, den diese Zahlungen bis zur
+                Fälligkeit genau tilgen – in geschlossener Form bestimmt, da die Restschulden linear vom Darlehensbetrag
+                abhängen –, und kleiner, wenn in einem ertragsschwachen Jahr sonst eine negative Tilgungsrate nötig wäre.
               </li>
               <li>
                 <strong>Basisfall.</strong> Bindende Grenze: {de.overview.binding[b.sizing.binding]}
@@ -540,13 +541,14 @@ Darlehen                          D      = min( D_DSCR, ${pct(f.maxGearing, 0)} 
                 liegt unter dem Covenant von {ratio(f.covenantDscr)}. Das Ziel gilt für den Bankfall zu Preisen der
                 Untergrenze; der Covenant wird an den Cashflows des Betriebs getestet, wo der einjährige P90-Stress im
                 Basisfall noch {ratio(BASE.p90.kpis.minDscr)} zeigt. Für keine der beiden Schwellen gibt es einen
-                veröffentlichten Marktwert; beide sind Annahmen und Eingaben.
+                veröffentlichten marktüblichen Referenzwert; beide sind Annahmen und Eingaben.
               </li>
               <li>
                 <strong>Kein Darlehen.</strong> Hat der Bankfall ein Jahr ohne Geld für den Schuldendienst – CFADS null oder
-                darunter –, passt keine Höhe gleicher Raten, und das Modell dimensioniert kein Darlehen. Ein Darlehen mit
-                Sculpting wird vor einem solchen Jahr getilgt, wenn die früheren Jahre das erlauben. Darlehen unter 1 € gelten
-                als keines, und Jahre mit weniger als 1 € Schuldendienst haben keinen DSCR.
+                darunter –, ist keine Darlehenshöhe mit gleich hohen Tilgungsraten tragfähig, und das Modell setzt kein
+                Darlehen an. Ein Darlehen mit Sculpting wird vor einem solchen Jahr getilgt, wenn die früheren Jahre das
+                erlauben. Ein Darlehensbetrag unter 1 € gilt als kein Darlehen, und Jahre mit weniger als 1 € Schuldendienst
+                haben keinen DSCR.
               </li>
             </ul>
 
@@ -565,24 +567,25 @@ Soli             = 5,5 % × Körperschaftsteuer`}</pre>
                 <strong>Abschreibung.</strong> Bemessungsgrundlage sind die Investitionskosten zuzüglich der aktivierten
                 Finanzierungskosten. Alle Wirtschaftsgüter des Windparks werden linear über {i.tax.depreciationYears} Jahre
                 abgeschrieben (AfA-Tabelle; BFH IV R 46/09); das erste Jahr zählt ab dem Monat der Inbetriebnahme. Die
-                degressive AfA (das Dreifache der linearen, höchstens 30 %: 18,75 %) ist ein Schalter, der nur für
-                Wirtschaftsgüter gilt, die zwischen dem 1. Juli 2025 und dem 31. Dezember 2027 fertiggestellt werden –
-                nicht für den Basisfall –, und wechselt zur linearen AfA, sobald diese höher ist. Ein beim Rückbau
-                verbleibender Buchwert wird im letzten Jahr abgeschrieben.
+                degressive AfA (das Dreifache des linearen AfA-Satzes, höchstens 30 %: hier 18,75 %) lässt sich per Schalter
+                wählen; sie gilt nur für Wirtschaftsgüter, die zwischen dem 1. Juli 2025 und dem 31. Dezember 2027
+                fertiggestellt werden – nicht für den Basisfall. Das Modell wechselt zur linearen AfA, sobald deren Betrag
+                höher ist. Ein beim Rückbau verbleibender Buchwert wird im letzten Jahr abgeschrieben.
               </li>
               <li>
                 <strong>Rückbaurückstellung.</strong> Steuerlich wird die Verpflichtung zeitanteilig über die Betriebsdauer
                 zu den Preisen des jeweiligen Bilanzstichtags angesammelt und mit 5,5 % abgezinst – außer wenn weniger als
                 zwölf Monate verbleiben (§ 6 Abs. 1 Nr. 3a Buchst. e EStG). Ihre Zuführung mindert den steuerpflichtigen
-                Gewinn. Die Rücklage in bar ist davon getrennt.
+                Gewinn. Davon getrennt ist die Liquiditätsreserve für den Rückbau.
               </li>
               <li>
-                Steuern sind nicht abziehbar (§ 4 Abs. 5b EStG), die Steuerberechnung selbst ist also nicht zirkulär.
-                Steuern werden im Jahr ihrer Entstehung gezahlt.
+                Die Steuern auf den Gewinn sind nicht abziehbar (Gewerbesteuer: § 4 Abs. 5b EStG; Körperschaftsteuer und
+                Solidaritätszuschlag: § 10 Nr. 2 KStG), die Steuerberechnung selbst ist also nicht zirkulär. Steuern werden
+                im Jahr ihrer Entstehung gezahlt.
               </li>
               <li>
-                <strong>Rechtsform.</strong> Eine GmbH & Co. KG zahlt nur Gewerbesteuer; die Einkommensteuer trifft ihre
-                Gesellschafter und wird nicht modelliert. Die Eigenkapital-IRR der KG ist daher eine Rendite vor den Steuern
+                <strong>Rechtsform.</strong> Auf ihren Gewinn zahlt eine GmbH & Co. KG nur Gewerbesteuer; ihre Gesellschafter
+                versteuern ihre Gewinnanteile selbst, und das wird nicht modelliert. Die Eigenkapital-IRR der KG ist daher eine Rendite vor den Steuern
                 der Gesellschafter und nicht unmittelbar mit der GmbH vergleichbar, die zusätzlich Körperschaftsteuer und
                 Solidaritätszuschlag zahlt.
               </li>
@@ -590,8 +593,9 @@ Soli             = 5,5 % × Körperschaftsteuer`}</pre>
                 Die Gewerbesteuer fließt der Gemeinde der Anlagen zu: Bei Windparks zerlegt § 29 Abs. 1 Nr. 2 GewStG den
                 Steuermessbetrag zu 9/10 nach installierter Leistung und zu 1/10 nach Arbeitslöhnen; mit einem Standort und
                 ohne eigenes Personal geht die gesamte Bemessungsgrundlage dorthin, und es gilt ein einziger Hebesatz. Die
-                Prüfungen markieren einen Hebesatz unter dem gesetzlichen Minimum von 280 % ab 2027 sowie Zinsen über der
-                Freigrenze von 3 Mio. € der Zinsschranke (§ 4h EStG), die das Modell nicht berechnet.
+                Prüfungen markieren einen Hebesatz unter dem gesetzlichen Minimum von 280 % ab 2027 sowie Zinsen von
+                3 Mio. € oder mehr im Jahr, ab denen die Freigrenze der Zinsschranke (§ 4h EStG) nicht mehr greift; die
+                Zinsschranke selbst berechnet das Modell nicht.
               </li>
             </ul>
 
@@ -601,19 +605,19 @@ Soli             = 5,5 % × Körperschaftsteuer`}</pre>
   Fehlbetrag    gedeckt zuerst aus Mitteln, die die Ausschüttungssperre zurückhält, dann aus der DSRA
 ± DSRA          auffüllen auf ${f.dsraMonths} Monate des Schuldendienstes im Folgejahr, Überschuss freigeben,
                 bei einem Fehlbetrag ziehen
-− Rücklage      gleiche Raten für den Rückbau in den letzten ${i.opex.decommissioningReserveYears} Jahren
+− Reserve       gleiche Raten für den Rückbau in den letzten ${i.opex.decommissioningReserveYears} Jahren
   Sperre        bei DSCR < ${num(f.lockupDscr, 2)} während der Laufzeit bleibt das Geld des Jahres in der Gesellschaft,
                 bis der DSCR wieder über der Schwelle liegt
 = ausschüttungsfähiger Cashflow`}</pre>
             <ul>
               <li>
-                Im letzten Jahr werden DSRA, zurückgehaltene Mittel und Rücklage freigegeben, und der Rückbau wird bezahlt.
+                Im letzten Jahr werden DSRA, zurückgehaltene Mittel und Rückbaureserve freigegeben, und der Rückbau wird bezahlt.
                 Reicht das Geld des letzten Jahres nicht, gilt der Fall wie bei jedem anderen Fehlbetrag als nicht
                 finanziert: Zahlungen der Gesellschafter werden nicht modelliert.
               </li>
               <li>
                 <strong>Finanzierung.</strong> Fehlt während der Laufzeit weiterhin Geld, führt das Modell den Fehlbetrag als
-                negative Kasse und markiert den Fall als nicht finanziert: Eigenkapital-IRR und Kapitalwert erscheinen dann
+                negativen Liquiditätsbestand (Finanzierungslücke) und markiert den Fall als nicht finanziert: Eigenkapital-IRR und Kapitalwert erscheinen dann
                 als „n. a.“ (nicht aussagekräftig). Zahlungen der Gesellschafter zur Deckung eines Fehlbetrags werden nicht
                 modelliert.
               </li>
@@ -625,7 +629,7 @@ Soli             = 5,5 % × Körperschaftsteuer`}</pre>
                 {negativeBook.length > 0
                   ? `Im Basisfall zeigt die Bilanz des Modells ${negativeBook.length === 1 ? "im Jahr" : "in den Jahren"} ${yearSpan(negativeBook)} ein negatives bilanzielles Eigenkapital – ein Hinweis, dass solche Grenzen greifen könnten, keine rechtliche Prüfung.`
                   : "Im Basisfall bleibt das bilanzielle Eigenkapital des Modells positiv."}{" "}
-                Gesellschafterdarlehen, die übliche Abhilfe, werden nicht modelliert.
+                Gesellschafterdarlehen, deren Rückzahlung keine Ausschüttung ist, werden nicht modelliert.
               </li>
             </ul>
 
@@ -646,12 +650,12 @@ Soli             = 5,5 % × Körperschaftsteuer`}</pre>
                 ],
                 [
                   "Kapitalwert (EK)",
-                  `XKAPITALWERT der Zahlungen der Gesellschafter zu den Eigenkapitalkosten (${pct(i.macro.costOfEquity, 0)}), abgezinst auf den Financial Close`,
+                  `XKAPITALWERT der Ein- und Auszahlungen aus Sicht der Gesellschafter zu den Eigenkapitalkosten (${pct(i.macro.costOfEquity, 0)}), abgezinst auf den Financial Close`,
                   meur(k.npvEquity),
                 ],
                 [
                   "Stromgestehungskosten (LCOE)",
-                  `In Anlehnung an Fraunhofer ISE: (Barwert der Investitionskosten + Barwert der Betriebskosten nach der Erstattung nach § 6 + Barwert des Rückbaus) ÷ Barwert der verkauften Menge; reale Preise von 2026 bei einem realen WACC von ${pct(i.macro.waccReal, 1)} (nominal: ${pct(i.macro.waccNominal, 1)}), ohne Steuern und Finanzierungskosten. Anders als bei ISE zählt die verkaufte Menge, und die Pacht hängt an den Erlösen, sodass sich der Wert mit dem Strompreis bewegt`,
+                  `In Anlehnung an Fraunhofer ISE: (Barwert der Investitionskosten + Barwert der um die Erstattung nach § 6 verminderten Betriebskosten + Barwert des Rückbaus) ÷ Barwert der verkauften Menge; reale Preise von 2026 bei einem realen WACC von ${pct(i.macro.waccReal, 1)} (nominal: ${pct(i.macro.waccNominal, 1)}), ohne Steuern und Finanzierungskosten. Anders als bei ISE zählt die verkaufte Menge, und die Pacht ist an die Erlöse gekoppelt, sodass sich der Wert mit dem Strompreis bewegt`,
                   `${ct(k.lcoeRealCt)} (nominal ${num(k.lcoeNominalCt, 2)})`,
                 ],
                 [
@@ -664,7 +668,7 @@ Soli             = 5,5 % × Körperschaftsteuer`}</pre>
                   "Barwert des CFADS über die Laufzeit zum Darlehenszins ÷ Darlehen, bei Inbetriebnahme – das Fälligkeitsjahr nur bis zum Fälligkeitstag; Reserven nicht angerechnet",
                   ratio(k.llcr),
                 ],
-                ["Amortisation", "Jahre ab Inbetriebnahme, bis der kumulierte Cashflow der Gesellschafter positiv wird", `${num(k.paybackYears, 1)} Jahre`],
+                ["Amortisationsdauer", "Jahre ab Inbetriebnahme, bis der kumulierte Cashflow der Gesellschafter positiv wird", `${num(k.paybackYears, 1)} Jahre`],
                 ["Fremdkapitalquote", "Darlehen ÷ Mittelverwendung gesamt", pct(k.gearing, 1)],
               ]}
             />
@@ -692,15 +696,15 @@ Soli             = 5,5 % × Körperschaftsteuer`}</pre>
               })}
             />
             <p>
-              <strong>Tornado.</strong> Jeder Treiber wird auf seinen niedrigen und seinen hohen Wert gesetzt, mit neu
-              dimensioniertem Darlehen – die Sicht vor dem Financial Close –, und die Treiber werden nach der Spannweite der
-              gewählten Kennzahl sortiert. Ein Lauf, in dem der Gesellschaft das Geld ausgeht oder eine Rechenprüfung
-              fehlschlägt, zeigt keine Eigenkapital-IRR. Der Treiber für negative Preise bewegt auch den Marktwertfaktor mit
-              (1 − Anteil): Erzeugung, die in Zeiten negativer Preise fällt, bringt fast nichts ein, also sinkt der Marktwert
+              <strong>Tornado.</strong> Jede Einflussgröße wird auf ihren unteren und ihren oberen Wert gesetzt, mit neu
+              dimensioniertem Darlehen – die Sicht vor dem Financial Close –, und die Einflussgrößen werden nach der
+              Spannweite der gewählten Kennzahl sortiert. Ein Lauf, in dem der Gesellschaft das Geld ausgeht oder eine Rechenprüfung
+              fehlschlägt, zeigt keine Eigenkapital-IRR. Die Einflussgröße für negative Preise ändert auch den
+              Marktwertfaktor mit (1 − Anteil): Erzeugung, die in Zeiten negativer Preise fällt, bringt fast nichts ein, also sinkt der Marktwert
               des Windes mit.
             </p>
             <Table
-              head={["Treiber", "Niedrig", "Hoch"]}
+              head={["Einflussgröße", "Niedrig", "Hoch"]}
               rows={TORNADO_DRIVERS.map((d) => [
                 de.sensitivity.drivers[d.id] ?? d.id,
                 settingLabel(d.setting, "low", FORMAT.de, de.sensitivity.units),
@@ -710,9 +714,9 @@ Soli             = 5,5 % × Körperschaftsteuer`}</pre>
             <p>
               <strong>Gebotsrechner.</strong> Er sucht den niedrigsten Zuschlagswert, bei dem die Eigenkapital-IRR ein Ziel
               erreicht, mit neu dimensioniertem Darlehen bei jedem Schritt, und meldet drei Dinge: den Preis allein für die
-              Rendite; den niedrigsten Preis, der außerdem finanzierbar ist – voll finanziert, im Covenant und mit einem
-              Zuschlag, der nach § 36e nicht erloschen ist –; und ob dieser Preis den Höchstwert der Eingaben einhält. Die IRR
-              ist im Zuschlagswert nicht monoton: Eine höhere Untergrenze erlaubt mehr Fremdkapital zu{" "}
+              Rendite; den niedrigsten Preis, der außerdem finanzierbar ist – voll finanziert, unter Einhaltung des
+              Covenants und mit einem Zuschlag, der nach § 36e nicht erloschen ist –; und ob dieser Preis den Höchstwert der
+              Eingaben einhält. Die IRR verläuft in Abhängigkeit vom Zuschlagswert nicht monoton: Eine höhere Untergrenze erlaubt mehr Fremdkapital zu{" "}
               {pct(f.interestRate, 2)}, was die Eigenkapitalrendite senken kann. Die Suche prüft deshalb ein Raster von
               0,25 ct auf den ersten Preis, der die Bedingungen erfüllt, und halbiert dann innerhalb dieses Schritts. Gebote
               haben zwei Nachkommastellen; die Antwort ist daher der niedrigste solche Preis, der die Bedingungen erfüllt,
@@ -766,8 +770,8 @@ Soli             = 5,5 % × Körperschaftsteuer`}</pre>
                 Die <a href={P.workbook}>Excel-Arbeitsmappe</a> (vorerst auf Englisch) ist eine zweite Umsetzung des Modells
                 in Tabellenformeln. Ihre Kopie ohne gespeicherte Ergebnisse hat Microsoft Excel allein neu berechnet. In{" "}
                 {VERIFIED_VARIANTS} Varianten – jeder Schalter (Rechtsform, Tilgungsprofil, Erlösbasis der Bank,
-                zweiseitiger Stresstest, PPA, Eigenkapital zuerst, degressive AfA, Südregion, Daten und Verzögerungen) und
-                die Grenzfälle der Reviews (kein Darlehen, kein Geld, negative Renditen, ein erloschener Zuschlag, Eingaben
+                zweiseitiger Stresstest, PPA, Eigenkapital zuerst, degressive AfA, Südregion, Datumsangaben und Verzögerungen) und
+                die Grenzfälle aus den externen Reviews (kein Darlehen, kein Geld, negative Renditen, ein erloschener Zuschlag, Eingaben
                 außerhalb des üblichen Bereichs) – stimmen alle ihre rund 26.000 Formelzellen mit dem Rechenkern überein:
                 Geldbeträge auf den Cent, Sätze und Verhältnisse auf 10⁻⁷. Jedes Paar von Schalterwerten kommt in mindestens
                 einer Variante zusammen vor. Zwei Änderungen in der Datei verhalten sich wie beschrieben: Neue
@@ -791,7 +795,7 @@ Soli             = 5,5 % × Körperschaftsteuer`}</pre>
                 der Fremdkapitalquote neu und meldet, wenn die eingefügten Werte nicht mehr passen.
               </li>
               <li>
-                Am 30. September 2026, vor den Reviews, hat eine Tabelle, die nach der schriftlichen Spezifikation – nicht
+                Am 30. September 2026, vor den externen Reviews, hat eine Tabelle, die nach der schriftlichen Spezifikation – nicht
                 nach dem Code – aufgebaut wurde, den Basisfall des ersten Rechenkerns in Microsoft Excel nachgerechnet. Alle
                 20 Kennzahlen und zwölf Jahreszeilen stimmten auf den Cent überein.
               </li>
@@ -809,22 +813,23 @@ Soli             = 5,5 % × Körperschaftsteuer`}</pre>
             <ul>
               <li>Der Betrieb wird jährlich gerechnet; die Erzeugung verteilt sich gleichmäßig über das Jahr (tatsächlich ist der Winter windreicher).</li>
               <li>Der Erlöspreis des Parks entspricht dem Marktwert aller Windenergie an Land.</li>
-              <li>Die Einkommensteuer der Gesellschafter einer KG wird nicht modelliert; Steuern werden im Jahr ihrer Entstehung gezahlt.</li>
+              <li>Die Steuern der Gesellschafter einer KG auf ihre Gewinnanteile werden nicht modelliert; Steuern werden im Jahr ihrer Entstehung gezahlt.</li>
               <li>
-                Ein einziges Bankdarlehen: keine Tranchen, Gesellschafterdarlehen, Refinanzierung oder Cash Sweep; Raten
-                während der Bauzeit werden nicht unterstützt.
+                Ein einziges vorrangiges Bankdarlehen: keine Tranchen, Gesellschafterdarlehen, Refinanzierung oder Cash Sweep;
+                Tilgungsraten während der Bauzeit werden nicht unterstützt.
               </li>
               <li>
                 Nicht modelliert: die Pönale nach § 55 bei verspäteter Inbetriebnahme, Zinsen auf Rückzahlungen nach § 36h,
                 die Zinsschranke und Zahlungen der Gesellschafter zur Deckung eines Fehlbetrags.
               </li>
               <li>
-                Nicht entschädigte Abregelungen (ein Entwurf des Netzpakets) und Einspeiseentgelte (das AgNes-Verfahren der
+                Nicht entschädigte netzbedingte Abregelungen (nach einem Entwurf des Netzpakets) und Einspeiseentgelte (das AgNes-Verfahren der
                 Bundesnetzagentur) sind nicht im Basisfall; das Entgelt steht als Eingabe zur Verfügung.
               </li>
               <li>
                 In der Excel-Arbeitsmappe werden Darlehen, Mittelverwendung gesamt und die Tilgung beim Sculpting auf der
-                Website berechnet; nach einer Änderung, die sie betrifft, dort neu berechnen und erneut herunterladen.
+                Website berechnet; berechnen Sie nach einer Änderung, die diese Werte betrifft, das Modell dort neu und laden Sie
+                die Arbeitsmappe erneut herunter.
                 Tornado und Gebotsrechner sind als Werte enthalten.
               </li>
               <li>Der Windpark ist fiktiv, die Ergebnisse sind beispielhaft.</li>

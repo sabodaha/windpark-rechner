@@ -69,7 +69,7 @@ export const en = {
       needsThreeValues: () => "needs three values",
       graceNotShorterThanTenor: () => "the grace period must be shorter than the loan term",
       repaymentBeforeCommissioning: ({ params }) =>
-        `repayment would start before commissioning; instalments during construction are not modelled — use at least ${params?.needed} grace years`,
+        `repayment would start before commissioning; instalments during construction are not modelled — use at least ${params?.needed} grace year${params?.needed === 1 ? "" : "s"}`,
       error: ({ message }) => message,
     } satisfies Record<IssueCode, (issue: InputIssue) => string>,
   },
@@ -209,7 +209,7 @@ export const en = {
     upfront: { label: "Upfront fee", hint: "One-off bank fee on the loan amount." },
     commitment: { label: "Commitment fee", hint: "Per month on the undrawn loan, from month 7 (KfW rule)." },
     equityFirst: { label: "Equity first", hint: "Owners fund construction first, the loan afterwards. Default: pro rata." },
-    legalForm: { label: "Legal form", hint: "A GmbH & Co. KG pays only trade tax; a GmbH also pays corporate tax and solidarity surcharge." },
+    legalForm: { label: "Legal form", hint: "On its profit, a GmbH & Co. KG pays only trade tax; a GmbH also pays corporate tax and solidarity surcharge." },
     hebesatz: { label: "Trade-tax multiplier (Hebesatz)", hint: "Set by the municipality. Hesse average 2025: 400 %. Legal minimum from 2027: 280 %." },
     depYears: { label: "Depreciation period", hint: "Wind parks are depreciated over 16 years (BFH IV R 46/09)." },
     degressive: { label: "Declining-balance depreciation", hint: "18.75 % a year, only for plants completed by 31 Dec 2027." },

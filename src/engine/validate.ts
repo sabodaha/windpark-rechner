@@ -181,7 +181,7 @@ export function validateInputs(i: Inputs): InputIssue[] {
         path: "financing.graceYears",
         code: "repaymentBeforeCommissioning",
         params: { needed },
-        message: `repayment would start before commissioning; instalments during construction are not modelled — use at least ${needed} grace years`,
+        message: `repayment would start before commissioning; instalments during construction are not modelled — use at least ${needed} grace year${needed === 1 ? "" : "s"}`,
       });
     }
   }

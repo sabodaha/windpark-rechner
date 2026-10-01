@@ -79,6 +79,14 @@ describe("validation issues in both languages", () => {
     });
   }
 
+  it("one grace year needed: singular in both languages", () => {
+    const short = edit((i) => void ((i.financing.graceYears = 0), (i.project.constructionMonths = 6)));
+    const [issue] = validateInputs(short).filter((i) => i.code === "repaymentBeforeCommissioning");
+    expect(issue?.params?.needed).toBe(1);
+    expect(issue!.message).toMatch(/use at least 1 grace year$/);
+    expect(de.invalid.issue.repaymentBeforeCommissioning(issue!)).toMatch(/Wählen Sie mindestens ein tilgungsfreies Jahr\.$/);
+  });
+
   it("German bounds use German numbers and dates", () => {
     const [range] = validateInputs(BROKEN.outOfRange!).filter((i) => i.code === "outOfRange");
     expect(de.invalid.issue.outOfRange(range!)).toBe("muss zwischen −0,1 und 0,3 liegen");

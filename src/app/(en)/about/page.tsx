@@ -83,8 +83,9 @@ export default function AboutPage() {
         </p>
         <p>
           The <Link href={PATHS.calculator}>wind farm calculator</Link> on this site shows how I build a model: every
-          input comes from a public source with a date, the mechanics follow the statutes and lenders’ practice, and a set
-          of checks has to pass before any number is shown. The <Link href={PATHS.methodology}>methodology</Link> and all{" "}
+          input comes from a dated public source or is a documented assumption, the mechanics follow the statutes and
+          lenders’ practice, inputs are validated before any calculation, and a set of checks flags funding gaps and
+          covenant breaches. The <Link href={PATHS.methodology}>methodology</Link> and all{" "}
           <Link href={PATHS.sources}>sources</Link> are published, so every result can be traced.
         </p>
 
