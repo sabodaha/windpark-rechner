@@ -7,9 +7,9 @@ import { SOURCES, type Inputs } from "@/engine";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { type FieldDef, type FieldValue, fromDisplay, sameValue, toDisplay } from "@/lib/fields";
-import { LOCALE } from "@/lib/format";
+import { useFormat } from "@/components/site/LocaleProvider";
 import { cn } from "@/lib/utils";
-import type { Messages } from "@/messages/en";
+import type { Messages } from "@/messages";
 
 interface Props {
   field: FieldDef;
@@ -19,8 +19,9 @@ interface Props {
   t: Messages;
 }
 
-const display = (f: FieldDef, v: number) =>
-  new Intl.NumberFormat(LOCALE, { minimumFractionDigits: 0, maximumFractionDigits: f.decimals ?? 2, useGrouping: false }).format(v);
+/** A value as the input shows it, in the page's number format ("4.79" / "4,79"), without thousands separators. */
+const display = (f: FieldDef, v: number, intl: string) =>
+  new Intl.NumberFormat(intl, { minimumFractionDigits: 0, maximumFractionDigits: f.decimals ?? 2, useGrouping: false }).format(v);
 
 /** Accepts "1.5", "1,5" and "1 500" regardless of locale. */
 function parseNumber(text: string): number | null {
@@ -153,22 +154,23 @@ function NumberInput({
   t: Messages;
   changed: boolean;
 }) {
+  const intl = useFormat().intl;
   const shown = toDisplay(f, value) as number;
-  const [text, setText] = useState(display(f, shown));
+  const [text, setText] = useState(display(f, shown, intl));
   const [focused, setFocused] = useState(false);
   useEffect(() => {
-    if (!focused) setText(display(f, shown));
+    if (!focused) setText(display(f, shown, intl));
   }, [shown, focused, f]);
 
   const commit = (raw: string) => {
     const v = parseNumber(raw);
     if (v === null) {
-      setText(display(f, shown));
+      setText(display(f, shown, intl));
       return;
     }
     const clamped = Math.min(f.max ?? Infinity, Math.max(f.min ?? -Infinity, v));
     onChange(f, fromDisplay(f, clamped));
-    setText(display(f, clamped));
+    setText(display(f, clamped, intl));
   };
 
   const [uMin, uMax] = f.usual ?? [NaN, NaN];
@@ -213,7 +215,7 @@ function NumberInput({
           onKeyDown={(e) => {
             if (e.key === "Enter") (e.target as HTMLInputElement).blur();
             if (e.key === "Escape") {
-              setText(display(f, shown));
+              setText(display(f, shown, intl));
               (e.target as HTMLInputElement).blur();
             }
           }}

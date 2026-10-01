@@ -3,12 +3,13 @@
 import { CircleAlert, CircleCheck, Info, TriangleAlert } from "lucide-react";
 import type { CheckGroup, ModelResult } from "@/engine";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { num } from "@/lib/format";
-import type { Messages } from "@/messages/en";
+import { useFormat } from "@/components/site/LocaleProvider";
+import type { Messages } from "@/messages";
 
 const ORDER: CheckGroup[] = ["integrity", "funding", "covenant", "inputs", "scope"];
 
 export function ChecksList({ result, t }: { result: ModelResult; t: Messages }) {
+  const f = useFormat();
   const C = t.checks;
   return (
     <Card>
@@ -36,7 +37,7 @@ export function ChecksList({ result, t }: { result: ModelResult; t: Messages }) 
                         <div>{C.ids[c.id] ?? c.id}</div>
                         <div className="text-xs text-muted-foreground">
                           {status}
-                          {c.value !== null && ` · ${C.value}: ${typeof c.value === "number" ? num(c.value, Math.abs(c.value) < 100 ? 3 : 0) : c.value}`}
+                          {c.value !== null && ` · ${C.value}: ${typeof c.value === "number" ? f.num(c.value, Math.abs(c.value) < 100 ? 3 : 0) : c.value}`}
                         </div>
                       </div>
                     </li>

@@ -6,7 +6,7 @@ import { type Inputs } from "@/engine";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { FIELDS, type FieldDef, type FieldValue, GROUPS, type GroupId, fromDisplay, sameValue, toDisplay } from "@/lib/fields";
 import { cn } from "@/lib/utils";
-import type { Messages } from "@/messages/en";
+import type { Messages } from "@/messages";
 import { FieldControl, FieldHelp } from "./FieldControl";
 
 interface Props {

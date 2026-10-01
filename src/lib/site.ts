@@ -1,4 +1,5 @@
 // Site-wide facts: canonical address, author, pages and structured data (schema.org JSON-LD).
+import { PUBLISHED_LOCALES, type Locale } from "./i18n";
 
 export const SITE = {
   url: "https://igorsabodakha.com",
@@ -35,31 +36,75 @@ export const CONTACT: { addressLines: string[] | null; email: string | null; pho
   phone: null,
 };
 
-export const PATHS = {
-  home: "/",
-  calculator: "/wind-farm-calculator/",
-  workbook: "/wind-farm-calculator/wind-farm-model.xlsx",
-  /** Print view of the report; the calculator's query gives it the user's inputs. Not in the sitemap. */
-  report: "/wind-farm-calculator/report/",
-  /** The base case as a PDF, printed from the report page and committed to public/ (npm run report:pdf). */
-  reportPdf: "/wind-farm-calculator/wind-farm-report.pdf",
-  methodology: "/wind-farm-calculator/methodology/",
-  sources: "/wind-farm-calculator/sources/",
-  about: "/about/",
-  impressum: "/impressum/",
-  privacy: "/privacy/",
-} as const;
+export type PageId = "home" | "calculator" | "methodology" | "sources" | "report" | "about" | "impressum" | "privacy";
+
+/** One address per page and language: English at the root, German under /de/ with German words (decision G01). */
+export const PAGE_PATHS: Record<Locale, Record<PageId, string>> = {
+  en: {
+    home: "/",
+    calculator: "/wind-farm-calculator/",
+    methodology: "/wind-farm-calculator/methodology/",
+    sources: "/wind-farm-calculator/sources/",
+    /** Print view of the report; the calculator's query gives it the user's inputs. Not in the sitemap. */
+    report: "/wind-farm-calculator/report/",
+    about: "/about/",
+    impressum: "/impressum/",
+    privacy: "/privacy/",
+  },
+  de: {
+    home: "/de/",
+    calculator: "/de/windpark-rechner/",
+    methodology: "/de/windpark-rechner/methodik/",
+    sources: "/de/windpark-rechner/quellen/",
+    report: "/de/windpark-rechner/bericht/",
+    about: "/de/ueber-mich/",
+    impressum: "/de/impressum/",
+    privacy: "/de/datenschutz/",
+  },
+};
+
+/** Every address of the site for one language: its pages and the downloads. */
+export function paths(locale: Locale) {
+  return {
+    ...PAGE_PATHS[locale],
+    // The print view and the downloads stay English until the German report and workbook exist (phases DE5–DE6).
+    report: PAGE_PATHS.en.report,
+    workbook: "/wind-farm-calculator/wind-farm-model.xlsx",
+    /** The base case as a PDF, printed from the report page and committed to public/ (npm run report:pdf). */
+    reportPdf: "/wind-farm-calculator/wind-farm-report.pdf",
+  };
+}
+
+export const PATHS = paths("en");
+
+/** The page and language of a path ("/de/ueber-mich" or "/de/ueber-mich/"), or null for an unknown path. */
+export function pageOf(pathname: string): { page: PageId; locale: Locale } | null {
+  const p = pathname.endsWith("/") ? pathname : `${pathname}/`;
+  for (const locale of Object.keys(PAGE_PATHS) as Locale[]) {
+    for (const [page, path] of Object.entries(PAGE_PATHS[locale]) as [PageId, string][]) if (path === p) return { page, locale };
+  }
+  return null;
+}
 
 /** Pages for the sitemap, most important first. */
-export const SITEMAP: { path: string; priority: number }[] = [
-  { path: PATHS.home, priority: 1 },
-  { path: PATHS.calculator, priority: 0.9 },
-  { path: PATHS.methodology, priority: 0.8 },
-  { path: PATHS.about, priority: 0.8 },
-  { path: PATHS.sources, priority: 0.6 },
-  { path: PATHS.impressum, priority: 0.2 },
-  { path: PATHS.privacy, priority: 0.2 },
+export const SITEMAP: { page: PageId; priority: number }[] = [
+  { page: "home", priority: 1 },
+  { page: "calculator", priority: 0.9 },
+  { page: "methodology", priority: 0.8 },
+  { page: "about", priority: 0.8 },
+  { page: "sources", priority: 0.6 },
+  { page: "impressum", priority: 0.2 },
+  { page: "privacy", priority: 0.2 },
 ];
+
+/** hreflang alternates of a page across the published languages (none while only English is published). */
+export function alternates(page: PageId): Record<string, string> | undefined {
+  if (PUBLISHED_LOCALES.length < 2) return undefined;
+  const languages: Record<string, string> = {};
+  for (const locale of PUBLISHED_LOCALES) languages[locale] = PAGE_PATHS[locale][page];
+  languages["x-default"] = PAGE_PATHS.en[page];
+  return languages;
+}
 
 export const absoluteUrl = (path: string) => `${SITE.url}${path}`;
 
@@ -86,7 +131,7 @@ export function websiteJsonLd() {
     "@id": WEBSITE_ID,
     url: absoluteUrl(PATHS.home),
     name: SITE.name,
-    inLanguage: "en",
+    inLanguage: PUBLISHED_LOCALES.length > 1 ? [...PUBLISHED_LOCALES] : PUBLISHED_LOCALES[0],
     publisher: { "@id": PERSON_ID },
   };
 }

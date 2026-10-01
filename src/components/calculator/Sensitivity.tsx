@@ -5,19 +5,21 @@ import { useEffect, useState } from "react";
 import { tornado, type Inputs, type TornadoBar, type TornadoMetric } from "@/engine";
 import { TornadoChart } from "@/components/charts/TornadoChart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ct, pct, ratio } from "@/lib/format";
+import { FORMAT, type Format } from "@/lib/format";
+import { useFormat } from "@/components/site/LocaleProvider";
 import { cn } from "@/lib/utils";
-import type { Messages } from "@/messages/en";
+import type { Messages } from "@/messages";
 
 const METRICS: TornadoMetric[] = ["equityIrr", "projectIrrPostTax", "minDscr", "lcoeRealCt"];
 
-export function formatMetric(metric: TornadoMetric, v: number): string {
-  if (metric === "minDscr") return ratio(v);
-  if (metric === "lcoeRealCt") return ct(v);
-  return pct(v, 1);
+export function formatMetric(metric: TornadoMetric, v: number, f: Format = FORMAT.en): string {
+  if (metric === "minDscr") return f.ratio(v);
+  if (metric === "lcoeRealCt") return f.ct(v);
+  return f.pct(v, 1);
 }
 
 export function Sensitivity({ inputs, t }: { inputs: Inputs; t: Messages }) {
+  const f = useFormat();
   const [metric, setMetric] = useState<TornadoMetric>("equityIrr");
   const [bars, setBars] = useState<TornadoBar[] | null>(null);
   const [busy, setBusy] = useState(true);
@@ -61,13 +63,13 @@ export function Sensitivity({ inputs, t }: { inputs: Inputs; t: Messages }) {
             <TornadoChart
               rows={bars.map((b) => ({ label: S.drivers[b.id] ?? b.id, lowLabel: b.lowLabel, highLabel: b.highLabel, low: b.low, high: b.high }))}
               base={base}
-              format={(v) => formatMetric(metric, v)}
+              format={(v) => formatMetric(metric, v, f)}
               lowName={S.low}
               highName={S.high}
               ariaLabel={`${S.title}: ${S.metrics[metric]}`}
             />
             <p className="mt-2 text-xs text-muted-foreground">
-              {S.base}: {formatMetric(metric, base)}
+              {S.base}: {formatMetric(metric, base, f)}
             </p>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full min-w-[28rem] text-xs tabular">
@@ -85,9 +87,9 @@ export function Sensitivity({ inputs, t }: { inputs: Inputs; t: Messages }) {
                     <tr key={b.id} className="border-b border-border last:border-0">
                       <td className="py-1">{S.drivers[b.id] ?? b.id}</td>
                       <td className="py-1 text-right text-muted-foreground">{b.lowLabel}</td>
-                      <td className="py-1 text-right">{b.low === null ? "—" : formatMetric(metric, b.low)}</td>
+                      <td className="py-1 text-right">{b.low === null ? "—" : formatMetric(metric, b.low, f)}</td>
                       <td className="py-1 text-right text-muted-foreground">{b.highLabel}</td>
-                      <td className="py-1 text-right">{b.high === null ? "—" : formatMetric(metric, b.high)}</td>
+                      <td className="py-1 text-right">{b.high === null ? "—" : formatMetric(metric, b.high, f)}</td>
                     </tr>
                   ))}
                 </tbody>

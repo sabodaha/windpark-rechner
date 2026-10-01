@@ -3,9 +3,9 @@
 import { CircleAlert, CircleCheck, TriangleAlert } from "lucide-react";
 import type { Inputs, ModelResult, ScenarioName } from "@/engine";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ct, eurCompact, meur, pct, ratio } from "@/lib/format";
+import { useFormat } from "@/components/site/LocaleProvider";
 import { cn } from "@/lib/utils";
-import type { Messages } from "@/messages/en";
+import type { Messages } from "@/messages";
 
 interface Props {
   results: Record<ScenarioName, ModelResult>;
@@ -17,6 +17,7 @@ interface Props {
 }
 
 export function KpiBar({ results, inputs, scenario, t, pending, onChecks }: Props) {
+  const f = useFormat();
   const r = results[scenario];
   const k = r.kpis;
   const v = r.validity;
@@ -25,22 +26,22 @@ export function KpiBar({ results, inputs, scenario, t, pending, onChecks }: Prop
   const tiles: { key: keyof Messages["kpis"]; value: string; sub?: string; tone?: "critical"; hint?: string }[] = [
     {
       key: "equityIrr",
-      value: nm ? t.kpis.notMeaningful : pct(k.equityIrr, 2),
+      value: nm ? t.kpis.notMeaningful : f.pct(k.equityIrr, 2),
       tone: nm ? "critical" : undefined,
       hint: nm ? t.kpis.notMeaningfulHint : undefined,
     },
-    { key: "projectIrr", value: pct(k.projectIrrPostTax, 2) },
-    { key: "lcoe", value: ct(k.lcoeRealCt) },
+    { key: "projectIrr", value: f.pct(k.projectIrrPostTax, 2) },
+    { key: "lcoe", value: f.ct(k.lcoeRealCt) },
     {
       key: "minDscr",
-      value: ratio(k.minDscr),
-      sub: scenario === "base" ? `${t.scenarios.p90}: ${ratio(results.p90.kpis.minDscr)}` : undefined,
+      value: f.ratio(k.minDscr),
+      sub: scenario === "base" ? `${t.scenarios.p90}: ${f.ratio(results.p90.kpis.minDscr)}` : undefined,
       tone: v.covenantBreach ? "critical" : undefined,
     },
-    { key: "debt", value: meur(k.debt), sub: `${pct(k.gearing, 0)} ${t.kpis.gearing}` },
+    { key: "debt", value: f.meur(k.debt), sub: `${f.pct(k.gearing, 0)} ${t.kpis.gearing}` },
     {
       key: "npv",
-      value: nm ? t.kpis.notMeaningful : meur(k.npvEquity),
+      value: nm ? t.kpis.notMeaningful : f.meur(k.npvEquity),
       tone: nm ? "critical" : undefined,
       hint: nm ? t.kpis.notMeaningfulHint : undefined,
     },
@@ -66,7 +67,7 @@ export function KpiBar({ results, inputs, scenario, t, pending, onChecks }: Prop
         );
       })}
       <span className="sr-only" aria-live="polite">
-        {t.kpis.equityIrr.label} {nm ? t.kpis.notMeaningful : pct(k.equityIrr, 2)}
+        {t.kpis.equityIrr.label} {nm ? t.kpis.notMeaningful : f.pct(k.equityIrr, 2)}
       </span>
       <ValidityLine result={r} inputs={inputs} t={t} onClick={onChecks} />
     </div>
@@ -75,6 +76,7 @@ export function KpiBar({ results, inputs, scenario, t, pending, onChecks }: Prop
 
 /** One line on the state of the selected scenario: the most serious problem first. */
 function ValidityLine({ result, inputs, t, onClick }: { result: ModelResult; inputs: Inputs; t: Messages; onClick: () => void }) {
+  const f = useFormat();
   const v = result.validity;
   const V = t.validity;
   const failedErrors = result.checks.filter((c) => !c.ok && c.severity === "error");
@@ -85,10 +87,10 @@ function ValidityLine({ result, inputs, t, onClick }: { result: ModelResult; inp
     message = `${V.integrity}: ${failedErrors.filter((c) => c.group === "integrity").map((c) => t.checks.ids[c.id] ?? c.id).join("; ")}`;
     level = "error";
   } else if (v.shortfall) {
-    message = V.shortfall(eurCompact(v.shortfall.amount), v.shortfall.year);
+    message = V.shortfall(f.eurCompact(v.shortfall.amount), v.shortfall.year);
     level = "error";
   } else if (v.covenantBreach) {
-    message = V.covenant(ratio(v.covenantBreach.dscr), v.covenantBreach.year, ratio(inputs.financing.covenantDscr));
+    message = V.covenant(f.ratio(v.covenantBreach.dscr), v.covenantBreach.year, f.ratio(inputs.financing.covenantDscr));
     level = "error";
   } else if (v.scope === "error") {
     message = `${V.scopeError}: ${failedErrors.filter((c) => c.group === "scope").map((c) => t.checks.ids[c.id] ?? c.id).join("; ")}`;

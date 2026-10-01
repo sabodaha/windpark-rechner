@@ -6,9 +6,9 @@ import type { Inputs, ModelResult, ScenarioName } from "@/engine";
 import { SERIES } from "@/components/charts/core";
 import { YearChart } from "@/components/charts/YearChart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { dateLabel, keur, meur, num, pct, ratio } from "@/lib/format";
+import { useFormat } from "@/components/site/LocaleProvider";
 import { cn } from "@/lib/utils";
-import type { Messages } from "@/messages/en";
+import type { Messages } from "@/messages";
 import { YearTable, type TableRow } from "./YearTable";
 
 const DSCR_VIEWS = ["operating", "lender"] as const;
@@ -21,11 +21,12 @@ interface Props {
 }
 
 const m = (v: number) => v / 1e6;
-const fmtM = (v: number) => num(v, 2);
-const fmtAxisM = (v: number) => num(v, Math.abs(v) < 10 && v % 1 !== 0 ? 1 : 0);
-const fmtRatio = (v: number | null) => (v === null ? "—" : ratio(v));
 
 export function Overview({ inputs, results, scenario, t }: Props) {
+  const fm = useFormat();
+  const fmtM = (v: number) => fm.num(v, 2);
+  const fmtAxisM = (v: number) => fm.num(v, Math.abs(v) < 10 && v % 1 !== 0 ? 1 : 0);
+  const fmtRatio = (v: number | null) => (v === null ? "—" : fm.ratio(v));
   const r = results[scenario];
   const a = r.annual;
   const years = a.map((x) => x.year);
@@ -119,12 +120,12 @@ export function Overview({ inputs, results, scenario, t }: Props) {
                 { id: "p90", label: C.dscr.p90, color: SERIES[1]!, values: results.p90.annual.map((x) => x.dscr) },
               ]}
               refLines={[
-                { label: `${C.dscr.lockup} ${ratio(f.lockupDscr)}`, value: f.lockupDscr, labelAt: "right-above" },
-                { label: `${C.dscr.covenant} ${ratio(f.covenantDscr)}`, value: f.covenantDscr, labelAt: "right-below" },
+                { label: `${C.dscr.lockup} ${fm.ratio(f.lockupDscr)}`, value: f.lockupDscr, labelAt: "right-above" },
+                { label: `${C.dscr.covenant} ${fm.ratio(f.covenantDscr)}`, value: f.covenantDscr, labelAt: "right-below" },
               ]}
               yMin={0}
-              format={(v) => ratio(v)}
-              axisFormat={(v) => num(v, 1)}
+              format={(v) => fm.ratio(v)}
+              axisFormat={(v) => fm.num(v, 1)}
               ariaLabel={`${C.dscr.title} — ${C.dscr.operating}, ${C.dscr.subtitle}`}
             />
           ) : (
@@ -135,12 +136,12 @@ export function Overview({ inputs, results, scenario, t }: Props) {
                 { id: "l90", label: C.dscr.lenderP90, color: SERIES[1]!, values: lender.dscrP90 },
               ]}
               refLines={[
-                { label: `${C.dscr.targetP50} ${ratio(f.targetDscrP50)}`, value: f.targetDscrP50, labelAt: "right-above" },
-                { label: `${C.dscr.targetP90} ${ratio(f.targetDscrP90)}`, value: f.targetDscrP90, labelAt: "right-below" },
+                { label: `${C.dscr.targetP50} ${fm.ratio(f.targetDscrP50)}`, value: f.targetDscrP50, labelAt: "right-above" },
+                { label: `${C.dscr.targetP90} ${fm.ratio(f.targetDscrP90)}`, value: f.targetDscrP90, labelAt: "right-below" },
               ]}
               yMin={0}
-              format={(v) => ratio(v)}
-              axisFormat={(v) => num(v, 1)}
+              format={(v) => fm.ratio(v)}
+              axisFormat={(v) => fm.num(v, 1)}
               ariaLabel={`${C.dscr.title} — ${C.dscr.lender}, ${C.dscr.lenderNote(basis)}`}
             />
           )}
@@ -152,8 +153,8 @@ export function Overview({ inputs, results, scenario, t }: Props) {
           table={{
             years,
             rows: [
-              { label: C.revenue.market, values: a.map((x) => perKwh(x.revenueMarket + x.revenuePostEeg, x.energySoldKwh)), format: (v) => num(v, 2) },
-              { label: C.revenue.premium, values: a.map((x) => perKwh(x.revenuePremium, x.energySoldKwh)), format: (v) => num(v, 2) },
+              { label: C.revenue.market, values: a.map((x) => perKwh(x.revenueMarket + x.revenuePostEeg, x.energySoldKwh)), format: (v) => fm.num(v, 2) },
+              { label: C.revenue.premium, values: a.map((x) => perKwh(x.revenuePremium, x.energySoldKwh)), format: (v) => fm.num(v, 2) },
             ],
           }}
           t={t}
@@ -166,11 +167,11 @@ export function Overview({ inputs, results, scenario, t }: Props) {
             ]}
             refLines={
               eegYears.length
-                ? [{ label: `${C.revenue.aw} ${num(k.awCt, 2)}`, value: k.awCt, from: eegYears[0]!, to: eegYears[eegYears.length - 1]! }]
+                ? [{ label: `${C.revenue.aw} ${fm.num(k.awCt, 2)}`, value: k.awCt, from: eegYears[0]!, to: eegYears[eegYears.length - 1]! }]
                 : []
             }
-            format={(v) => `${num(v, 2)} ct`}
-            axisFormat={(v) => num(v, 0)}
+            format={(v) => `${fm.num(v, 2)} ct`}
+            axisFormat={(v) => fm.num(v, 0)}
             ariaLabel={`${C.revenue.title}, ${C.revenue.subtitle}`}
           />
         </ChartCard>
@@ -208,23 +209,23 @@ export function Overview({ inputs, results, scenario, t }: Props) {
           </CardHeader>
           <CardContent>
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
-              <Fact label={t.overview.capacity} value={`${num(k.capacityMw, 1)} MW`} />
-              <Fact label={t.overview.p50} value={`${num(k.fullLoadHoursP50, 0)} h`} />
-              <Fact label={t.overview.kf} value={num(k.correctionFactor, 3)} />
+              <Fact label={t.overview.capacity} value={`${fm.num(k.capacityMw, 1)} MW`} />
+              <Fact label={t.overview.p50} value={`${fm.num(k.fullLoadHoursP50, 0)} h`} />
+              <Fact label={t.overview.kf} value={fm.num(k.correctionFactor, 3)} />
               <Fact
                 label={t.overview.aw}
-                value={r.awPeriods.map((p) => `${num(p.awCt, 2)}`).filter((v, i, all) => all.indexOf(v) === i).join(" → ") + " ct/kWh"}
+                value={r.awPeriods.map((p) => `${fm.num(p.awCt, 2)}`).filter((v, i, all) => all.indexOf(v) === i).join(" → ") + " ct/kWh"}
               />
-              <Fact label={t.overview.cod} value={dateLabel(r.timeline.cod)} />
-              <Fact label={t.overview.firstInstalment} value={r.timeline.firstInstalment ? dateLabel(r.timeline.firstInstalment) : "—"} />
-              <Fact label={t.overview.loanEnd} value={dateLabel(r.timeline.loanMaturity)} />
-              <Fact label={t.overview.eegEnd} value={dateLabel(r.timeline.eegEnd)} />
-              <Fact label={t.overview.endOfLife} value={dateLabel(r.timeline.endOfLife)} />
-              <Fact label={t.overview.awardLapse} value={dateLabel(r.timeline.awardLapse)} />
+              <Fact label={t.overview.cod} value={fm.dateLabel(r.timeline.cod)} />
+              <Fact label={t.overview.firstInstalment} value={r.timeline.firstInstalment ? fm.dateLabel(r.timeline.firstInstalment) : "—"} />
+              <Fact label={t.overview.loanEnd} value={fm.dateLabel(r.timeline.loanMaturity)} />
+              <Fact label={t.overview.eegEnd} value={fm.dateLabel(r.timeline.eegEnd)} />
+              <Fact label={t.overview.endOfLife} value={fm.dateLabel(r.timeline.endOfLife)} />
+              <Fact label={t.overview.awardLapse} value={fm.dateLabel(r.timeline.awardLapse)} />
               <Fact label={t.overview.sizing} value={bindingLabel} />
               <Fact
                 label={t.tables.lenderCase}
-                value={t.tables.lenderDscr(basis, ratio(results.base.sizing.minBankDscrP50), ratio(results.base.sizing.minBankDscrP90))}
+                value={t.tables.lenderDscr(basis, fm.ratio(results.base.sizing.minBankDscrP50), fm.ratio(results.base.sizing.minBankDscrP90))}
               />
             </dl>
           </CardContent>
@@ -233,7 +234,7 @@ export function Overview({ inputs, results, scenario, t }: Props) {
           <CardHeader>
             <CardTitle>{t.overview.sourcesUses}</CardTitle>
             <CardDescription>
-              € thousand · {pct(k.gearing, 1)} {t.kpis.gearing}
+              € thousand · {fm.pct(k.gearing, 1)} {t.kpis.gearing}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -253,19 +254,19 @@ export function Overview({ inputs, results, scenario, t }: Props) {
                 ).map((key) => (
                   <tr key={key} className={cn("border-b border-border last:border-0", key === "totalUses" && "font-semibold")}>
                     <td className="py-1">{t.overview.uses[key]}</td>
-                    <td className="py-1 text-right">{keur(r.sourcesUses[key])}</td>
+                    <td className="py-1 text-right">{fm.keur(r.sourcesUses[key])}</td>
                   </tr>
                 ))}
                 {(["debt", "equity", "totalSources"] as const).map((key) => (
                   <tr key={key} className={cn("border-b border-border last:border-0", key === "totalSources" && "font-semibold")}>
                     <td className="py-1">{t.overview.uses[key]}</td>
-                    <td className="py-1 text-right">{keur(r.sourcesUses[key])}</td>
+                    <td className="py-1 text-right">{fm.keur(r.sourcesUses[key])}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
             <p className="mt-2 text-xs text-muted-foreground">
-              {t.kpis.debt.label}: {meur(k.debt)} · Equity: {meur(k.equity)}
+              {t.kpis.debt.label}: {fm.meur(k.debt)} · Equity: {fm.meur(k.equity)}
             </p>
           </CardContent>
         </Card>

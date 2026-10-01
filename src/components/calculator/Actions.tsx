@@ -4,9 +4,10 @@ import { Check, Download, FileText, Link2, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { BASE_CASE } from "@/engine";
-import { PATHS } from "@/lib/site";
+import { useLocale } from "@/components/site/LocaleProvider";
+import { paths } from "@/lib/site";
 import { encodeInputs } from "@/lib/url-state";
-import type { Messages } from "@/messages/en";
+import type { Messages } from "@/messages";
 import type { Snapshot } from "./useCalculator";
 
 interface Props {
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export function Actions({ snapshot, pending, t, isCustom, onReset }: Props) {
+  const P = paths(useLocale());
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -66,7 +68,7 @@ export function Actions({ snapshot, pending, t, isCustom, onReset }: Props) {
       </Button>
       {query === "" ? (
         <Button asChild variant="outline" size="sm">
-          <a href={PATHS.reportPdf} download>
+          <a href={P.reportPdf} download>
             <FileText aria-hidden />
             {t.actions.reportPdf}
           </a>
@@ -74,7 +76,7 @@ export function Actions({ snapshot, pending, t, isCustom, onReset }: Props) {
       ) : (
         <Button asChild variant="outline" size="sm">
           <a
-            href={reportOff ? undefined : `${PATHS.report}?${query}`}
+            href={reportOff ? undefined : `${P.report}?${query}`}
             role={reportOff ? "link" : undefined}
             target="_blank"
             rel="noopener"

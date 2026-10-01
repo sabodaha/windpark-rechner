@@ -3,7 +3,7 @@
 import { RadioGroup } from "@/components/ui/radio-group";
 import { SCENARIOS, type ScenarioName } from "@/engine";
 import { cn } from "@/lib/utils";
-import type { Messages } from "@/messages/en";
+import type { Messages } from "@/messages";
 
 export function ScenarioSwitch({ value, onChange, t }: { value: ScenarioName; onChange: (s: ScenarioName) => void; t: Messages }) {
   const S = t.scenarios;

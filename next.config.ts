@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
   trailingSlash: true,
   images: { unoptimized: true },
   poweredByHeader: false,
+  // Two root layouts (English at the root, German under /de/, each with its own lang): one 404 page for both.
+  experimental: { globalNotFound: true },
 };
 
 export default nextConfig;

@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { DATA_AS_OF } from "@/engine";
-import { dateLabel } from "@/lib/format";
-import { PATHS, SITE } from "@/lib/site";
-import { en } from "@/messages/en";
-
-const t = en.site;
+import { FORMAT } from "@/lib/format";
+import type { Locale } from "@/lib/i18n";
+import { paths, SITE } from "@/lib/site";
+import { MESSAGES } from "@/messages";
 
 /** Footer on every page: the author block, the disclaimer and the legal links. */
-export function SiteFooter() {
+export function SiteFooter({ locale }: { locale: Locale }) {
+  const m = MESSAGES[locale];
+  const t = m.site;
+  const P = paths(locale);
   const link = "rounded-sm hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
   return (
     <footer className="no-print mt-12 border-t border-border bg-card/60 text-sm">
@@ -17,7 +19,7 @@ export function SiteFooter() {
             {t.footer.aboutTitle}
           </h2>
           <p className="mt-2 max-w-prose text-muted-foreground">{t.footer.about}</p>
-          <Link href={PATHS.about} className={`mt-2 inline-block font-medium text-link ${link}`}>
+          <Link href={P.about} className={`mt-2 inline-block font-medium text-link ${link}`}>
             {t.footer.more} →
           </Link>
         </section>
@@ -27,22 +29,22 @@ export function SiteFooter() {
           </h2>
           <ul className="mt-2 space-y-1.5 text-muted-foreground">
             <li>
-              <Link href={PATHS.calculator} className={link}>
+              <Link href={P.calculator} className={link}>
                 {t.nav.calculator}
               </Link>
             </li>
             <li>
-              <Link href={PATHS.methodology} className={link}>
+              <Link href={P.methodology} className={link}>
                 {t.nav.methodology}
               </Link>
             </li>
             <li>
-              <Link href={PATHS.sources} className={link}>
+              <Link href={P.sources} className={link}>
                 {t.nav.sources}
               </Link>
             </li>
             <li>
-              <Link href={PATHS.about} className={link}>
+              <Link href={P.about} className={link}>
                 {t.nav.about}
               </Link>
             </li>
@@ -59,12 +61,12 @@ export function SiteFooter() {
           </h2>
           <ul className="mt-2 space-y-1.5 text-muted-foreground">
             <li>
-              <Link href={PATHS.impressum} className={link}>
+              <Link href={P.impressum} className={link}>
                 {t.footer.impressum}
               </Link>
             </li>
             <li>
-              <Link href={PATHS.privacy} className={link}>
+              <Link href={P.privacy} className={link}>
                 {t.footer.privacy}
               </Link>
             </li>
@@ -73,9 +75,9 @@ export function SiteFooter() {
       </div>
       <div className="border-t border-border">
         <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-1 px-4 py-4 text-xs text-muted-foreground sm:px-6">
-          <p>{en.header.disclaimer}</p>
+          <p>{m.header.disclaimer}</p>
           <p>
-            {t.footer.noTracking} {t.footer.dataAsOf} {dateLabel(DATA_AS_OF)}. © {DATA_AS_OF.slice(0, 4)} {t.name}
+            {t.footer.noTracking} {t.footer.dataAsOf} {FORMAT[locale].dateLabel(DATA_AS_OF)}. © {DATA_AS_OF.slice(0, 4)} {t.name}
           </p>
         </div>
       </div>

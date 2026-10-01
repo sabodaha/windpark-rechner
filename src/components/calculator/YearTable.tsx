@@ -1,7 +1,8 @@
 "use client";
 
 import type { AnnualRow } from "@/engine";
-import { keur, num, ratio } from "@/lib/format";
+import { FORMAT, type Format } from "@/lib/format";
+import { useFormat } from "@/components/site/LocaleProvider";
 import { cn } from "@/lib/utils";
 
 export interface TableRow {
@@ -14,6 +15,7 @@ export interface TableRow {
 
 /** Years as columns, the label column stays in place while the table scrolls sideways. */
 export function YearTable({ years, rows, caption, note }: { years: number[]; rows: TableRow[]; caption: string; note?: string }) {
+  const f = useFormat();
   return (
     <div>
     <div className="overflow-x-auto rounded-lg border border-border">
@@ -39,7 +41,7 @@ export function YearTable({ years, rows, caption, note }: { years: number[]; row
               </th>
               {r.values.map((v, i) => (
                 <td key={years[i]} className={cn("whitespace-nowrap px-2 py-1.5 text-right", v !== null && v < 0 && "text-muted-foreground")}>
-                  {(r.format ?? keur)(v)}
+                  {(r.format ?? f.keur)(v)}
                 </td>
               ))}
             </tr>
@@ -55,10 +57,10 @@ export function YearTable({ years, rows, caption, note }: { years: number[]; row
 type Key = keyof AnnualRow;
 const col = (rows: AnnualRow[], key: Key, sign = 1) => rows.map((a) => (a[key] === null ? null : (a[key] as number) * sign));
 
-export function cashFlowRows(a: AnnualRow[], L: Record<string, string>): TableRow[] {
+export function cashFlowRows(a: AnnualRow[], L: Record<string, string>, f: Format = FORMAT.en): TableRow[] {
   return [
-    { label: L.energy!, values: a.map((r) => r.energySoldKwh / 1e6), format: (v) => num(v, 1) },
-    { label: L.marketValue!, values: a.map((r) => r.marketValueEurKwh * 1000), format: (v) => num(v, 1) },
+    { label: L.energy!, values: a.map((r) => r.energySoldKwh / 1e6), format: (v) => f.num(v, 1) },
+    { label: L.marketValue!, values: a.map((r) => r.marketValueEurKwh * 1000), format: (v) => f.num(v, 1) },
     { label: L.revenueMarket!, values: col(a, "revenueMarket"), indent: true },
     { label: L.revenuePremium!, values: col(a, "revenuePremium"), indent: true },
     ...(a.some((r) => r.siteQualitySettlement !== 0)
@@ -77,7 +79,7 @@ export function cashFlowRows(a: AnnualRow[], L: Record<string, string>): TableRo
     { label: L.interest!, values: col(a, "interest", -1), indent: true },
     { label: L.principal!, values: col(a, "principal", -1), indent: true },
     { label: L.debtService!, values: col(a, "debtService", -1) },
-    { label: L.dscr!, values: col(a, "dscr"), format: (v) => (v === null ? "—" : ratio(v)) },
+    { label: L.dscr!, values: col(a, "dscr"), format: (v) => (v === null ? "—" : f.ratio(v)) },
     { label: L.dsraBalance!, values: col(a, "dsraBalance") },
     { label: L.decommissioningReserve!, values: col(a, "decommissioningReserve") },
     { label: L.trappedCash!, values: col(a, "trappedCash") },
@@ -87,7 +89,7 @@ export function cashFlowRows(a: AnnualRow[], L: Record<string, string>): TableRo
   ];
 }
 
-export function pnlRows(a: AnnualRow[], L: Record<string, string>): TableRow[] {
+export function pnlRows(a: AnnualRow[], L: Record<string, string>, f: Format = FORMAT.en): TableRow[] {
   return [
     { label: L.revenue!, values: col(a, "revenue"), bold: true },
     { label: L.municipalRefund!, values: col(a, "municipalRefund") },
@@ -106,7 +108,7 @@ export function pnlRows(a: AnnualRow[], L: Record<string, string>): TableRow[] {
   ];
 }
 
-export function debtRows(a: AnnualRow[], L: Record<string, string>): TableRow[] {
+export function debtRows(a: AnnualRow[], L: Record<string, string>, f: Format = FORMAT.en): TableRow[] {
   return [
     { label: L.debtOpening!, values: col(a, "debtOpening") },
     { label: L.interest!, values: col(a, "interest") },
@@ -114,13 +116,13 @@ export function debtRows(a: AnnualRow[], L: Record<string, string>): TableRow[] 
     { label: L.debtClosing!, values: col(a, "debtClosing"), bold: true },
     { label: L.debtService!, values: col(a, "debtService"), bold: true },
     { label: L.cfads!, values: col(a, "cfads") },
-    { label: L.dscr!, values: col(a, "dscr"), format: (v) => (v === null ? "—" : ratio(v)), bold: true },
+    { label: L.dscr!, values: col(a, "dscr"), format: (v) => (v === null ? "—" : f.ratio(v)), bold: true },
     { label: L.dsraBalance!, values: col(a, "dsraBalance") },
     { label: L.trappedCash!, values: col(a, "trappedCash") },
   ];
 }
 
-export function taxRows(a: AnnualRow[], L: Record<string, string>): TableRow[] {
+export function taxRows(a: AnnualRow[], L: Record<string, string>, f: Format = FORMAT.en): TableRow[] {
   return [
     { label: L.ebt!, values: col(a, "ebt"), bold: true },
     { label: L.tradeTax!, values: col(a, "tradeTax") },

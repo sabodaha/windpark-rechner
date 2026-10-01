@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { dateLabel } from "@/lib/format";
-import { PATHS } from "@/lib/site";
-import { en, type Messages } from "@/messages/en";
+import { useFormat, useLocale, useMessages } from "@/components/site/LocaleProvider";
+import { paths } from "@/lib/site";
+import type { Messages } from "@/messages";
 import { Actions } from "./Actions";
 import { BidCalculator } from "./BidCalculator";
 import { ChecksList } from "./ChecksList";
@@ -23,10 +23,12 @@ import { Sensitivity } from "./Sensitivity";
 import { useCalculator } from "./useCalculator";
 import { cashFlowRows, debtRows, pnlRows, taxRows, YearTable } from "./YearTable";
 
-const t = en;
-type Tab = keyof typeof en.tabs;
+type Tab = keyof Messages["tabs"];
 
 export function Calculator() {
+  const t = useMessages();
+  const f = useFormat();
+  const P = paths(useLocale());
   const { inputs, snapshot, pending, setField, reset, isCustom, restored, ignored } = useCalculator();
   const [scenario, setScenario] = useState<ScenarioName>("base");
   const [tab, setTab] = useState<Tab>("overview");
@@ -49,13 +51,13 @@ export function Calculator() {
           </p>
         )}
         <p className="text-xs text-muted-foreground">
-          {t.header.disclaimer} {t.header.dataAsOf} {dateLabel(DATA_AS_OF)}.
+          {t.header.disclaimer} {t.header.dataAsOf} {f.dateLabel(DATA_AS_OF)}.
         </p>
         <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          <Link href={PATHS.methodology} className="font-medium text-link hover:underline">
+          <Link href={P.methodology} className="font-medium text-link hover:underline">
             {t.site.calculatorLinks.methodology} →
           </Link>
-          <Link href={PATHS.sources} className="font-medium text-link hover:underline">
+          <Link href={P.sources} className="font-medium text-link hover:underline">
             {t.site.calculatorLinks.sources} →
           </Link>
         </p>
@@ -110,7 +112,7 @@ export function Calculator() {
               <TabsContent value="cashflow">
                 <YearTable
                   years={snapshot.results[scenario].annual.map((a) => a.year)}
-                  rows={cashFlowRows(snapshot.results[scenario].annual, L)}
+                  rows={cashFlowRows(snapshot.results[scenario].annual, L, f)}
                   caption={`${t.tabs.cashflow} · ${t.tables.unit}`}
                   note={t.tables.distributionNote}
                 />
@@ -118,21 +120,21 @@ export function Calculator() {
               <TabsContent value="pnl">
                 <YearTable
                   years={snapshot.results[scenario].annual.map((a) => a.year)}
-                  rows={pnlRows(snapshot.results[scenario].annual, L)}
+                  rows={pnlRows(snapshot.results[scenario].annual, L, f)}
                   caption={`${t.tabs.pnl} · ${t.tables.unit}`}
                 />
               </TabsContent>
               <TabsContent value="debt">
                 <YearTable
                   years={snapshot.results[scenario].annual.map((a) => a.year)}
-                  rows={debtRows(snapshot.results[scenario].annual, L)}
+                  rows={debtRows(snapshot.results[scenario].annual, L, f)}
                   caption={`${t.tabs.debt} · ${t.tables.unit}`}
                 />
               </TabsContent>
               <TabsContent value="tax">
                 <YearTable
                   years={snapshot.results[scenario].annual.map((a) => a.year)}
-                  rows={taxRows(snapshot.results[scenario].annual, L)}
+                  rows={taxRows(snapshot.results[scenario].annual, L, f)}
                   caption={`${t.tabs.tax} · ${t.tables.unit}`}
                 />
               </TabsContent>
