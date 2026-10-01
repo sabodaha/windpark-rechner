@@ -11,9 +11,9 @@ import { nbsp } from "@/lib/typography";
 const P = paths("de");
 const { ct, num, pct, ratio } = FORMAT.de;
 
-const TITLE = "Igor Sabodakha – Finanzexperte in Wiesbaden";
+const TITLE = "Igor Sabodakha – Finanzfachmann in Wiesbaden";
 const DESCRIPTION =
-  "Igor Sabodakha, Finanzexperte in Wiesbaden: Wirtschaftsprüfung, Transaktionsberatung, Unternehmensbewertung und " +
+  "Igor Sabodakha, Finanzfachmann in Wiesbaden: Wirtschaftsprüfung, Transaktionsberatung, Unternehmensbewertung und " +
   "Finanzmodellierung. Offenes, mit Quellen belegtes Projektfinanzierungsmodell eines Windparks an Land in Deutschland.";
 
 export const metadata = pageMetadata({ absoluteTitle: TITLE, description: DESCRIPTION, path: P.home });
@@ -88,7 +88,7 @@ export default function Home() {
       />
 
       <section className="mx-auto w-full max-w-[1100px] px-4 pb-10 pt-12 sm:px-6 sm:pt-16">
-        <p className="text-sm font-medium text-muted-foreground">Finanzexperte · Wiesbaden</p>
+        <p className="text-sm font-medium text-muted-foreground">Finanzfachmann · Wiesbaden</p>
         <h1 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">Igor Sabodakha</h1>
         <p className="mt-4 max-w-2xl text-lg leading-relaxed text-foreground/85 sm:text-xl">
           {nbsp(

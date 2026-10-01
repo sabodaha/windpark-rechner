@@ -419,6 +419,8 @@ export const en = {
     editInputs: "Edit assumptions",
     close: "Show results",
     closePanel: "Close",
+    remember: "Remember my inputs on this device",
+    rememberHint: "Keeps your inputs in this browser for your next visit; nothing is sent to the server. Untick to delete them.",
   },
   report: {
     title: "Wind farm model report",

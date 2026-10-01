@@ -9,7 +9,7 @@ const P = paths("de");
 
 const TITLE = "Über Igor Sabodakha";
 const DESCRIPTION =
-  "Igor Sabodakha – Finanzexperte in Wiesbaden. Grant Thornton (Wirtschaftsprüfung und Transaktionsberatung), " +
+  "Igor Sabodakha – Finanzfachmann in Wiesbaden. Grant Thornton (Wirtschaftsprüfung und Transaktionsberatung), " +
   "selbstständige Bewertungs- und Modellierungsprojekte, Finanzen in einem Fintech-Start-up und die App Storywell.";
 
 export const metadata = pageMetadata({ absoluteTitle: TITLE, description: DESCRIPTION, path: P.about, type: "profile" });
@@ -73,7 +73,7 @@ export default function AboutPage() {
         <article className="prose-page mx-auto w-full max-w-3xl px-4 pb-4 pt-10 sm:px-6 sm:pt-14">
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Über Igor Sabodakha</h1>
           <p className="text-lg">
-            Ich bin Finanzexperte in {SITE.city} mit über 15&nbsp;Jahren internationaler Erfahrung in Wirtschaftsprüfung,
+            Ich bin Finanzfachmann in {SITE.city} mit über 15&nbsp;Jahren internationaler Erfahrung in Wirtschaftsprüfung,
             Transaktionsberatung, Unternehmensbewertung und Finanzmodellierung.
           </p>
           <p>

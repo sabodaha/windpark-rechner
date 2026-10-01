@@ -17,9 +17,12 @@ interface Props {
   t: Messages;
   isCustom: boolean;
   onReset: () => void;
+  /** Keep the inputs in this browser for the next visit (off unless the visitor ticks it). */
+  remember: boolean;
+  onRemember: (on: boolean) => void;
 }
 
-export function Actions({ snapshot, pending, t, isCustom, onReset }: Props) {
+export function Actions({ snapshot, pending, t, isCustom, onReset, remember, onRemember }: Props) {
   const P = paths(useLocale());
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -102,6 +105,15 @@ export function Actions({ snapshot, pending, t, isCustom, onReset }: Props) {
           {t.actions.reset}
         </Button>
       )}
+      <label className="flex h-8 cursor-pointer items-center gap-1.5 px-1 text-xs text-muted-foreground" title={t.actions.rememberHint}>
+        <input
+          type="checkbox"
+          checked={remember}
+          onChange={(e) => onRemember(e.target.checked)}
+          className="size-3.5 cursor-pointer accent-[var(--primary)]"
+        />
+        {t.actions.remember}
+      </label>
     </div>
   );
 }

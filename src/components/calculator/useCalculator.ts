@@ -13,7 +13,7 @@ import {
   type ScenarioName,
 } from "@/engine";
 import { type FieldDef, type FieldValue, withField } from "@/lib/fields";
-import { decodeInputs, encodeInputs, ignoredParams, linkHasInputs, loadFromStorage, saveToStorage } from "@/lib/url-state";
+import { clearStorage, decodeInputs, encodeInputs, ignoredParams, linkHasInputs, loadFromStorage, saveToStorage } from "@/lib/url-state";
 
 /**
  * One completed calculation: the inputs and the results that belong to them. Everything shown or exported —
@@ -38,11 +38,14 @@ function calculate(inputs: Inputs): Snapshot {
 
 /**
  * Calculator state. The first render uses the base case on server and client alike (the static HTML
- * shows it); after mounting, inputs from the URL — or else the last session — are applied.
+ * shows it); after mounting, inputs from the URL — or else the last session, if the visitor asked to remember
+ * it — are applied.
  */
 export function useCalculator() {
   const [inputs, setInputs] = useState<Inputs>(BASE_CASE);
   const [restored, setRestored] = useState(false);
+  /** The visitor ticked "remember my inputs on this device"; nothing is stored otherwise. */
+  const [remember, setRemember] = useState(false);
   /** Parameters of the opening link that were not applied, until the inputs are changed. */
   const [ignored, setIgnored] = useState<string[]>([]);
   const deferred = useDeferredValue(inputs);
@@ -50,6 +53,9 @@ export function useCalculator() {
   const pending = deferred !== inputs;
 
   useEffect(() => {
+    const stored = loadFromStorage();
+    // An entry exists only if the visitor asked to remember the inputs on an earlier visit.
+    if (stored !== null) setRemember(true);
     const query = window.location.search.slice(1);
     // A link with inputs is what the visitor asked for — even if none of them can be read, the last session does
     // not replace it: the base case plus the valid values, and a list of the rest.
@@ -59,7 +65,6 @@ export function useCalculator() {
       if (fromUrl) setInputs(fromUrl);
       return;
     }
-    const stored = loadFromStorage();
     const fromStorage = stored ? decodeInputs(stored, BASE_CASE) : null;
     if (fromStorage) {
       setInputs(fromStorage);
@@ -76,8 +81,9 @@ export function useCalculator() {
     const query = encodeInputs(inputs, BASE_CASE);
     const url = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
     window.history.replaceState(null, "", url);
-    saveToStorage(query);
-  }, [inputs]);
+    if (remember) saveToStorage(query);
+    else clearStorage();
+  }, [inputs, remember]);
 
   const setField = useCallback((f: FieldDef, v: FieldValue) => {
     setInputs((prev) => withField(prev, f, v));
@@ -93,5 +99,5 @@ export function useCalculator() {
 
   const isCustom = useMemo(() => encodeInputs(inputs, BASE_CASE) !== "", [inputs]);
 
-  return { inputs, snapshot, pending, setField, reset, isCustom, restored, ignored };
+  return { inputs, snapshot, pending, setField, reset, isCustom, restored, ignored, remember, setRemember };
 }

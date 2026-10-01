@@ -129,7 +129,7 @@ export const CALCULATOR_ID = `${absoluteUrl(PATHS.calculator)}#app`;
 const PERSON_TEXT: Record<Locale, { jobTitle: string; knowsAbout: string[] }> = {
   en: { jobTitle: SITE.jobTitle, knowsAbout: ["Financial modelling", "Project finance", "Business valuation", "Due diligence", "Audit"] },
   de: {
-    jobTitle: "Finanzexperte",
+    jobTitle: "Finanzfachmann",
     knowsAbout: ["Finanzmodellierung", "Projektfinanzierung", "Unternehmensbewertung", "Due Diligence", "Wirtschaftsprüfung"],
   },
 };

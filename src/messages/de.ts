@@ -512,6 +512,8 @@ export const de: Messages = typeset<Messages>({
     editInputs: "Annahmen bearbeiten",
     close: "Ergebnisse anzeigen",
     closePanel: "Schließen",
+    remember: "Eingaben auf diesem Gerät merken",
+    rememberHint: "Speichert Ihre Eingaben in diesem Browser für den nächsten Besuch; an den Server wird nichts gesendet. Haken entfernen, um sie zu löschen.",
   },
   report: {
     title: "Bericht zum Windparkmodell",
@@ -590,7 +592,7 @@ export const de: Messages = typeset<Messages>({
     footer: {
       aboutTitle: "Über den Autor",
       about:
-        "Igor Sabodakha ist Finanzexperte in Wiesbaden mit über 15 Jahren internationaler Erfahrung in Wirtschaftsprüfung, " +
+        "Igor Sabodakha ist Finanzfachmann in Wiesbaden mit über 15 Jahren internationaler Erfahrung in Wirtschaftsprüfung, " +
         "Transaktionsberatung, Unternehmensbewertung und Finanzmodellierung.",
       more: "Mehr über mich",
       site: "Website",

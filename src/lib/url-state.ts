@@ -3,7 +3,8 @@ import { isIsoDate } from "@/engine/dates";
 import type { Inputs } from "@/engine";
 import { FIELDS, type FieldDef, type FieldValue, sameValue, withField } from "./fields";
 
-const STORAGE_KEY = "windpark-rechner:v1:inputs";
+/** Where the calculator keeps the inputs when the visitor asks it to remember them (Privacy names this key). */
+export const STORAGE_KEY = "windpark-rechner:v1:inputs";
 
 function encodeValue(v: FieldValue): string {
   if (typeof v === "boolean") return v ? "1" : "0";
@@ -86,15 +87,28 @@ export function linkHasInputs(query: string): boolean {
   return [...new URLSearchParams(query).keys()].some((key) => !TRACKING.test(key));
 }
 
+/**
+ * Keeps the inputs for the next visit — only after the visitor asked for it. An empty entry (the base case) still
+ * records that request, so the box stays ticked.
+ */
 export function saveToStorage(query: string): void {
   try {
-    if (query) window.localStorage.setItem(STORAGE_KEY, query);
-    else window.localStorage.removeItem(STORAGE_KEY);
+    window.localStorage.setItem(STORAGE_KEY, query);
   } catch {
     // storage unavailable (private mode, blocked site data) — the URL still carries the state
   }
 }
 
+/** Forgets the inputs and the request to remember them. */
+export function clearStorage(): void {
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // nothing stored, or storage unavailable
+  }
+}
+
+/** The stored inputs; "" when the visitor asked to remember the base case; null when nothing is stored. */
 export function loadFromStorage(): string | null {
   try {
     return window.localStorage.getItem(STORAGE_KEY);

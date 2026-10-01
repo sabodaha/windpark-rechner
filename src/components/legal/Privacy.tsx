@@ -4,9 +4,9 @@ import Link from "next/link";
 import { Placeholder } from "@/components/site/Placeholder";
 import type { Locale } from "@/lib/i18n";
 import { CONTACT, PAGE_PATHS, SITE } from "@/lib/site";
+import { STORAGE_KEY } from "@/lib/url-state";
 import { MESSAGES } from "@/messages";
 
-const STORAGE_KEY = "windpark-rechner:v1:inputs";
 const CLOUDFLARE_POLICY = "https://www.cloudflare.com/privacypolicy/";
 const HESSEN_DPA = "https://datenschutz.hessen.de/";
 
@@ -35,8 +35,9 @@ export function PrivacyEn() {
         This site sets no cookies, uses no analytics or tracking and loads no content from third parties; its fonts are
         served from this site. There is no contact form. The <Link href={PAGE_PATHS.en.calculator}>calculator</Link> runs
         entirely in your browser: what you enter is calculated there and not sent to the server. Only when an address
-        that contains inputs is loaded — when you open, reload or share a calculator link with inputs after the “?” —
-        does that address, inputs included, reach the server like any page address (see “Hosting and server logs”).
+        that contains inputs is loaded — when you, or someone you shared it with, open or reload a calculator link with
+        inputs after the “?” — does that address, inputs included, reach the server like any page address (see “Hosting
+        and server logs”).
       </p>
 
       <h2 id="en-controller">Controller</h2>
@@ -47,7 +48,8 @@ export function PrivacyEn() {
         The site is hosted by Cloudflare, Inc., 101 Townsend St, San Francisco, CA 94107, USA (Cloudflare Pages). To
         deliver the pages and protect them against attacks, Cloudflare processes technical data of every request: IP
         address, date and time, the page requested (its full address, including any inputs in a calculator link), the
-        referring page, browser and operating system.
+        referring page, browser and operating system. This data is kept only as long as delivering and protecting the site
+        requires; Cloudflare’s privacy policy names no fixed period.
       </p>
       <p>
         Legal basis: Art. 6 (1) (f) GDPR — the legitimate interest in delivering the site securely and reliably.
@@ -58,10 +60,11 @@ export function PrivacyEn() {
 
       <h2 id="en-storage">Local storage in your browser</h2>
       <p>
-        Once you change an input, the calculator keeps your latest inputs in your browser’s local storage (key{" "}
-        <code>{STORAGE_KEY}</code>), so they are still there on your next visit. This data stays on your device and is
-        never sent to the server. It is deleted when you press “Reset” or clear this site’s data in your browser. Legal
-        basis: § 25 (2) no. 2 TDDDG.
+        Only if you tick “{MESSAGES.en.actions.remember}” in the calculator does it keep your latest inputs in your
+        browser’s local storage (key <code>{STORAGE_KEY}</code>), so they are still there on your next visit; without the
+        tick nothing is stored. Local storage itself is never sent to the server; a calculator address with inputs reaches
+        the server only when it is loaded, as described above. The stored inputs are deleted when you untick the box or
+        clear this site’s data in your browser. Legal basis: § 25 (2) no. 2 TDDDG — storage you have expressly asked for.
       </p>
 
       <h2 id="en-downloads">Downloads and links</h2>
@@ -80,10 +83,16 @@ export function PrivacyEn() {
 
       <h2 id="en-rights">Your rights</h2>
       <p>
-        You have the right to access (Art. 15 GDPR), rectification (Art. 16), erasure (Art. 17), restriction of
-        processing (Art. 18), data portability (Art. 20) and to object (Art. 21). Write to the address above. You may
-        also lodge a complaint with a supervisory authority (Art. 77 GDPR), for example the{" "}
+        Subject to the conditions of the law, you have the right to access (Art. 15 GDPR), rectification (Art. 16),
+        erasure (Art. 17), restriction of processing (Art. 18), data portability (Art. 20) and to object (Art. 21). Write
+        to the address above. You may also lodge a complaint with a supervisory authority (Art. 77 GDPR), for example the{" "}
         <a href={HESSEN_DPA}>Hessian Commissioner for Data Protection and Freedom of Information</a>.
+      </p>
+
+      <h2 id="en-objection">Right to object</h2>
+      <p>
+        Where I process your data on the basis of Art. 6 (1) (f) GDPR, you may object to this processing at any time on
+        grounds relating to your particular situation (Art. 21 GDPR). Write to the address above.
       </p>
       <p>There is no automated decision-making or profiling. As of October 2026.</p>
     </section>
@@ -92,11 +101,11 @@ export function PrivacyEn() {
 
 /**
  * The German text. On the English page (`standalone` false) it is a section under its own heading and names the
- * English interface's button; on the German page its parts are the page's main sections.
+ * English interface's checkbox; on the German page its parts are the page's main sections.
  */
 export function PrivacyDe({ standalone = false }: { standalone?: boolean }) {
   const H = standalone ? "h2" : "h3";
-  const reset = standalone ? MESSAGES.de.actions.reset : MESSAGES.en.actions.reset;
+  const remember = standalone ? MESSAGES.de.actions.remember : MESSAGES.en.actions.remember;
   const calculator = standalone ? <Link href={PAGE_PATHS.de.calculator}>Rechner</Link> : "Rechner";
   return (
     <section lang="de" aria-labelledby={standalone ? "de-summary" : "de"}>
@@ -106,9 +115,9 @@ export function PrivacyDe({ standalone = false }: { standalone?: boolean }) {
         Diese Website setzt keine Cookies, nutzt keine Analyse- oder Tracking-Dienste und lädt keine Inhalte von Dritten;
         die Schriften werden von dieser Website geladen. Es gibt kein Kontaktformular. Der {calculator} läuft vollständig
         in Ihrem Browser: Ihre Eingaben werden dort berechnet und nicht an den Server übertragen. Nur wenn eine Adresse mit
-        Eingaben aufgerufen wird – wenn Sie einen Rechner-Link mit Eingaben nach dem „?“ öffnen, neu laden oder
-        weitergeben –, erreicht diese Adresse samt Eingaben den Server wie jede Seitenadresse (siehe „Hosting und
-        Server-Logfiles“).
+        Eingaben aufgerufen wird – wenn Sie oder eine Person, an die Sie den Link weitergegeben haben, einen Rechner-Link
+        mit Eingaben nach dem „?“ öffnen oder neu laden –, erreicht diese Adresse samt Eingaben den Server wie jede
+        Seitenadresse (siehe „Hosting und Server-Logfiles“).
       </p>
 
       <H id={standalone ? "de-controller" : undefined}>Verantwortlicher</H>
@@ -119,7 +128,9 @@ export function PrivacyDe({ standalone = false }: { standalone?: boolean }) {
         Die Website wird bei Cloudflare, Inc., 101 Townsend St, San Francisco, CA 94107, USA (Cloudflare Pages) gehostet.
         Um die Seiten auszuliefern und vor Angriffen zu schützen, verarbeitet Cloudflare bei jedem Aufruf technische Daten:
         IP-Adresse, Datum und Uhrzeit, aufgerufene Seite (die vollständige Adresse, einschließlich etwaiger Eingaben in
-        einem Rechner-Link), verweisende Seite, Browser und Betriebssystem.
+        einem Rechner-Link), verweisende Seite, Browser und Betriebssystem. Diese Daten werden nur so lange gespeichert, wie
+        es die Auslieferung und der Schutz der Website erfordern; eine feste Frist nennt die Datenschutzerklärung von
+        Cloudflare nicht.
       </p>
       <p>
         Rechtsgrundlage ist Art.&nbsp;6 Abs.&nbsp;1 lit.&nbsp;f DSGVO; das berechtigte Interesse liegt in der sicheren und
@@ -131,10 +142,12 @@ export function PrivacyDe({ standalone = false }: { standalone?: boolean }) {
 
       <H id={standalone ? "de-storage" : undefined}>Lokaler Speicher im Browser</H>
       <p>
-        Sobald Sie eine Eingabe ändern, speichert der Rechner Ihre zuletzt verwendeten Eingaben im lokalen Speicher Ihres
-        Browsers (Schlüssel <code>{STORAGE_KEY}</code>), damit sie beim nächsten Besuch erhalten bleiben. Die Daten
-        verbleiben auf Ihrem Gerät und werden nicht an den Server übertragen. Sie werden gelöscht, wenn Sie „{reset}“
-        wählen oder die Websitedaten in Ihrem Browser löschen. Rechtsgrundlage ist §&nbsp;25 Abs.&nbsp;2 Nr.&nbsp;2 TDDDG.
+        Nur wenn Sie im Rechner „{remember}“ anhaken, speichert er Ihre zuletzt verwendeten Eingaben im lokalen Speicher
+        Ihres Browsers (Schlüssel <code>{STORAGE_KEY}</code>), damit sie beim nächsten Besuch erhalten bleiben; ohne den
+        Haken wird nichts gespeichert. Der lokale Speicher selbst wird nicht an den Server übertragen; eine Rechner-Adresse
+        mit Eingaben erreicht den Server nur beim Aufruf, wie oben beschrieben. Die gespeicherten Eingaben werden gelöscht,
+        wenn Sie den Haken entfernen oder die Websitedaten in Ihrem Browser löschen. Rechtsgrundlage ist §&nbsp;25
+        Abs.&nbsp;2 Nr.&nbsp;2 TDDDG: Die Speicherung erfolgt auf Ihren ausdrücklichen Wunsch.
       </p>
 
       <H id={standalone ? "de-downloads" : undefined}>Downloads und Links</H>
@@ -153,11 +166,18 @@ export function PrivacyDe({ standalone = false }: { standalone?: boolean }) {
 
       <H id={standalone ? "de-rights" : undefined}>Ihre Rechte</H>
       <p>
-        Sie haben das Recht auf Auskunft (Art.&nbsp;15 DSGVO), Berichtigung (Art.&nbsp;16), Löschung (Art.&nbsp;17),
-        Einschränkung der Verarbeitung (Art.&nbsp;18), Datenübertragbarkeit (Art.&nbsp;20) und Widerspruch
-        (Art.&nbsp;21). Wenden Sie sich dazu an die oben genannte Adresse. Sie können sich außerdem bei einer
-        Aufsichtsbehörde beschweren (Art.&nbsp;77 DSGVO), zum Beispiel beim{" "}
+        Unter den jeweiligen gesetzlichen Voraussetzungen haben Sie das Recht auf Auskunft (Art.&nbsp;15 DSGVO),
+        Berichtigung (Art.&nbsp;16), Löschung (Art.&nbsp;17), Einschränkung der Verarbeitung (Art.&nbsp;18),
+        Datenübertragbarkeit (Art.&nbsp;20) und Widerspruch (Art.&nbsp;21). Wenden Sie sich dazu an die oben genannte
+        Adresse. Sie können sich außerdem bei einer Aufsichtsbehörde beschweren (Art.&nbsp;77 DSGVO), zum Beispiel beim{" "}
         <a href={HESSEN_DPA}>Hessischen Beauftragten für Datenschutz und Informationsfreiheit</a>.
+      </p>
+
+      <H id={standalone ? "de-objection" : undefined}>Widerspruchsrecht</H>
+      <p>
+        Verarbeite ich Ihre Daten auf Grundlage von Art.&nbsp;6 Abs.&nbsp;1 lit.&nbsp;f DSGVO, können Sie dieser
+        Verarbeitung aus Gründen, die sich aus Ihrer besonderen Situation ergeben, jederzeit widersprechen (Art.&nbsp;21
+        DSGVO). Wenden Sie sich dazu an die oben genannte Adresse.
       </p>
       <p>Eine automatisierte Entscheidungsfindung oder ein Profiling findet nicht statt. Stand: Oktober 2026.</p>
     </section>

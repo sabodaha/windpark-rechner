@@ -29,7 +29,7 @@ export function Calculator() {
   const t = useMessages();
   const f = useFormat();
   const P = paths(useLocale());
-  const { inputs, snapshot, pending, setField, reset, isCustom, restored, ignored } = useCalculator();
+  const { inputs, snapshot, pending, setField, reset, isCustom, restored, ignored, remember, setRemember } = useCalculator();
   const [scenario, setScenario] = useState<ScenarioName>("base");
   const [tab, setTab] = useState<Tab>("overview");
   const L = t.tables.rows;
@@ -83,7 +83,7 @@ export function Calculator() {
               <div className="overflow-y-auto px-4 pb-6">{panel}</div>
             </SheetContent>
           </Sheet>
-          <Actions snapshot={snapshot} pending={pending} t={t} isCustom={isCustom} onReset={reset} />
+          <Actions snapshot={snapshot} pending={pending} t={t} isCustom={isCustom} onReset={reset} remember={remember} onRemember={setRemember} />
         </div>
       </div>
 
