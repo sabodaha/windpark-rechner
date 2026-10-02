@@ -1,0 +1,528 @@
+{
+ "schema": "bess-ua-library",
+ "version": 2,
+ "created": "2026-10-02",
+ "spec": "model methodology S1.2, revenue library",
+ "attribution": "Дані: АТ «Оператор ринку», https://www.oree.com.ua",
+ "license": "Derived results only; source data © АТ «Оператор ринку». NBU exchange rates.",
+ "sources": {
+  "pricesSha256": "b9796e770162bce3d0ef59fce2a3762d05f464e5932f7f4f74925464ae4f1e37",
+  "fxSha256": "cfe4c5738e14709c70b8424c26c331da192b5414381cd22419f41a0f87c07aa4"
+ },
+ "problem": {
+  "resolution": "hourly",
+  "boundary": "dailyReset (empty at start and end of each local day)",
+  "losses": "all on charge (RTE on charging)",
+  "auxiliary": "inside RTE",
+  "poiLimits": "1.0 x power",
+  "availability": "1.0 (derated in the engine)",
+  "objective": "max sales - purchases - fee x import",
+  "tieBreak": "minimum discharge within 1e-9 x |V*| + 1e-6",
+  "mipRelGap": 1e-06,
+  "perMW": true
+ },
+ "axes": {
+  "snapshot": [
+   "UA-2025",
+   "UA-LTM-2026-09"
+  ],
+  "durationHoursBoL": [
+   1,
+   2,
+   4
+  ],
+  "usableHours": {
+   "1": [
+    0.6,
+    0.65,
+    0.7,
+    0.75,
+    0.8,
+    0.85,
+    0.9,
+    0.95,
+    1.0,
+    1.05,
+    1.1
+   ],
+   "2": [
+    1.2,
+    1.3,
+    1.4,
+    1.5,
+    1.6,
+    1.7,
+    1.8,
+    1.9,
+    2.0,
+    2.1
+   ],
+   "4": [
+    2.4,
+    2.5,
+    2.6,
+    2.7,
+    2.8,
+    2.9,
+    3.0,
+    3.1,
+    3.2,
+    3.3,
+    3.4,
+    3.5,
+    3.6,
+    3.7,
+    3.8,
+    3.9,
+    4.0,
+    4.1,
+    4.2
+   ]
+  },
+  "cycleCap": [
+   1.0,
+   1.5
+  ],
+  "rte": [
+   0.85,
+   0.88,
+   0.9
+  ],
+  "importFeeUAH": [
+   0.0,
+   500.0,
+   1000.0,
+   1500.0,
+   2000.0,
+   2500.0,
+   3000.0,
+   3500.0,
+   4000.0
+  ]
+ },
+ "nodeOrder": [
+  "snapshot",
+  "durationHoursBoL",
+  "cycleCap",
+  "rte",
+  "importFeeUAH",
+  "usableHours"
+ ],
+ "fields": [
+  "salesUAH",
+  "purchasesUAH",
+  "salesEUR",
+  "purchasesEUR",
+  "importMWh",
+  "exportMWh"
+ ],
+ "months": 12,
+ "perNodeExtra": [
+  "peakDayPurchasesUAH"
+ ],
+ "dtype": "float32",
+ "doublesPerNode": 73,
+ "nodes": 4320,
+ "payload": "ua-library-v2.bin",
+ "payloadSha256": "3336e7b430179d21f060b43d03e4e1dfe309531f223f985b0dd8253826e52225",
+ "snapshots": {
+  "UA-2025": {
+   "from": "2025-01-01",
+   "to": "2025-12-31",
+   "days": 365,
+   "hours": 8760,
+   "avgPriceUAH": 5292.3884,
+   "avgPriceEUR": 112.566004,
+   "monthly": [
+    {
+     "month": 1,
+     "days": 31,
+     "hours": 744,
+     "avgPriceUAH": 5548.0338,
+     "avgPriceEUR": 127.353209,
+     "avgFx": 43.5654
+    },
+    {
+     "month": 2,
+     "days": 28,
+     "hours": 672,
+     "avgPriceUAH": 5872.8711,
+     "avgPriceEUR": 135.432309,
+     "avgFx": 43.358432
+    },
+    {
+     "month": 3,
+     "days": 31,
+     "hours": 743,
+     "avgPriceUAH": 5150.6613,
+     "avgPriceEUR": 115.29541,
+     "avgFx": 44.690919
+    },
+    {
+     "month": 4,
+     "days": 30,
+     "hours": 720,
+     "avgPriceUAH": 4258.6324,
+     "avgPriceEUR": 91.828932,
+     "avgFx": 46.435913
+    },
+    {
+     "month": 5,
+     "days": 31,
+     "hours": 744,
+     "avgPriceUAH": 4421.9493,
+     "avgPriceEUR": 94.344613,
+     "avgFx": 46.84799
+    },
+    {
+     "month": 6,
+     "days": 30,
+     "hours": 720,
+     "avgPriceUAH": 4664.6662,
+     "avgPriceEUR": 97.554168,
+     "avgFx": 47.8332
+    },
+    {
+     "month": 7,
+     "days": 31,
+     "hours": 744,
+     "avgPriceUAH": 5184.2423,
+     "avgPriceEUR": 106.077696,
+     "avgFx": 48.872471
+    },
+    {
+     "month": 8,
+     "days": 31,
+     "hours": 744,
+     "avgPriceUAH": 5188.7848,
+     "avgPriceEUR": 107.749066,
+     "avgFx": 48.152577
+    },
+    {
+     "month": 9,
+     "days": 30,
+     "hours": 720,
+     "avgPriceUAH": 4196.9232,
+     "avgPriceEUR": 86.60198,
+     "avgFx": 48.45376
+    },
+    {
+     "month": 10,
+     "days": 31,
+     "hours": 745,
+     "avgPriceUAH": 5986.522,
+     "avgPriceEUR": 123.5562,
+     "avgFx": 48.463268
+    },
+    {
+     "month": 11,
+     "days": 30,
+     "hours": 720,
+     "avgPriceUAH": 6387.8857,
+     "avgPriceEUR": 131.24367,
+     "avgFx": 48.668027
+    },
+    {
+     "month": 12,
+     "days": 31,
+     "hours": 744,
+     "avgPriceUAH": 6648.9458,
+     "avgPriceEUR": 134.568331,
+     "avgFx": 49.419371
+    }
+   ]
+  },
+  "UA-LTM-2026-09": {
+   "from": "2025-10-01",
+   "to": "2026-09-30",
+   "days": 365,
+   "hours": 8760,
+   "avgPriceUAH": 6354.596,
+   "avgPriceEUR": 125.78034,
+   "monthly": [
+    {
+     "month": 1,
+     "days": 31,
+     "hours": 744,
+     "avgPriceUAH": 8253.2564,
+     "avgPriceEUR": 163.72016,
+     "avgFx": 50.345413
+    },
+    {
+     "month": 2,
+     "days": 28,
+     "hours": 672,
+     "avgPriceUAH": 9785.7191,
+     "avgPriceEUR": 191.824453,
+     "avgFx": 51.023529
+    },
+    {
+     "month": 3,
+     "days": 31,
+     "hours": 743,
+     "avgPriceUAH": 7075.5283,
+     "avgPriceEUR": 139.52806,
+     "avgFx": 50.724119
+    },
+    {
+     "month": 4,
+     "days": 30,
+     "hours": 720,
+     "avgPriceUAH": 5391.303,
+     "avgPriceEUR": 105.368416,
+     "avgFx": 51.09407
+    },
+    {
+     "month": 5,
+     "days": 31,
+     "hours": 744,
+     "avgPriceUAH": 5068.7204,
+     "avgPriceEUR": 98.505939,
+     "avgFx": 51.459961
+    },
+    {
+     "month": 6,
+     "days": 30,
+     "hours": 720,
+     "avgPriceUAH": 5599.1849,
+     "avgPriceEUR": 108.716224,
+     "avgFx": 51.52312
+    },
+    {
+     "month": 7,
+     "days": 31,
+     "hours": 744,
+     "avgPriceUAH": 4443.8861,
+     "avgPriceEUR": 87.084132,
+     "avgFx": 51.031981
+    },
+    {
+     "month": 8,
+     "days": 31,
+     "hours": 744,
+     "avgPriceUAH": 5893.2432,
+     "avgPriceEUR": 113.972559,
+     "avgFx": 51.762748
+    },
+    {
+     "month": 9,
+     "days": 30,
+     "hours": 720,
+     "avgPriceUAH": 5988.2803,
+     "avgPriceEUR": 116.351965,
+     "avgFx": 51.478247
+    },
+    {
+     "month": 10,
+     "days": 31,
+     "hours": 745,
+     "avgPriceUAH": 5986.522,
+     "avgPriceEUR": 123.5562,
+     "avgFx": 48.463268
+    },
+    {
+     "month": 11,
+     "days": 30,
+     "hours": 720,
+     "avgPriceUAH": 6387.8857,
+     "avgPriceEUR": 131.24367,
+     "avgFx": 48.668027
+    },
+    {
+     "month": 12,
+     "days": 31,
+     "hours": 744,
+     "avgPriceUAH": 6648.9458,
+     "avgPriceEUR": 134.568331,
+     "avgFx": 49.419371
+    }
+   ]
+  }
+ },
+ "golden": {
+  "1": {
+   "value": 388702.0951,
+   "target": 388702,
+   "ok": true
+  },
+  "2": {
+   "value": 753227.9859,
+   "target": 753228,
+   "ok": true
+  },
+  "4": {
+   "value": 1384274.8975,
+   "target": 1384275,
+   "ok": true
+  }
+ },
+ "releaseGate": {
+  "metric": "net objective, UAH (sales - purchases - fee x import)",
+  "interpolation": {
+   "usableHours": "linear",
+   "importFee": "better adjacent node per month"
+  },
+  "annualHours": 0.0010196323119637822,
+  "monthlyHours": 0.003036246893919211,
+  "annualFee": 0.0014418537577165532,
+  "monthlyFee": 0.0141989842074772,
+  "gateAnnual": 0.005,
+  "gateMonthly": 0.015,
+  "passed": true,
+  "byDuration": {
+   "1": {
+    "annual": 0.0005403932634989259,
+    "monthly": 0.004316236600998406
+   },
+   "2": {
+    "annual": 0.0007064030567879026,
+    "monthly": 0.00577418622070764
+   },
+   "4": {
+    "annual": 0.0014418537577165532,
+    "monthly": 0.0141989842074772
+   }
+  },
+  "worstCases": [
+   {
+    "snapshot": "UA-2025",
+    "durationH": 4,
+    "cycleCap": 1.5,
+    "rte": 0.88,
+    "feeUAH": 3750.0,
+    "usableH": 4.0,
+    "axis": "Fee",
+    "annualError": 0.001442,
+    "monthlyError": 0.014199
+   },
+   {
+    "snapshot": "UA-2025",
+    "durationH": 4,
+    "cycleCap": 1.0,
+    "rte": 0.88,
+    "feeUAH": 3750.0,
+    "usableH": 4.0,
+    "axis": "Fee",
+    "annualError": 0.001118,
+    "monthlyError": 0.014199
+   },
+   {
+    "snapshot": "UA-2025",
+    "durationH": 4,
+    "cycleCap": 1.5,
+    "rte": 0.85,
+    "feeUAH": 3750.0,
+    "usableH": 4.0,
+    "axis": "Fee",
+    "annualError": 0.001083,
+    "monthlyError": 0.011634
+   },
+   {
+    "snapshot": "UA-2025",
+    "durationH": 4,
+    "cycleCap": 1.5,
+    "rte": 0.85,
+    "feeUAH": 4000.0,
+    "usableH": 2.55,
+    "axis": "Hours",
+    "annualError": 0.00102,
+    "monthlyError": 0.003036
+   },
+   {
+    "snapshot": "UA-2025",
+    "durationH": 4,
+    "cycleCap": 1.0,
+    "rte": 0.85,
+    "feeUAH": 4000.0,
+    "usableH": 2.55,
+    "axis": "Hours",
+    "annualError": 0.000998,
+    "monthlyError": 0.003036
+   },
+   {
+    "snapshot": "UA-2025",
+    "durationH": 4,
+    "cycleCap": 1.0,
+    "rte": 0.85,
+    "feeUAH": 3750.0,
+    "usableH": 4.0,
+    "axis": "Fee",
+    "annualError": 0.000914,
+    "monthlyError": 0.011634
+   },
+   {
+    "snapshot": "UA-2025",
+    "durationH": 4,
+    "cycleCap": 1.5,
+    "rte": 0.85,
+    "feeUAH": 2000.0,
+    "usableH": 2.55,
+    "axis": "Hours",
+    "annualError": 0.000817,
+    "monthlyError": 0.001522
+   },
+   {
+    "snapshot": "UA-2025",
+    "durationH": 4,
+    "cycleCap": 1.5,
+    "rte": 0.88,
+    "feeUAH": 4000.0,
+    "usableH": 2.65,
+    "axis": "Hours",
+    "annualError": 0.000765,
+    "monthlyError": 0.002167
+   },
+   {
+    "snapshot": "UA-2025",
+    "durationH": 4,
+    "cycleCap": 1.0,
+    "rte": 0.88,
+    "feeUAH": 4000.0,
+    "usableH": 2.65,
+    "axis": "Hours",
+    "annualError": 0.000743,
+    "monthlyError": 0.002167
+   },
+   {
+    "snapshot": "UA-2025",
+    "durationH": 2,
+    "cycleCap": 1.5,
+    "rte": 0.88,
+    "feeUAH": 4000.0,
+    "usableH": 1.75,
+    "axis": "Hours",
+    "annualError": 0.000706,
+    "monthlyError": 0.00233
+   },
+   {
+    "snapshot": "UA-2025",
+    "durationH": 4,
+    "cycleCap": 1.5,
+    "rte": 0.85,
+    "feeUAH": 3250.0,
+    "usableH": 4.0,
+    "axis": "Fee",
+    "annualError": 0.000706,
+    "monthlyError": 0.008686
+   },
+   {
+    "snapshot": "UA-2025",
+    "durationH": 4,
+    "cycleCap": 1.0,
+    "rte": 0.85,
+    "feeUAH": 2000.0,
+    "usableH": 2.55,
+    "axis": "Hours",
+    "annualError": 0.000697,
+    "monthlyError": 0.001274
+   }
+  ]
+ },
+ "build": {
+  "python": "3.12.10",
+  "scipy": "1.18.0",
+  "numpy": "2.4.6",
+  "seconds": 3246.0
+ },
+ "releaseGateRecomputed": "2026-10-02"
+}
