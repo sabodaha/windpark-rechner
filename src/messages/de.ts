@@ -582,7 +582,9 @@ export const de: Messages = typeset<Messages>({
     navLabel: "Hauptmenü",
     nav: {
       calculator: "Windpark-Investitionsrechner",
-      calculatorShort: "Rechner",
+      calculatorShort: "Windpark",
+      bess: "Batteriespeicher-Rechner (Englisch)",
+      bessShort: "Batterie (EN)",
       methodology: "Methodik",
       sources: "Quellen",
       about: "Über mich",
@@ -590,6 +592,8 @@ export const de: Messages = typeset<Messages>({
     calculatorLinks: { methodology: "So funktioniert das Modell", sources: "Alle Quellen" },
     resultsLabel: "Ergebnisse",
     footer: {
+      /** Under every page: both models are fictional. */
+      disclaimer: "Beispielrechnung – keine Anlage-, Steuer- oder Rechtsberatung. Windpark und Batteriespeicher sind fiktiv.",
       aboutTitle: "Über den Autor",
       about:
         "Igor Sabodakha ist Finanzfachmann in Wiesbaden mit über 15 Jahren internationaler Erfahrung in Wirtschaftsprüfung, " +

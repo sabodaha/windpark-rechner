@@ -28,6 +28,11 @@ export const OG_IMAGE: Record<Locale, { url: string; width: number; height: numb
   de: { url: "/og-de.png", width: 1200, height: 630, alt: "Igor Sabodakha – Windpark-Investitionsrechner" },
 };
 
+export type OgImage = (typeof OG_IMAGE)[Locale];
+
+/** The sharing image of the battery storage pages (scripts/images/og-bess.html). */
+export const BESS_OG_IMAGE: OgImage = { url: "/og-bess.png", width: 1200, height: 630, alt: "Igor Sabodakha — Battery Storage Investment Calculator" };
+
 /** The language of a page follows from its address (PAGE_PATHS); its hreflang alternates too. */
 export function pageMetadata({
   title,
@@ -35,6 +40,7 @@ export function pageMetadata({
   description,
   path,
   type = "website",
+  image: ownImage,
 }: {
   /** Shown as "{title} — Igor Sabodakha". */
   title?: string;
@@ -43,13 +49,15 @@ export function pageMetadata({
   description: string;
   path: string;
   type?: "website" | "article" | "profile";
+  /** Instead of the language's default sharing image. */
+  image?: OgImage;
 }): Metadata {
   const at = pageOf(path);
   const locale: Locale = at?.locale ?? "en";
   const fullTitle = absoluteTitle ?? `${title}${TITLE_SEPARATOR[locale]}${SITE.name}`;
   const languages = at ? alternates(at.page) : undefined;
   const others = languages ? PUBLISHED_LOCALES.filter((l) => l !== locale && languages[l]) : [];
-  const image = OG_IMAGE[locale];
+  const image = ownImage ?? OG_IMAGE[locale];
   return {
     title: absoluteTitle ? { absolute: absoluteTitle } : title,
     description,

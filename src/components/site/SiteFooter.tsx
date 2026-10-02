@@ -28,21 +28,26 @@ export function SiteFooter({ locale }: { locale: Locale }) {
             {t.footer.site}
           </h2>
           <ul className="mt-2 space-y-1.5 text-muted-foreground">
-            <li>
-              <Link href={P.calculator} className={link}>
-                {t.nav.calculator}
-              </Link>
-            </li>
-            <li>
-              <Link href={P.methodology} className={link}>
-                {t.nav.methodology}
-              </Link>
-            </li>
-            <li>
-              <Link href={P.sources} className={link}>
-                {t.nav.sources}
-              </Link>
-            </li>
+            {(
+              [
+                [P.calculator, t.nav.calculator, P.methodology, P.sources],
+                [P.bess, t.nav.bess, P.bessMethodology, P.bessSources],
+              ] as const
+            ).map(([home, name, methodology, sources]) => (
+              <li key={home}>
+                <Link href={home} className={link}>
+                  {name}
+                </Link>
+                <span className="mt-0.5 flex gap-3 pl-3 text-xs">
+                  <Link href={methodology} className={link}>
+                    {t.nav.methodology}
+                  </Link>
+                  <Link href={sources} className={link}>
+                    {t.nav.sources}
+                  </Link>
+                </span>
+              </li>
+            ))}
             <li>
               <Link href={P.about} className={link}>
                 {t.nav.about}
@@ -75,7 +80,7 @@ export function SiteFooter({ locale }: { locale: Locale }) {
       </div>
       <div className="border-t border-border">
         <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-1 px-4 py-4 text-xs text-muted-foreground sm:px-6">
-          <p>{m.header.disclaimer}</p>
+          <p>{t.footer.disclaimer}</p>
           <p>
             {t.footer.noTracking} {t.footer.dataAsOf} {FORMAT[locale].dateLabel(DATA_AS_OF)}. © {DATA_AS_OF.slice(0, 4)} {t.name}
           </p>

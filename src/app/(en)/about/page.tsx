@@ -82,11 +82,13 @@ export default function AboutPage() {
           own.
         </p>
         <p>
-          The <Link href={PATHS.calculator}>wind farm calculator</Link> on this site shows how I build a model: every
-          input comes from a dated public source or is a documented assumption, the mechanics follow the statutes and
-          lenders’ practice, inputs are validated before any calculation, and a set of checks flags funding gaps and
-          covenant breaches. The <Link href={PATHS.methodology}>methodology</Link> and all{" "}
-          <Link href={PATHS.sources}>sources</Link> are published, so every result can be traced.
+          The <Link href={PATHS.calculator}>wind farm</Link> and <Link href={PATHS.bess}>battery storage</Link>{" "}
+          calculators on this site show how I build a model: every input comes from a dated public source or is a
+          documented assumption, the mechanics follow the statutes and lenders’ practice, inputs are validated before any
+          calculation, and a set of checks flags funding gaps and covenant breaches. The methodology and all sources of
+          each model are published (wind farm: <Link href={PATHS.methodology}>methodology</Link>,{" "}
+          <Link href={PATHS.sources}>sources</Link>; battery: <Link href={PATHS.bessMethodology}>methodology</Link>,{" "}
+          <Link href={PATHS.bessSources}>sources</Link>), so every result can be traced.
         </p>
 
         <h2>Experience</h2>

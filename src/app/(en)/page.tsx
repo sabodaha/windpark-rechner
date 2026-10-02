@@ -2,15 +2,17 @@ import Link from "next/link";
 import { JsonLd } from "@/components/site/JsonLd";
 import { Placeholder } from "@/components/site/Placeholder";
 import { Button } from "@/components/ui/button";
+import { BESS_CASE_NAME } from "@/bess/data";
+import { bessBase } from "@/bess/server";
 import { BASE, BASE_CASE, BID_AT_COST_OF_EQUITY, TENDER_FACTS } from "@/content/baseCase";
-import { ct, num, pct, ratio } from "@/lib/format";
+import { ct, eurCompact, meur, num, pct, ratio } from "@/lib/format";
 import { pageMetadata } from "@/lib/metadata";
 import { absoluteUrl, CONTACT, graph, PATHS, PERSON_ID, personJsonLd, SITE, WEBSITE_ID, websiteJsonLd } from "@/lib/site";
 
 const TITLE = "Igor Sabodakha — Finance professional in Wiesbaden";
 const DESCRIPTION =
   "Igor Sabodakha, finance professional in Wiesbaden: audit, transaction advisory, valuation and financial modelling. " +
-  "Open, source-backed project-finance model of a German onshore wind farm.";
+  "Open, source-backed project-finance models of a German onshore wind farm and a battery storage plant in Ukraine.";
 
 export const metadata = pageMetadata({ absoluteTitle: TITLE, description: DESCRIPTION, path: PATHS.home });
 
@@ -56,6 +58,16 @@ const FEATURES: { title: string; text: string }[] = [
 ];
 
 export default function Home() {
+  const bess = bessBase();
+  const bk = bess.core.result.kpis;
+  const bessIrr = bk.investorIrr?.status === "valid" ? bk.investorIrr.value : null;
+  const bessBe = bess.extras.breakEven.status === "found" ? bess.extras.breakEven.value : null;
+  const bessKpis: { label: string; value: string }[] = [
+    { label: "Investor IRR (€)", value: bessIrr === null ? "n/a" : pct(bessIrr, 1) },
+    { label: `Investor NPV at ${pct(bess.core.inputs.equityHurdle, 0)}`, value: meur(bk.investorNpv?.value ?? null, 1) },
+    { label: "Net revenue 2029, per MW", value: eurCompact(bk.netRevenue2029PerMW?.value ?? null) },
+    { label: "Break-even spreads", value: bessBe === null ? "n/a" : `× ${num(bessBe, 2)}` },
+  ];
   const base = BASE.base.kpis;
   const bid = BID_AT_COST_OF_EQUITY.feasible?.awardPriceCt ?? null;
   const kpis: { label: string; value: string }[] = [
@@ -88,13 +100,16 @@ export default function Home() {
           seven of them at Grant Thornton.
         </p>
         <p className="mt-3 max-w-2xl leading-relaxed text-muted-foreground">
-          This site publishes an open project-finance model of a German onshore wind farm. Every input has a public
-          source or a documented assumption, every formula is documented, and the whole calculation runs in your
-          browser.
+          This site publishes open project-finance models: a German onshore wind farm and a battery storage plant in
+          Ukraine. Every input has a public source or a documented assumption, every formula is documented, and the whole
+          calculation runs in your browser.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Button asChild>
-            <Link href={PATHS.calculator}>Open the calculator</Link>
+            <Link href={PATHS.calculator}>Wind farm calculator</Link>
+          </Button>
+          <Button asChild>
+            <Link href={PATHS.bess}>Battery storage calculator</Link>
           </Button>
           <Button asChild variant="outline">
             <Link href={PATHS.about}>About me</Link>
@@ -152,9 +167,62 @@ export default function Home() {
         </div>
       </section>
 
+      <section aria-labelledby="battery" className="mx-auto w-full max-w-[1100px] px-4 pt-6 sm:px-6">
+        <div className="rounded-xl border border-border bg-card p-5 sm:p-7">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">New model</p>
+          <h2 id="battery" className="mt-1 text-2xl font-semibold tracking-tight">
+            Battery Storage Investment Calculator
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Fictional battery “{BESS_CASE_NAME}” · {bess.core.inputs.powerMW} MW /{" "}
+            {bess.core.inputs.powerMW * bess.core.inputs.durationH} MWh · Kyiv region, Ukraine · day-ahead trading only
+          </p>
+
+          <dl className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {bessKpis.map((k) => (
+              <div key={k.label} className="rounded-lg border border-border px-3 py-2">
+                <dt className="text-xs text-muted-foreground">{k.label}</dt>
+                <dd className="text-lg font-semibold tabular">{k.value}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <div className="mt-5 rounded-lg bg-muted px-4 py-3.5">
+            <h3 className="font-semibold">What the base case shows</h3>
+            <p className="mt-1.5 leading-relaxed text-foreground/85">
+              Trading on the day-ahead market alone, a two-hour battery that starts in 2028 keeps{" "}
+              {eurCompact(bk.netRevenue2029PerMW?.value ?? null)} per MW of its trading margin in the first full year. After
+              operating costs, network tariffs and the expected war loss, that does not carry a{" "}
+              {meur(bess.core.result.capexAllInEur, 1)} investment: the investor{" "}
+              {bessIrr !== null && bessIrr < 0 ? `loses ${pct(-bessIrr, 1)}` : `earns ${pct(bessIrr, 1)}`} a year in euros.{" "}
+              {bessBe !== null && (
+                <>
+                  Daily price spreads would have to be about {num(bessBe, 1)} times the reference path to reach the{" "}
+                  {pct(bess.core.inputs.equityHurdle, 0)} hurdle.{" "}
+                </>
+              )}
+              The next version adds balancing services and Ukrenergo’s auctions, the other income a battery in Ukraine can
+              earn.
+            </p>
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium">
+            <Link href={PATHS.bess} className="text-link hover:underline">
+              Open the calculator →
+            </Link>
+            <Link href={PATHS.bessMethodology} className="text-link hover:underline">
+              How the model works →
+            </Link>
+            <Link href={PATHS.bessSources} className="text-link hover:underline">
+              All sources →
+            </Link>
+          </div>
+        </div>
+      </section>
+
       <section aria-labelledby="covers" className="mx-auto w-full max-w-[1100px] px-4 pt-12 sm:px-6">
         <h2 id="covers" className="text-xl font-semibold tracking-tight">
-          What the model covers
+          What the wind farm model covers
         </h2>
         <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (

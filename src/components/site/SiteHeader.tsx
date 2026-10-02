@@ -13,8 +13,7 @@ export function SiteHeader({ locale }: { locale: Locale }) {
       label={t.navLabel}
       items={[
         { href: P.calculator, label: t.nav.calculator, short: t.nav.calculatorShort },
-        { href: P.methodology, label: t.nav.methodology },
-        { href: P.sources, label: t.nav.sources },
+        { href: P.bess, label: t.nav.bess, short: t.nav.bessShort },
         { href: P.about, label: t.nav.about },
       ]}
     />

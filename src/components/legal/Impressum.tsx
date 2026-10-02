@@ -56,9 +56,9 @@ export function ImpressumDe() {
       <p>{SITE.name}, Anschrift wie oben</p>
       <h3>Haftungsausschluss</h3>
       <p>
-        Der Windpark-Investitionsrechner ist eine Beispielrechnung für ein fiktives Projekt – keine Anlage-, Steuer- oder
-        Rechtsberatung. Die Inhalte wurden sorgfältig geprüft; für ihre Richtigkeit, Vollständigkeit und Aktualität wird
-        dennoch keine Gewähr übernommen.
+        Der Windpark-Investitionsrechner und der Batteriespeicher-Rechner sind Beispielrechnungen für fiktive Projekte –
+        keine Anlage-, Steuer- oder Rechtsberatung. Die Inhalte wurden sorgfältig geprüft; für ihre Richtigkeit,
+        Vollständigkeit und Aktualität wird dennoch keine Gewähr übernommen.
       </p>
       <h3>Externe Links</h3>
       <p>
@@ -80,9 +80,9 @@ export function ImpressumEn() {
       <p>{SITE.name}, address as above</p>
       <h3>Disclaimer</h3>
       <p>
-        The wind farm calculator is an illustrative calculation of a fictional project — not investment, tax or legal
-        advice. The content has been checked carefully; still, no guarantee is given that it is correct, complete and up
-        to date.
+        The wind farm and battery storage calculators are illustrative calculations of fictional projects — not
+        investment, tax or legal advice. The content has been checked carefully; still, no guarantee is given that it is
+        correct, complete and up to date.
       </p>
       <h3>External links</h3>
       <p>

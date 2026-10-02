@@ -1,6 +1,6 @@
-// Renders the social-sharing images (public/og.png, German public/og-de.png) and the Apple touch icon (src/app/apple-icon.png) from
+// Renders the social-sharing images (public/og.png, German public/og-de.png, the battery calculator's public/og-bess.png) and the Apple touch icon (src/app/apple-icon.png) from
 // the HTML templates next to this file, with a local Chromium browser in headless mode. Run after a
-// build, which provides the self-hosted Inter font:  npm run build && node scripts/images/render.mjs
+// build, which provides the self-hosted Inter font:  npm run build && node scripts/images/render.mjs [template prefix…]
 // Browser: $BROWSER, or Microsoft Edge at its default Windows path.
 import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -68,6 +68,15 @@ async function render(template, out, width, height, font) {
   console.log(`${out} (${statSync(out).size} bytes)`);
 }
 
-await render("og.html", join(root, "public", "og.png"), 1200, 630, latinInter());
-await render("og.de.html", join(root, "public", "og-de.png"), 1200, 630, latinInter());
-await render("apple-icon.html", join(root, "src", "app", "apple-icon.png"), 180, 180);
+// `node scripts/images/render.mjs og-bess` renders only the templates whose names start with the arguments.
+const only = process.argv.slice(2);
+const jobs = [
+  ["og.html", join(root, "public", "og.png"), 1200, 630, true],
+  ["og.de.html", join(root, "public", "og-de.png"), 1200, 630, true],
+  ["og-bess.html", join(root, "public", "og-bess.png"), 1200, 630, true],
+  ["apple-icon.html", join(root, "src", "app", "apple-icon.png"), 180, 180, false],
+];
+for (const [template, out, width, height, inter] of jobs) {
+  if (only.length > 0 && !only.some((o) => template.startsWith(o))) continue;
+  await render(template, out, width, height, inter ? latinInter() : undefined);
+}

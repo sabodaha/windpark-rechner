@@ -21,7 +21,7 @@ export const SITE = {
     website: "https://dartim-media.com/",
   },
   /** Last content change of the site (sitemap lastmod, dateModified); the data date is DATA_AS_OF. */
-  updated: "2026-10-01",
+  updated: "2026-10-02",
 } as const;
 
 /**
@@ -35,7 +35,18 @@ export const CONTACT: { addressLines: string[] | null; email: string | null; pho
   phone: null,
 };
 
-export type PageId = "home" | "calculator" | "methodology" | "sources" | "report" | "about" | "impressum" | "privacy";
+export type PageId =
+  | "home"
+  | "calculator"
+  | "methodology"
+  | "sources"
+  | "report"
+  | "bess"
+  | "bessMethodology"
+  | "bessSources"
+  | "about"
+  | "impressum"
+  | "privacy";
 
 /** One address per page and language: English at the root, German under /de/ with German words (decision G01). */
 export const PAGE_PATHS: Record<Locale, Record<PageId, string>> = {
@@ -46,6 +57,10 @@ export const PAGE_PATHS: Record<Locale, Record<PageId, string>> = {
     sources: "/wind-farm-calculator/sources/",
     /** Print view of the report; the calculator's query gives it the user's inputs. Not in the sitemap. */
     report: "/wind-farm-calculator/report/",
+    /** Battery storage calculator (v1: Ukraine); English only so far. */
+    bess: "/battery-storage-calculator/",
+    bessMethodology: "/battery-storage-calculator/methodology/",
+    bessSources: "/battery-storage-calculator/sources/",
     about: "/about/",
     impressum: "/impressum/",
     privacy: "/privacy/",
@@ -56,6 +71,10 @@ export const PAGE_PATHS: Record<Locale, Record<PageId, string>> = {
     methodology: "/de/windpark-rechner/methodik/",
     sources: "/de/windpark-rechner/quellen/",
     report: "/de/windpark-rechner/bericht/",
+    // reserved for the German battery pages; until they exist the links lead to the English ones
+    bess: "/de/batteriespeicher-rechner/",
+    bessMethodology: "/de/batteriespeicher-rechner/methodik/",
+    bessSources: "/de/batteriespeicher-rechner/quellen/",
     about: "/de/ueber-mich/",
     impressum: "/de/impressum/",
     privacy: "/de/datenschutz/",
@@ -65,8 +84,8 @@ export const PAGE_PATHS: Record<Locale, Record<PageId, string>> = {
 const PAGE_IDS = Object.keys(PAGE_PATHS.en) as PageId[];
 
 /**
- * The pages built in each language. The German report's print view follows with the German report (DE5); until
- * then its links lead to the English one.
+ * The pages built in each language. The German report's print view follows with the German report (DE5), the battery
+ * calculator with its German version; until then their links lead to the English pages.
  */
 export const LOCALE_PAGES: Record<Locale, readonly PageId[]> = {
   en: PAGE_IDS,
@@ -102,9 +121,12 @@ export function pageOf(pathname: string): { page: PageId; locale: Locale } | nul
 export const SITEMAP: { page: PageId; priority: number }[] = [
   { page: "home", priority: 1 },
   { page: "calculator", priority: 0.9 },
+  { page: "bess", priority: 0.9 },
   { page: "methodology", priority: 0.8 },
+  { page: "bessMethodology", priority: 0.7 },
   { page: "about", priority: 0.8 },
   { page: "sources", priority: 0.6 },
+  { page: "bessSources", priority: 0.5 },
   { page: "impressum", priority: 0.2 },
   { page: "privacy", priority: 0.2 },
 ];
@@ -124,6 +146,7 @@ export const absoluteUrl = (path: string) => `${SITE.url}${path}`;
 export const PERSON_ID = `${SITE.url}/#person`;
 export const WEBSITE_ID = `${SITE.url}/#website`;
 export const CALCULATOR_ID = `${absoluteUrl(PATHS.calculator)}#app`;
+export const BESS_ID = `${absoluteUrl(PATHS.bess)}#app`;
 
 /** The person in the words of one language; the same @id on every page. */
 const PERSON_TEXT: Record<Locale, { jobTitle: string; knowsAbout: string[] }> = {

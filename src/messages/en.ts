@@ -451,7 +451,9 @@ export const en = {
     navLabel: "Main",
     nav: {
       calculator: "Wind farm calculator",
-      calculatorShort: "Calculator",
+      calculatorShort: "Wind farm",
+      bess: "Battery storage calculator",
+      bessShort: "Battery",
       methodology: "Methodology",
       sources: "Sources",
       about: "About",
@@ -459,6 +461,8 @@ export const en = {
     calculatorLinks: { methodology: "How the model works", sources: "All sources" },
     resultsLabel: "Results",
     footer: {
+      /** Under every page: both models are fictional. */
+      disclaimer: "Illustrative calculation — not investment, tax or legal advice. The wind farm and the battery are fictional.",
       aboutTitle: "About the author",
       about:
         "Igor Sabodakha is a finance professional in Wiesbaden with more than 15 years of international experience in " +

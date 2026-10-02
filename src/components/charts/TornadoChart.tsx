@@ -89,9 +89,12 @@ export function TornadoChart({ rows, base, format, lowName, highName, ariaLabel,
                 </text>
                 {seg(lo, SERIES[0]!, -BAR / 2 - 1)}
                 {seg(hi, SERIES[1]!, 1)}
-                <text x={x(maxV) + 4} y={cy} dy="0.32em" fill={MUTED} className="tabular">
-                  {format(maxV)}
-                </text>
+                {/* a row whose settings only lower the result has no label to the right of the base line */}
+                {(maxV > base || minV >= base) && (
+                  <text x={x(maxV) + 4} y={cy} dy="0.32em" fill={MUTED} className="tabular">
+                    {format(maxV)}
+                  </text>
+                )}
                 {minV < base && (
                   <text x={x(minV) - 4} y={cy} dy="0.32em" textAnchor="end" fill={MUTED} className="tabular">
                     {format(minV)}

@@ -3,6 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { PrivacyDe, PrivacyEn } from "../src/components/legal/Privacy";
+import { BESS_STORAGE_KEY } from "../src/bess/url-state";
 import { clearStorage, loadFromStorage, saveToStorage, STORAGE_KEY } from "../src/lib/url-state";
 import { de } from "../src/messages/de";
 import { en } from "../src/messages/en";
@@ -61,6 +62,9 @@ describe("remembered inputs", () => {
     expect(enPage).toContain(`“${en.actions.remember}”`);
     expect(enPage).toContain(`„${en.actions.remember}“`); // the German text on the English page names the English box
     expect(dePage).toContain(`„${de.actions.remember}“`);
-    for (const page of [enPage, dePage]) expect(page).toContain(STORAGE_KEY);
+    for (const page of [enPage, dePage]) {
+      expect(page).toContain(STORAGE_KEY);
+      expect(page).toContain(BESS_STORAGE_KEY);
+    }
   });
 });
