@@ -58,7 +58,9 @@ export interface CheckResult {
 
 export interface Metric {
   value: number | null;
-  status: "valid" | "ambiguous" | "notDefined" | "unfunded";
+  /** `notApplicable`: the metric has no meaning in this case (cover ratios without a loan). `unfunded` is used for the
+   *  investor IRR only; project IRRs classify their signed cash flows mathematically (U10). */
+  status: "valid" | "ambiguous" | "notDefined" | "unfunded" | "notApplicable";
   /** IRRs only: every root found in the search domain (several when `ambiguous`). */
   roots?: number[];
 }

@@ -22,6 +22,8 @@ const summary = (r: BessResult) => ({
   lenderPeriods: r.lenderPeriods,
   annual: r.annual,
   checks: r.checks.filter((c) => c.status !== "pass"),
+  /** Every check with its status, passes included: the evidence behind "no check failed". */
+  allChecks: r.checks,
   investorFlows: dated(r.investorFlows),
   projectPreTax: dated(r.detail!.projectPreTax),
   projectPostTax: dated(r.detail!.projectPostTax),

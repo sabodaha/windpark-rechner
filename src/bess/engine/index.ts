@@ -59,6 +59,7 @@ export interface RunOptions {
 }
 
 const metric = (value: number | null): Metric => ({ value, status: value === null || !Number.isFinite(value) ? "notDefined" : "valid" });
+const NOT_APPLICABLE: Metric = { value: null, status: "notApplicable" };
 
 export function runBess(inp: BessInputs, lib: Library, opts: RunOptions = {}): BessResult {
   const cal = buildCalendar(inp.codDelayMonths);
@@ -201,6 +202,19 @@ export function runBess(inp: BessInputs, lib: Library, opts: RunOptions = {}): B
   // checks: an integrity failure, a bad business and missing data are different statuses (spec §17)
   const checks: CheckResult[] = [];
   const add = (c: CheckResult) => checks.push(c);
+  // physics: RTE × energy bought = energy delivered in every closed month, within the storage tolerance (M03), and the
+  // delivered energy within the daily cycle limit
+  let energyGap = 0;
+  let cycleExcess = 0;
+  for (const o of ops.months) {
+    if (!o.operating) continue;
+    energyGap = Math.max(energyGap, Math.abs(inp.rte * o.importMWh - o.exportMWh));
+    const limit = inp.cycleCap * inp.durationH * inp.powerMW * cal.months[o.index]!.days;
+    cycleExcess = Math.max(cycleExcess, o.exportMWh - limit);
+  }
+  const storageTolerance = (ENGINE.storageToleranceEnergyPer50MW * inp.powerMW) / 50;
+  add({ id: "energyBalance", group: "physical", status: energyGap <= storageTolerance ? "pass" : "fail", value: energyGap });
+  add({ id: "cycleLimit", group: "physical", status: cycleExcess <= storageTolerance ? "pass" : "fail", value: cycleExcess });
   const unsupported = ops.unsupported ?? lenderUnsupported;
   add({ id: "library", group: "data", status: unsupported ? "fail" : "pass", note: unsupported ?? undefined });
   add({ id: "sizingConverged", group: "funding", status: funding.sizingStatus === "failed" ? "fail" : "pass", value: funding.iterations });
@@ -217,7 +231,8 @@ export function runBess(inp: BessInputs, lib: Library, opts: RunOptions = {}): B
   add({ id: "repatriationCap", group: "scope", status: led.repatriationCapBound ? "warning" : "pass", value: led.remittanceTailMonths });
   add({ id: "terminalRemittance", group: "scope", status: inp.terminalRemittance === "blocked" ? "warning" : "pass", value: led.blockedAtEndEur });
   add({ id: "thinCap", group: "scope", status: led.thinCapMax > 3.5 ? "warning" : "pass", value: led.thinCapMax });
-  add({ id: "dividendsWithinTaxableProfit", group: "scope", status: led.dividendsDeclaredUah <= led.vintageCapacityUah + 1 ? "pass" : "outOfScope" });
+  // a model rule, not a disclosure: declarations above settled taxable profit would put the case outside v1 (S13-03)
+  add({ id: "dividendsWithinTaxableProfit", group: "integrity", status: led.dividendsDeclaredUah <= led.vintageCapacityUah + 1 ? "pass" : "fail" });
   add({ id: "receivablesWrittenOff", group: "scope", status: led.receivablesWrittenOffUah > 1 ? "warning" : "pass", value: led.receivablesWrittenOffUah });
   add({ id: "cohortLost", group: "scope", status: ops.cohortLost ? "warning" : "pass" });
   add({ id: "retiredBelowGrid", group: "scope", status: ops.retiredBelowGrid ? "warning" : "pass" });
@@ -226,15 +241,20 @@ export function runBess(inp: BessInputs, lib: Library, opts: RunOptions = {}): B
   add({ id: "psoSurcharges", group: "scope", status: "outOfScope", note: "PSO surcharges from 2030 (law 4937-IX) not quantified" });
   add({ id: "warCover", group: "scope", status: inp.insurance && !inp.coverAvailable ? "warning" : "pass" });
   add({ id: "taxRulesVerification", group: "scope", status: "warning", note: "tax deadlines and asset classes to be verified against the Tax Code" });
-  const returnsMeaningful = !unsupported && !deficit && !checks.some((c) => c.status === "fail" && c.group === "integrity");
+  // returns are shown only for a funded case whose calculation, physics and data hold (spec §17, S13-03)
+  const returnsMeaningful = !unsupported && !deficit && !checks.some((c) => c.status === "fail" && (c.group === "integrity" || c.group === "physical"));
 
   return {
     inputs: inp,
     funding,
     kpis: {
       investorIrr, investorNpv: metric(investorNpv), projectIrrPreTax: projectPre, projectIrrPostTax: projectPost,
-      projectNpv: metric(projectNpv), minDscr: metric(minDscr), avgDscr: metric(avgDscr), lenderMinDscr: metric(lenderMin),
-      llcr: metric(llcr), gearing: metric(funding.debtEur / Math.max(led.usesExVatEur, 1)), debtEur: metric(funding.debtEur),
+      projectNpv: metric(projectNpv),
+      // without a loan there is no debt service to cover: not applicable rather than undefined (M11)
+      minDscr: funding.debtEur > 0 ? metric(minDscr) : NOT_APPLICABLE,
+      avgDscr: funding.debtEur > 0 ? metric(avgDscr) : NOT_APPLICABLE,
+      lenderMinDscr: funding.debtEur > 0 ? metric(lenderMin) : NOT_APPLICABLE,
+      llcr: funding.debtEur > 0 ? metric(llcr) : NOT_APPLICABLE, gearing: metric(funding.debtEur / Math.max(led.usesExVatEur, 1)), debtEur: metric(funding.debtEur),
       equityEur: metric(led.equityEur), lcos: metric(lcos),
       pfMargin2029PerMW: metric(pf2029 / inp.powerMW), capturedMargin2029PerMW: metric(cap2029 / inp.powerMW),
       netRevenue2029PerMW: metric(net2029 / inp.powerMW), paybackYears: metric(payback), paybackDipsAfter: metric(dipsAfter ? 1 : 0),
@@ -263,7 +283,10 @@ export function runBess(inp: BessInputs, lib: Library, opts: RunOptions = {}): B
 
 export interface BreakEven {
   value: number | null;
-  status: "found" | "notReached" | "unsupportedBelow";
+  /** `found` — the first supported sign change (a zero endpoint counts); `notReached` — no change of sign on the
+   *  supported points; `unsupportedBelow` — the NPV is already positive at the lowest supported multiplier, which lies
+   *  above the start of the domain; `unsupported` — no point of the domain is inside the library (U12). */
+  status: "found" | "notReached" | "unsupportedBelow" | "unsupported";
   /** Smallest multiplier the library supports in the search domain. */
   supportedFrom: number | null;
 }
@@ -300,5 +323,7 @@ export function breakEvenSpread(inp: BessInputs, lib: Library, funding: LockedFu
     }
     return { value: (a + b) / 2, status: "found", supportedFrom };
   }
-  return { value: null, status: supportedFrom !== null && supportedFrom > lo0 + 1e-9 ? "unsupportedBelow" : "notReached", supportedFrom };
+  if (supportedFrom === null) return { value: null, status: "unsupported", supportedFrom };
+  const belowLibrary = supportedFrom > lo0 + 1e-9 && pts[0]![1] > 0;
+  return { value: null, status: belowLibrary ? "unsupportedBelow" : "notReached", supportedFrom };
 }

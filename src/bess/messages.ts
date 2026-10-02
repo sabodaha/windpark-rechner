@@ -71,11 +71,13 @@ export const bessEn = {
       ambiguous: "several",
       notDefined: "none",
       unfunded: "cash short",
+      notApplicable: "n/a",
     },
     statusHint: {
       ambiguous: "The cash flows change sign more than once, so they have several IRRs; the NPV is the measure to read.",
       notDefined: "The cash flows never repay what was paid in at any rate, so there is no IRR — which is not the same as 0%.",
       unfunded: "The company runs out of cash in this case; returns are not shown. The NPV stays, marked.",
+      notApplicable: "No loan in this case, so there is no debt service to cover.",
     },
     withoutDebt: "Without debt",
     noDebtHint: "The same project financed with equity only: what the asset earns before leverage.",
@@ -100,6 +102,7 @@ export const bessEn = {
     spreadContext: (ua: string, eu: string) => `For comparison, 2025: Ukraine ${ua}, neighbouring EU markets ${eu}.`,
     notReached: "Even spreads three times the path do not reach the hurdle.",
     unsupportedBelow: (k: string) => `Break-even lies below the range the revenue library covers (from ${k}).`,
+    unsupported: "Break-even cannot be searched: these inputs lie outside the revenue library.",
     calculating: "Calculating break-even…",
     notIncluded:
       "Not in this version: balancing and ancillary services, and Ukrenergo’s multi-year auctions for them (contracts of up " +
@@ -476,6 +479,8 @@ export const bessEn = {
       dividendsWithinTaxableProfit: "Dividends within taxed profit (no advance tax)",
       receivablesWrittenOff: "Receivables collected",
       cohortLost: "Legacy network tariff kept",
+      energyBalance: "Energy delivered equals efficiency × energy bought, every month",
+      cycleLimit: "Delivered energy within the daily cycle limit",
       retiredBelowGrid: "Battery in service to the end of its life",
       feeFloor: "Equivalent fee never floored at zero",
       tariffAfter2037: "Network tariff after April 2037",

@@ -63,6 +63,8 @@ export function WhatItTakes({
               </>
             ) : be.status === "unsupportedBelow" ? (
               <p>{W.unsupportedBelow(times(be.supportedFrom ?? 0))}</p>
+            ) : be.status === "unsupported" ? (
+              <p>{W.unsupported}</p>
             ) : (
               <p>{W.notReached}</p>
             )}

@@ -152,6 +152,8 @@ export const MACRO = {
 
 export const ENGINE = {
   absToleranceMoney: 0.01,
+  /** RTE × bought − delivered per month after Float32 storage, MWh at 50 MW (M03); scales with power. */
+  storageToleranceEnergyPer50MW: 1e-3,
   irrNpvResidual: 1,
   breakEvenDomain: [0.5, 3.0] as const,
 } as const;

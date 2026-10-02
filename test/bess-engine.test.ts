@@ -14,7 +14,7 @@ function load() {
   return parseLibrary(manifest, bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength));
 }
 
-const integrity = (r: BessResult) => r.checks.filter((c) => ["integrity", "funding", "data"].includes(c.group));
+const integrity = (r: BessResult) => r.checks.filter((c) => ["integrity", "physical", "funding", "data"].includes(c.group));
 
 describe.runIf(built)("BESS engine on the UA library", () => {
   const lib = built ? load() : (null as never);
