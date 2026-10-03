@@ -6,7 +6,8 @@ import type { Calendar } from "./calendar";
 import { paidCapexEur, type CapexBuild } from "./capex";
 import { lookup, monthFields, type Library, UnsupportedLibraryInput } from "./library";
 import { FX_ANCHOR_2025, fxMonth, hicpIndex, uaCpiIndex } from "./macro";
-import { CASE, CAPEX, GRID, OPEX, PRICE_LEVEL_EUR, SPREAD_PATHS, TECH, WAR, type ScenarioId } from "./registry";
+import { CASE, CAPEX, GRID, OPEX, PRICE_LEVEL_EUR, RESERVE, SPREAD_PATHS, TECH, WAR, type ScenarioId } from "./registry";
+import { settlementHours, type ContractPlan } from "./reserves";
 import type { BessInputs } from "./types";
 
 export interface OpsSettings {
@@ -16,6 +17,82 @@ export interface OpsSettings {
   spreadScale: number;
   /** Tariff on gross withdrawal from COD, as if the legacy cohort were lost (sensitivity, spec §16). */
   grossTariffFromCod?: boolean;
+  /** v1.1a: the reserve contract of this run (the lender case passes its own plan without renewal, β = 0). */
+  plan?: ContractPlan | null;
+}
+
+/** One month of the v1.1a reserve (spec v1.1 R3 §2–§6). Energy in AC MWh, money in UAH (accrual, ex VAT). */
+export interface ReserveMonth {
+  award: "A1" | "A2" | "";
+  /** Award in which the exit event of this month's exit day happened (stock sold on the 1st), or "". */
+  exitOrigin: "A1" | "A2" | "";
+  window: number;
+  H: number;
+  A: number;
+  S: number;
+  R: number;
+  released: number;
+  Zplus: number;
+  Z: number;
+  sigmaP: number;
+  sigmaE: number;
+  /** σ* of one unit of mass (spec §3), also in transition months; sigma = W·σ*. */
+  sigmaStar: number;
+  sigma: number;
+  /** Share of the DA library withheld for the fill and exit days (τ, spec §3). */
+  tau: number;
+  sigmaA: number;
+  U: number;
+  Dn: number;
+  K: number;
+  Uset: number;
+  Dset: number;
+  /** Routine restoration at constant stock, the pre-service fill and the exit-day sale (spec §4, R2-01). */
+  Broutine: number;
+  Xroutine: number;
+  Bfill: number;
+  Xexit: number;
+  /** Totals, non-overlapping: B = Bfill + Broutine, X = Xroutine + Xexit. */
+  B: number;
+  X: number;
+  J: number;
+  /** Stock waiting at this month's close for next month's exit day. */
+  exitQueue: number;
+  Iopen: number;
+  Iclose: number;
+  standingMWh: number;
+  energyPriceUah: number;
+  capacityUah: number;
+  upEnergyUah: number;
+  downEnergyUah: number;
+  /** Routine restoration purchase (B_routine) and export (X_routine). */
+  restorationPurchaseUah: number;
+  restorationSaleUah: number;
+  fillPurchaseUah: number;
+  exitSaleUah: number;
+  /** Inventory cost basis: the fill (commodity only) is capitalised; released on the exit sale, written off on
+   *  destruction (spec §4). */
+  basisAddUah: number;
+  basisReleaseUah: number;
+  basisWriteOffUah: number;
+  basisCloseUah: number;
+  penaltyAsUah: number;
+  penaltyBsUah: number;
+  standingLoadUah: number;
+  recertUah: number;
+  /** Market-operator fee and NEURC levy in total, and the parts on the exit sale and (levy) on up energy. */
+  moFeeUah: number;
+  levyUah: number;
+  moFeeExitUah: number;
+  levyExitUah: number;
+  levyUpUah: number;
+  /** One network bill: total, the DA slice alone, and the DA slice with the non-exit reserve flows. */
+  networkTotalUah: number;
+  networkDaUah: number;
+  networkServiceUah: number;
+  /** Daily envelope (spec §3): (а) quota and (б) recovery on service days; (в) the fill day; (г) the exit day — left
+   *  side and limit. */
+  quota: { Q: number; a: [number, number]; b: [number, number]; fill: [number, number]; exitQuota: [number, number]; exitPower: [number, number] };
 }
 
 export interface OpsMonth {
@@ -56,6 +133,11 @@ export interface OpsMonth {
   libraryFeeUah: number;
   /** Peak daily purchases of the node in use, per the whole plant, base-period UAH. */
   peakDayPurchasesUah: number;
+  /** v1.1a reserve of the month, or null without a contract. */
+  reserve: ReserveMonth | null;
+  /** Fixed site costs of the month (O&M, property insurance, security, administration, metering, land, the monthly
+   *  market-operator fee): the shared costs allocated to the contract bucket by resource share (spec v1.1 §11). */
+  fixedOpexUah: number;
 }
 
 export interface OpsResult {
@@ -67,6 +149,21 @@ export interface OpsResult {
   feeFloorMonths: number;
   unsupported: string | null;
   augmentationUah: number;
+  /** v1.1a checks (spec R3 §3–§4, §14): the largest violation of each, ≤ 0 passes. Physical screens of the initial
+   *  award and its transition days; `renewal` — any physical screen in the second award's months and exits. */
+  reserveChecks: ReserveChecks;
+}
+
+export interface ReserveChecks {
+  headroom: number;
+  quotaA: number;
+  recoveryB: number;
+  transitionPower: number;
+  renewal: number;
+  energyBalance: number;
+  inventory: number;
+  inventoryCost: number;
+  lifecycle: number;
 }
 
 const yearKey = (table: Record<number, number>, y: number) => table[Math.min(Math.max(y, 2028), 2031)]!;
@@ -99,6 +196,115 @@ export function runOperations(inp: BessInputs, lib: Library, cal: Calendar, cape
   const payouts = new Map<number, number>();
   const compensations = new Map<number, number>();
   const compUsed = new Map<number, number>();
+  const plan = s.plan ?? null;
+  const rc: ReserveChecks = { headroom: -Infinity, quotaA: -Infinity, recoveryB: -Infinity, transitionPower: -Infinity, renewal: -Infinity, energyBalance: 0, inventory: 0, inventoryCost: 0, lifecycle: 0 };
+  /** Reserve stock (deliverable AC MWh), its UAH cost basis and the basis per MWh (constant: no refill), carried month to
+   *  month; the stock that left by exit or destruction, for the lifecycle check. */
+  let stock = 0;
+  let basis = 0;
+  let unitBasis = 0;
+  let stockOut = 0;
+  /** Record a physical screen's violation against the initial award or, for the second award, against `renewal`. */
+  const screen = (key: "headroom" | "quotaA" | "recoveryB" | "transitionPower", award: string, v: number) => {
+    if (award === "A2") rc.renewal = Math.max(rc.renewal, v);
+    else rc[key] = Math.max(rc[key], v);
+  };
+
+  /** One month of the reserve's physics and money (spec v1.1 R3 §3–§6); carries the stock and its cost basis. */
+  function reserveMonth(rm: ReserveMonth, plan: ContractPlan, usableAcBoL: number, i: number, fx: number, price: number, cpiMo: number, hicp26: number) {
+    const c = plan.c;
+    const C = c.acceptedMW;
+    const W = rm.window;
+    const rte = inp.rte;
+    const unit = c.sustainHours * C; // the stock of one unit of mass (spec §4)
+    rm.energyPriceUah = price;
+    // gross commands and their within-hour netting: a common cancelled quantity keeps the signed difference (R1-05);
+    // routine restoration keeps the continuing stock constant; destruction and the exit queue at the month end (R2-01)
+    if (W) {
+      rm.U = c.activationUp * C * rm.H * rm.A * rm.Zplus;
+      rm.Dn = c.activationDown * C * rm.H * rm.A * rm.Zplus;
+      rm.K = (1 - c.nettingShare) * Math.min(rm.U, rm.Dn);
+      rm.Uset = rm.U - rm.K;
+      rm.Dset = rm.Dn - rm.K;
+      rm.Broutine = Math.max(rm.U / rte - rm.Dn, 0);
+      rm.Xroutine = Math.max(rte * rm.Dn - rm.U, 0);
+      rm.J = c.onHit === "terminated" ? plan.hitLoss[i]! * unit : 0;
+      rm.exitQueue = (plan.otherLoss[i]! + (i === plan.lastService ? plan.Send : 0)) * unit;
+    }
+    // the fill on the last day of the month before the first obligated hour; the exit sale on the 1st (spec §4)
+    if (i === plan.fillIndex) rm.Bfill = unit / rte;
+    rm.Xexit = plan.exitMass[i]! * unit;
+    rm.B = rm.Bfill + rm.Broutine;
+    rm.X = rm.Xroutine + rm.Xexit;
+    // one identity on the totals, compared with the closing stock the states imply
+    rm.Iopen = stock;
+    rm.Iclose = rm.Iopen + rte * (rm.Dn + rm.B) - rm.U - rm.X - rm.J;
+    const expected = i === plan.fillIndex ? unit
+      : W ? (i === plan.lastService ? rm.exitQueue : unit * (plan.S[i]! - plan.hitLoss[i]! - plan.otherLoss[i]!) + rm.exitQueue)
+      : 0;
+    rc.energyBalance = Math.max(rc.energyBalance, Math.abs(rm.Iclose - expected));
+    stock = rm.Iclose;
+    stockOut += rm.Xexit + rm.J;
+    // the cost basis: the fill's commodity cost, released on the exit sale and written off on destruction (spec §4)
+    if (i === plan.fillIndex) {
+      rm.fillPurchaseUah = rm.Bfill * price;
+      rm.basisAddUah = rm.fillPurchaseUah;
+      unitBasis = rm.fillPurchaseUah / unit;
+    }
+    rm.basisReleaseUah = unitBasis * rm.Xexit;
+    rm.basisWriteOffUah = unitBasis * rm.J;
+    basis = basis + rm.basisAddUah - rm.basisReleaseUah - rm.basisWriteOffUah;
+    rm.basisCloseUah = basis;
+    rc.inventoryCost = Math.max(rc.inventoryCost, Math.abs(basis - unitBasis * stock));
+    // money, accrual, UAH ex VAT
+    const award = plan.awards.find((a) => a.tag === rm.award);
+    const pc = award ? award.eurPerMWHour : 0;
+    if (W) {
+      rm.capacityUah = C * pc * fx * rm.H * rm.A * rm.Zplus;
+      rm.penaltyAsUah = RESERVE.penaltyFactorAfrr * pc * fx * C * c.penaltyHours * (c.failureEvents / 12) * rm.Zplus;
+      rm.standingMWh = c.standingLoadShare * C * rm.H * rm.Zplus;
+    }
+    rm.upEnergyUah = rm.Uset * price * (1 + c.balancingPremiumUp);
+    rm.downEnergyUah = rm.Dset * price * (1 - c.balancingPremiumDown);
+    rm.restorationPurchaseUah = rm.Broutine * price;
+    rm.restorationSaleUah = rm.Xroutine * price;
+    rm.exitSaleUah = rm.Xexit * price;
+    rm.penaltyBsUah = c.bsFeeShare * (rm.Uset + rm.Dset) * price;
+    rm.standingLoadUah = rm.standingMWh * price;
+    if (plan.recertIndex.includes(i)) rm.recertUah = RESERVE.certificateCostEur2026 * hicp26 * fx * (plan.S[i]! + plan.R[i]!);
+    const moRate = OPEX.marketOperatorFeeUahPerMWh * cpiMo;
+    rm.moFeeUah = moRate * (rm.B + rm.X + rm.standingMWh);
+    rm.moFeeExitUah = moRate * rm.Xexit;
+    rm.levyUpUah = OPEX.neurcFeeRate * rm.upEnergyUah;
+    rm.levyExitUah = OPEX.neurcFeeRate * rm.exitSaleUah;
+    rm.levyUah = OPEX.neurcFeeRate * (rm.restorationSaleUah + rm.exitSaleUah + rm.upEnergyUah);
+    // the daily envelope (spec §3): service days (а) quota and (б) recovery; the fill day (в) and the exit day (г)
+    const Q = inp.cycleCap * usableAcBoL;
+    const Hd = RESERVE.longestDayHours;
+    const Ht = RESERVE.transitionDayHours;
+    const pcsPower = C * (1 + c.recoveryPowerShare);
+    rm.quota.Q = Q;
+    if (W) {
+      const phi = c.peakDayFactor;
+      const Uday = phi * c.activationUp * C * Hd;
+      const Xday = phi * Math.max(0, rte * c.activationDown - c.activationUp) * C * Hd;
+      const Bday = phi * Math.max(0, c.activationUp / rte - c.activationDown) * C * Hd;
+      rm.quota.a = [Uday + Xday, rm.sigmaStar * Q];
+      rm.quota.b = [Math.max(Bday, Xday), c.recoveryPowerShare * C * Hd];
+      screen("quotaA", rm.award, rm.quota.a[0] - rm.quota.a[1]);
+      screen("recoveryB", rm.award, rm.quota.b[0] - rm.quota.b[1]);
+    }
+    if (i === plan.fillIndex) {
+      rm.quota.fill = [rm.Bfill, pcsPower * Ht];
+      screen("transitionPower", "A1", rm.quota.fill[0] - rm.quota.fill[1]);
+    }
+    if (rm.Xexit > 0) {
+      rm.quota.exitQuota = [unit, rm.sigmaStar * Q];
+      rm.quota.exitPower = [unit, pcsPower * Ht];
+      screen("quotaA", rm.exitOrigin, rm.quota.exitQuota[0] - rm.quota.exitQuota[1]);
+      screen("transitionPower", rm.exitOrigin, rm.quota.exitPower[0] - rm.quota.exitPower[1]);
+    }
+  }
 
   for (const m of cal.months) {
     const fx = fxMonth(m.year, m.month, inp.fxStress);
@@ -108,7 +314,7 @@ export function runOperations(inp: BessInputs, lib: Library, cal: Calendar, cape
       opexUah: 0, tariffUah: 0, warExpectedUah: 0, insurancePremiumUah: 0, insuranceClaimAccrualUah: 0,
       insurancePayoutUah: payouts.get(m.index) ?? 0, stateCompensationAccrualUah: 0,
       stateCompensationUah: compensations.get(m.index) ?? 0, lifecycleVatUah: 0, lifecycleCapexUah: 0, decommissioningUah: 0,
-      grossTariffRegime: false, libraryFeeUah: 0, peakDayPurchasesUah: 0,
+      grossTariffRegime: false, libraryFeeUah: 0, peakDayPurchasesUah: 0, reserve: null, fixedOpexUah: 0,
     };
     months.push(row);
     if (m.phase === "settlement") {
@@ -191,22 +397,59 @@ export function runOperations(inp: BessInputs, lib: Library, cal: Calendar, cape
     }
     const f = lib0 ? monthFields(lib0, m.month) : { salesUAH: 0, purchasesUAH: 0, salesEUR: 0, purchasesEUR: 0, importMWh: 0, exportMWh: 0 };
     const avail = (m.opIndex < 12 ? TECH.availabilityYear1 : TECH.availability) * (1 - outageDerate);
-    const I = f.importMWh * P * avail;
-    const O = f.exportMWh * P * avail;
+    // v1.1a: in its service months the reserve holds a homogeneous slice σ* of PCS and energy per unit of mass; the fill
+    // and exit days withhold the moving mass's slice for one day (τ); the DA slice is the rest of the battery,
+    // σ_a = 1 − σ·Z − τ (spec R3 §3). Without a contract Pda is P exactly and the v1 arithmetic is unchanged.
+    let rm: ReserveMonth | null = null;
+    let Pda = P;
+    if (plan) {
+      const i = m.index;
+      const c = plan.c;
+      const W = plan.window[i]!;
+      const C = c.acceptedMW;
+      // simultaneous import of a serving state: down command, recovery, the reserve's standing load and the site's own
+      // auxiliary-load stress (R2-02)
+      const aAux = inp.auxStress ? TECH.auxStressShareOfPower : 0;
+      const sigmaP = (C * (1 + c.recoveryPowerShare + c.standingLoadShare)) / P + aAux;
+      const sigmaE = row.usableHours > 0 ? (C * 2 * c.sustainHours) / (row.usableHours * P) : Infinity;
+      const sigmaStar = Math.max(sigmaP, sigmaE);
+      const moving = (i === plan.fillIndex ? 1 : 0) + plan.exitMass[i]!;
+      const tau = moving > 0 ? (sigmaStar * moving) / m.days : 0;
+      const sigma = W ? sigmaStar : 0;
+      const sigmaA = 1 - sigma * plan.Z[i]! - tau;
+      const exitOrigin = plan.exitOrigin[i]!;
+      if (W) screen("headroom", plan.awardOf[i]!, sigmaStar - 1);
+      if (i === plan.fillIndex) screen("headroom", "A1", sigmaStar - 1);
+      if (plan.exitMass[i]! > 0) screen("headroom", exitOrigin, sigmaStar - 1);
+      Pda = P * sigmaA;
+      rm = {
+        award: plan.awardOf[i]!, exitOrigin, window: W, H: settlementHours(m.month, m.days), A: m.opIndex < 12 ? TECH.availabilityYear1 : TECH.availability,
+        S: plan.S[i]!, R: plan.R[i]!, released: plan.released[i]!, Zplus: plan.Zplus[i]!, Z: plan.Z[i]!, sigmaP, sigmaE, sigmaStar, sigma, tau, sigmaA,
+        U: 0, Dn: 0, K: 0, Uset: 0, Dset: 0, Broutine: 0, Xroutine: 0, Bfill: 0, Xexit: 0, B: 0, X: 0, J: 0, exitQueue: 0,
+        Iopen: 0, Iclose: 0, standingMWh: 0, energyPriceUah: 0, capacityUah: 0, upEnergyUah: 0, downEnergyUah: 0,
+        restorationPurchaseUah: 0, restorationSaleUah: 0, fillPurchaseUah: 0, exitSaleUah: 0, basisAddUah: 0, basisReleaseUah: 0,
+        basisWriteOffUah: 0, basisCloseUah: 0, penaltyAsUah: 0, penaltyBsUah: 0, standingLoadUah: 0, recertUah: 0, moFeeUah: 0,
+        levyUah: 0, moFeeExitUah: 0, levyExitUah: 0, levyUpUah: 0, networkTotalUah: 0, networkDaUah: 0, networkServiceUah: 0,
+        quota: { Q: 0, a: [0, 0], b: [0, 0], fill: [0, 0], exitQuota: [0, 0], exitPower: [0, 0] },
+      };
+      row.reserve = rm;
+    }
+    const I = f.importMWh * Pda * avail;
+    const O = f.exportMWh * Pda * avail;
     row.importMWh = I;
     row.exportMWh = O;
-    row.peakDayPurchasesUah = (lib0?.peakDayPurchasesUAH ?? 0) * P;
-    row.purchasesHistUah = f.purchasesUAH * P * avail;
+    row.peakDayPurchasesUah = (lib0?.peakDayPurchasesUAH ?? 0) * Pda;
+    row.purchasesHistUah = f.purchasesUAH * Pda * avail;
 
     if (inp.pathCurrency === "EUR") {
-      const sh = f.salesEUR * P * avail;
-      const ph = f.purchasesEUR * P * avail;
+      const sh = f.salesEUR * Pda * avail;
+      const ph = f.purchasesEUR * Pda * avail;
       const shift = level - mult * meta.avgPriceEUR;
       row.salesUah = (mult * sh + shift * O) * hicpIndex(y) * fx;
       row.purchasesUah = (mult * ph + shift * I) * hicpIndex(y) * fx;
     } else {
-      const sh = f.salesUAH * P * avail;
-      const ph = f.purchasesUAH * P * avail;
+      const sh = f.salesUAH * Pda * avail;
+      const ph = f.purchasesUAH * Pda * avail;
       const shift = level * FX_ANCHOR_2025 - mult * meta.avgPriceUAH;
       row.salesUah = (mult * sh + shift * O) * uaCpiIndex(y);
       row.purchasesUah = (mult * ph + shift * I) * uaCpiIndex(y);
@@ -216,17 +459,30 @@ export function runOperations(inp: BessInputs, lib: Library, cal: Calendar, cape
     row.captureLossUah = row.pfMarginUah - row.capturedUah;
     row.optimiserFeeUah = inp.optimiserFeeRate * Math.max(row.capturedUah, 0);
 
-    // degradation: delivered energy split by usable share, EFC = 0.9 × AC cycles of the cohort's start-of-life energy
+    const auxPrice = inp.pathCurrency === "EUR" ? level * hicpIndex(y) * fx : level * FX_ANCHOR_2025 * uaCpiIndex(y);
+    if (plan && rm) reserveMonth(rm, plan, capex.usableAcMWh, m.index, fx, auxPrice, cpiMo, hicp);
+
+    // degradation: delivered energy split by usable share, EFC = 0.9 × AC cycles of the cohort's start-of-life energy;
+    // the reserve's cell discharge (commands up, routine exports and the exit sale) wears the same cohorts (spec §3)
+    const discharge = rm ? O + rm.U + rm.X : O;
     cohorts.forEach((c, j) => {
-      if (usable > 0 && c.active) c.efc += (TECH.efcPerAcCycle * O * (shares[j]! / usable)) / c.bol;
+      if (usable > 0 && c.active) c.efc += (TECH.efcPerAcCycle * discharge * (shares[j]! / usable)) / c.bol;
     });
 
     // costs
     const aux = inp.auxStress ? TECH.auxStressShareOfPower * P * m.days * 24 : 0;
     row.auxMWh = aux;
-    const auxPrice = inp.pathCurrency === "EUR" ? level * hicpIndex(y) * fx : level * FX_ANCHOR_2025 * uaCpiIndex(y);
-    const withdrawal = row.grossTariffRegime ? I + aux : Math.max(0, I + aux - O);
-    row.tariffUah = tariffRate * withdrawal;
+    // one network bill for the connection point; the reserve's slice adds its imports and exports (a summed-slice proxy
+    // of the meter, spec §3). For the bucket allocation (spec §11) the bill of the DA slice alone and the bill with the
+    // non-exit reserve flows are kept: the exit sale's increment follows the exit's origin
+    const bill = (imp: number, exp: number) => tariffRate * (row.grossTariffRegime ? I + aux + imp : Math.max(0, I + aux + imp - O - exp));
+    const resImp = rm ? rm.Dn + rm.B + rm.standingMWh : 0;
+    row.tariffUah = bill(resImp, rm ? rm.U + rm.X : 0);
+    if (rm) {
+      rm.networkTotalUah = row.tariffUah;
+      rm.networkServiceUah = bill(resImp, rm.U + rm.Xroutine);
+      rm.networkDaUah = bill(0, 0);
+    }
     const rvEur = rv2026 * hicp;
     const eur = (v: number) => v * fx;
     row.opexUah =
@@ -240,6 +496,16 @@ export function runOperations(inp: BessInputs, lib: Library, cal: Calendar, cape
       OPEX.marketOperatorFeeUahPerMonth * cpiMo +
       OPEX.neurcFeeRate * row.salesUah +
       aux * auxPrice;
+    if (rm) {
+      row.fixedOpexUah =
+        eur((OPEX.omEurPerKwYear * P * 1000 * hicp) / 12) +
+        eur((OPEX.propertyInsuranceRate * rvEur) / 12) +
+        OPEX.securityUahPerMonth * cpi +
+        eur((OPEX.spvAdminEurPerYear * hicp) / 12) +
+        eur((OPEX.meteringEurPerYear * hicp) / 12) +
+        (OPEX.landLeaseEurPerHaYear * OPEX.landHa * CAPEX.bookFxUah * cpi) / 12 +
+        OPEX.marketOperatorFeeUahPerMonth * cpiMo;
+    }
 
     // war risk: expected loss without cover; with insurance the premium, the expected repair and lagged receipts
     if (inp.insurance) {
@@ -270,5 +536,8 @@ export function runOperations(inp: BessInputs, lib: Library, cal: Calendar, cape
   }
   // receivables falling due after the last month are not collected: the ledger writes them off (no claim recovery
   // beyond the settlement horizon is assumed)
-  return { months, cohortLost, unsupported, augmentationUah, retiredBelowGrid, feeFloorMonths };
+  rc.inventory = Math.max(Math.abs(stock), Math.abs(basis));
+  // every unit of the filled stock leaves exactly once, by an exit sale or destruction (spec §4, noDoubleSale)
+  if (plan && !plan.cancelled) rc.lifecycle = Math.abs(plan.c.sustainHours * plan.c.acceptedMW - stockOut);
+  return { months, cohortLost, unsupported, augmentationUah, retiredBelowGrid, feeFloorMonths, reserveChecks: rc };
 }

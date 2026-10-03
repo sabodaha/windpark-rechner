@@ -150,6 +150,72 @@ export const MACRO = {
   projectDiscountRate: 0.1,
 } as const;
 
+/** v1.1a reserve contract rules and defaults (spec v1.1 R2 §17). */
+export const RESERVE = {
+  /** Performance security per awarded MW, EUR, posted as cash in the AS escrow (MR 3.18.11–3.18.12). */
+  collateralEurPerMW: 30_000,
+  /** Approved late start: +20 % security, the TSO keeps 25 % of the increased amount per month (MR 3.18.16). */
+  deferralTopUpShare: 0.2,
+  deferralRetentionPerMonth: 0.25,
+  deferralMaxMonths: 4,
+  /** aFRR availability non-compliance factor (MR 5.22.1). */
+  penaltyFactorAfrr: 2,
+  /** Re-certification, EUR in 2026 prices, indexed with euro inflation; certificate valid 60 months (TSC Annex 7, I.7.1). */
+  certificateCostEur2026: 15_000,
+  certificateMonths: 60,
+  /** Special-auction cap for symmetric aFRR, UAH per MW-hour (Ukrenergo, caps for 2027; frozen scenario). */
+  auctionCapUah: 1339.82,
+  minTenorMonths: 13,
+  maxTenorMonths: 60,
+  maxDeferralMonths: 36,
+  minSustainHours: 1,
+  /** Longest settlement day, hours (the autumn DST change): the conservative energy bound of a service day. */
+  longestDayHours: 25,
+  /** Shortest settlement day, hours (the spring DST change): the conservative bound of a fill or exit day (spec R3 §3). */
+  transitionDayHours: 23,
+  /** p* diagnostic domain and stopping rules (spec R3 §12). */
+  pStarDomain: [0, 40] as const,
+  pStarStep: 1,
+  pStarResidualEur: 1,
+  pStarBracket: 0.001,
+  pStarMaxBisections: 80,
+} as const;
+
+export const CONTRACT_DEFAULTS = {
+  enabled: true,
+  acceptedMW: 40,
+  eurPerMWHour: 17,
+  auctionMonthOffset: 0,
+  startOffsetFromCod: 1,
+  tenorMonths: 60,
+  sustainHours: 1,
+  recoveryPowerShare: 0.1,
+  peakDayFactor: 2,
+  activationUp: 0.05,
+  activationDown: 0.05,
+  nettingShare: 0.5,
+  balancingPremiumUp: 0,
+  balancingPremiumDown: 0,
+  settlementRegime: "offset" as const,
+  balancingLagMonths: 12,
+  balancingCollection: 1,
+  asPaymentLagMonths: 1,
+  liquidityDays: 3,
+  failureEvents: 2,
+  penaltyHours: 1,
+  bsFeeShare: 0,
+  onHit: "terminated" as const,
+  otherLossRate: 0,
+  standingLoadShare: 0,
+  deductible: true,
+  renewal: false,
+  renewalPrice: 17,
+  renewalTenorMonths: 60,
+};
+
+/** Illustrative award presets by battery duration (spec §3, V03); each is validated against C_max. */
+export const CONTRACT_PRESET_MW: Record<1 | 2 | 4, number> = { 1: 20, 2: 40, 4: 45 };
+
 export const ENGINE = {
   absToleranceMoney: 0.01,
   /** RTE × bought − delivered per month after Float32 storage, MWh at 50 MW (M03); scales with power. */

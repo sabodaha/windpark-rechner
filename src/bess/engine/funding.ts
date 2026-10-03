@@ -8,6 +8,7 @@ import type { OpsResult } from "./operations";
 import { lookup, type Library } from "./library";
 import { FX_ANCHOR_2025, fxMonth, hicpIndex, uaCpiIndex } from "./macro";
 import { CAPEX, FINANCE, OPEX, PRICE_LEVEL_EUR, SPREAD_PATHS } from "./registry";
+import type { ContractPlan } from "./reserves";
 import type { BessInputs, LockedFunding } from "./types";
 
 /** Period interest rates (simple, 30/360 by months) for the debt calendar. */
@@ -48,7 +49,9 @@ export function sculpt(budgets: number[], rates: number[]): { opening: number; c
  * guarantee, fixed in UAH at the contractual COD and not replenished. The peak day is bounded after the price
  * transformation by a safe affine envelope: m·(historical peak purchases) + max(0, L − m·L̄)·(largest daily import).
  */
-export function liquidityReserveUah(inp: BessInputs, lib: Library, cal: Calendar): number {
+/** `daShare` — v1.1a: the DA share σ_a of the contractual-COD month; the purchase envelope scales with it (spec v1.1 R3.1 §3,
+ *  gate-3 amendment G3-10), the balance guarantee does not. 1 without a contract: the v1 value exactly. */
+export function liquidityReserveUah(inp: BessInputs, lib: Library, cal: Calendar, daShare = 1): number {
   const y = cal.months[cal.plannedCodIndex]!.year;
   const m = SPREAD_PATHS[inp.scenario][Math.min(Math.max(y, 2028), 2031) as 2028]! as number;
   const level = PRICE_LEVEL_EUR[Math.min(Math.max(y, 2028), 2031) as 2028]! as number;
@@ -64,7 +67,7 @@ export function liquidityReserveUah(inp: BessInputs, lib: Library, cal: Calendar
     inp.pathCurrency === "EUR"
       ? (m * (peakUah / FX_ANCHOR_2025) + Math.max(0, level - m * meta.avgPriceEUR) * maxDayImport) * hicpIndex(y) * fx
       : (m * peakUah + Math.max(0, level * FX_ANCHOR_2025 - m * meta.avgPriceUAH) * maxDayImport) * uaCpiIndex(y);
-  return FINANCE.liquidityReserveDays * purchasesUah * (1 + CAPEX.vatRate) + OPEX.brpGuaranteeUah;
+  return FINANCE.liquidityReserveDays * purchasesUah * daShare * (1 + CAPEX.vatRate) + OPEX.brpGuaranteeUah;
 }
 
 export interface SizingResult {
@@ -72,15 +75,25 @@ export interface SizingResult {
   ledger: LedgerResult;
 }
 
-export function sizeDebt(inp: BessInputs, opsLender: OpsResult, capex: CapexBuild, cal: Calendar, liqUah: number): SizingResult {
+/** Debt-service budget of a period (R24, spec v1.1 §11): the contract bucket at its DSCR, the merchant bucket at the
+ *  merchant DSCR, a negative bucket subtracted in full. Without a contract C = 0 and this is v1's max(0, CFADS)/DSCR. */
+export function periodBudget(cfadsEur: number, contractEur: number, merchantDscr: number): number {
+  const C = contractEur;
+  const M = cfadsEur - C;
+  return Math.max(0, Math.max(C, 0) / FINANCE.targetDscrContracted + Math.max(M, 0) / merchantDscr - Math.max(-C, 0) - Math.max(-M, 0));
+}
+
+export function sizeDebt(inp: BessInputs, opsLender: OpsResult, capex: CapexBuild, cal: Calendar, liqUah: number, plan: ContractPlan | null = null): SizingResult {
   const rates = periodRates(cal, inp.interestRate);
   let funding: LockedFunding = {
     debtEur: 0, principalEur: new Array(cal.periods.length).fill(0), dsraInitialEur: 0, liquidityReserveUah: liqUah,
     sizingStatus: "failed", iterations: 0,
   };
-  let ledger = runLedger(inp, opsLender, capex, cal, funding);
+  let ledger = runLedger(inp, opsLender, capex, cal, funding, undefined, plan);
   for (let it = 1; it <= FINANCE.sizingMaxIterations; it++) {
-    const budgets = ledger.periods.map((p) => Math.max(0, p.cfadsEur) / inp.targetDscr);
+    const budgets = plan
+      ? ledger.periods.map((p) => periodBudget(p.cfadsEur, p.cfadsContractEur, inp.targetDscr))
+      : ledger.periods.map((p) => Math.max(0, p.cfadsEur) / inp.targetDscr);
     const { opening, closing } = sculpt(budgets, rates);
     const cap = inp.maxGearing * ledger.usesExVatEur;
     const target = Math.max(0, Math.min(opening, cap));
@@ -101,10 +114,10 @@ export function sizeDebt(inp: BessInputs, opsLender: OpsResult, capex: CapexBuil
         debtEur: target, principalEur: principalT, dsraInitialEur: ds1T, liquidityReserveUah: liqUah,
         sizingStatus: "converged", iterations: it,
       };
-      ledger = runLedger(inp, opsLender, capex, cal, funding);
+      ledger = runLedger(inp, opsLender, capex, cal, funding, undefined, plan);
       break;
     }
-    ledger = runLedger(inp, opsLender, capex, cal, funding);
+    ledger = runLedger(inp, opsLender, capex, cal, funding, undefined, plan);
   }
   return { funding, ledger };
 }

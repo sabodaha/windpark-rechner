@@ -9,12 +9,16 @@ import type { CapexBuild } from "./capex";
 import { fxMonth } from "./macro";
 import type { OpsResult } from "./operations";
 import { CAPEX, ENGINE, FINANCE, MACRO, TAX } from "./registry";
+import { reserveLedger, type ReserveLedger } from "./reserve-ledger";
+import type { ContractPlan } from "./reserves";
 import type { BessInputs, LockedFunding } from "./types";
 
 export interface PeriodRow {
   day: number;
   lastMonth: number;
   cfadsEur: number;
+  /** v1.1a: the contract bucket of the period (EUR); 0 without a contract (spec v1.1 §11). */
+  cfadsContractEur: number;
   debtServiceEur: number;
   interestEur: number;
   principalEur: number;
@@ -80,6 +84,11 @@ export interface LedgerResult {
   dividendsDeclaredUah: number;
   vintageCapacityUah: number;
   receivablesWrittenOffUah: number;
+  /** v1.1a: the reserve's ledger arrays and the contract bucket after its share of cash tax (UAH per month). */
+  reserve: ReserveLedger | null;
+  contractCfadsUah: number[];
+  /** v1.1a: the contract weight w_C of each tax assessment, keyed "year-quarter" (spec v1.1 §11). */
+  taxWeights: Record<string, number>;
   monthly: {
     opCashUah: number[];
     taxPaidUah: number[];
@@ -97,6 +106,16 @@ export interface LedgerResult {
  *  cumulative quarterly. Q1–Q3 are paid 50 days after the quarter (2nd month after), the year (and Q4) with the annual
  *  return in March; an overpayment is credited against later payments. The tax expense accrues monthly on the cumulative
  *  profit of the year. */
+export interface TaxEvent {
+  month: number;
+  /** Assessment (tax year and quarter; 4 for the annual settlement) of the amount due. */
+  y: number;
+  q: number;
+  due: number;
+  /** Earlier overpayments used against it, oldest first, with their own assessments (FIFO). */
+  uses: { amount: number; y: number; q: number }[];
+}
+
 export function taxSchedule(cal: Calendar, pbt: number[], revenue: number[]) {
   const n = cal.months.length;
   const last = n - 1;
@@ -105,6 +124,9 @@ export function taxSchedule(cal: Calendar, pbt: number[], revenue: number[]) {
   const taxable = new Map<number, number>();
   /** Month index by which a year's tax is settled (annual payment). */
   const settledBy = new Map<number, number>();
+  /** Every payment with its assessment, for the v1.1a allocation of cash tax to the debt buckets (spec v1.1 §11). */
+  const events: TaxEvent[] = [];
+  const credits: { amount: number; y: number; q: number }[] = [];
   let lcf = 0;
   let credit = 0;
   const monthIdx = new Map(cal.months.map((m) => [`${m.year}-${m.month}`, m.index]));
@@ -113,10 +135,21 @@ export function taxSchedule(cal: Calendar, pbt: number[], revenue: number[]) {
     const mm = mo > 12 ? mo - 12 : mo;
     return Math.min(monthIdx.get(`${yy}-${mm}`) ?? last, last);
   };
-  const settle = (i: number, due: number) => {
+  const settle = (i: number, due: number, y: number, q: number) => {
     const use = Math.min(credit, due);
     credit -= use;
     pay[i]! += due - use;
+    const uses: TaxEvent["uses"] = [];
+    let left = use;
+    while (left > 1e-12 && credits.length) {
+      const c0 = credits[0]!;
+      const take = Math.min(c0.amount, left);
+      uses.push({ amount: take, y: c0.y, q: c0.q });
+      c0.amount -= take;
+      left -= take;
+      if (c0.amount <= 1e-12) credits.shift();
+    }
+    events.push({ month: i, y, q, due, uses });
   };
   const years = [...new Set(cal.months.map((m) => m.year))];
   for (const y of years) {
@@ -127,6 +160,9 @@ export function taxSchedule(cal: Calendar, pbt: number[], revenue: number[]) {
     let ytd = 0;
     let liabilityPrev = 0;
     let accruedPrev = 0;
+    /** The year's positive assessments still open to reversal, oldest first: a reversal turns them into credits that keep
+     *  their own assessment (spec v1.1 §11: reversals and overpayments keep the original weights, FIFO). */
+    const open: { amount: number; y: number; q: number }[] = [];
     for (let q = 1; q <= 4; q++) {
       const qMonths = inYear.filter((m) => Math.ceil(m.month / 3) === q);
       if (qMonths.length === 0) continue;
@@ -141,16 +177,31 @@ export function taxSchedule(cal: Calendar, pbt: number[], revenue: number[]) {
       const due = liability - liabilityPrev;
       liabilityPrev = liability;
       if (quarterly) {
-        if (due < 0) credit += -due;
-        else settle(q === 4 ? at(y + 1, 3) : at(y, q * 3 + 2), due);
+        if (due < 0) {
+          credit += -due;
+          let left = -due;
+          while (left > 1e-12 && open.length) {
+            const a = open[0]!;
+            const take = Math.min(a.amount, left);
+            credits.push({ amount: take, y: a.y, q: a.q });
+            a.amount -= take;
+            left -= take;
+            if (a.amount <= 1e-12) open.shift();
+          }
+          // a year's dues never sum below zero, so nothing is left; kept for safety with the reversal's own assessment
+          if (left > 1e-12) credits.push({ amount: left, y, q });
+        } else {
+          settle(q === 4 ? at(y + 1, 3) : at(y, q * 3 + 2), due, y, q);
+          if (due > 0) open.push({ amount: due, y, q });
+        }
       }
     }
-    if (!quarterly && liabilityPrev > 0) settle(at(y + 1, 3), liabilityPrev);
+    if (!quarterly && liabilityPrev > 0) settle(at(y + 1, 3), liabilityPrev, y, 4);
     settledBy.set(y, at(y + 1, 3));
     taxable.set(y, Math.max(0, ytd - lcfOpen));
     lcf = ytd < 0 ? lcfOpen - ytd : Math.max(0, lcfOpen - ytd);
   }
-  return { pay, expense, taxable, settledBy };
+  return { pay, expense, taxable, settledBy, events };
 }
 
 interface Construction {
@@ -252,7 +303,7 @@ const TAX_MIN_LIFE_MONTHS = 60; // Tax Code 138.3.3: group 4 (machines and equip
 
 /** `projectReserveUah` — the liquidity reserve of the unlevered project view, sized for this case's own inputs even when
  *  the funding is locked (S1.3, U10). */
-export function runLedger(inp: BessInputs, ops: OpsResult, capex: CapexBuild, cal: Calendar, f: LockedFunding, projectReserveUah = f.liquidityReserveUah): LedgerResult {
+export function runLedger(inp: BessInputs, ops: OpsResult, capex: CapexBuild, cal: Calendar, f: LockedFunding, projectReserveUah = f.liquidityReserveUah, plan: ContractPlan | null = null): LedgerResult {
   const months = cal.months;
   const n = months.length;
   const last = n - 1;
@@ -343,8 +394,40 @@ export function runLedger(inp: BessInputs, ops: OpsResult, capex: CapexBuild, ca
       pnlOperating[i]! -= writtenOff;
     }
   });
-  const revenue = om.map((o) => o.salesUah);
-  const unlev = taxSchedule(cal, pnlOperating.map((v, i) => v - depUnlev[i]!), revenue);
+  // v1.1a: the reserve's accruals and operating cash join the company's (spec v1.1 §9–§10); without a contract the v1
+  // arrays are untouched
+  const rl = plan ? reserveLedger(inp, ops, cal, plan, fx) : null;
+  if (rl) for (let i = 0; i < n; i++) {
+    pnlOperating[i]! += rl.pnl[i]!;
+    opCash[i]! += rl.cash[i]!;
+  }
+  const revenue = rl ? om.map((o, i) => o.salesUah + rl.revenue[i]!) : om.map((o) => o.salesUah);
+  const taxBase = (v: number[]) => (rl ? v.map((x, i) => x + rl.taxAdd[i]!) : v);
+  const unlev = taxSchedule(cal, taxBase(pnlOperating.map((v, i) => v - depUnlev[i]!)), revenue);
+  /** Contract weight of an assessment (spec v1.1 §11): positive YTD accrual EBITDA of the contract bucket against the
+   *  merchant bucket; with no positive EBITDA, the initial award's time-weighted resource share. */
+  const weights = new Map<string, number>();
+  const contractWeight = (y: number, q: number): number => {
+    if (!rl) return 0;
+    const key = `${y}-${q}`;
+    const hit = weights.get(key);
+    if (hit !== undefined) return hit;
+    let eC = 0;
+    let eT = 0;
+    let sz = 0;
+    let cnt = 0;
+    for (const mm of months) {
+      if (mm.year !== y || mm.month > q * 3) continue;
+      eC += rl.contractEbitda[mm.index]!;
+      eT += pnlOperating[mm.index]!;
+      sz += rl.sigmaZ[mm.index]!;
+      cnt += 1;
+    }
+    const den = Math.max(0, eC) + Math.max(0, eT - eC);
+    const w = den > 0 ? Math.max(0, eC) / den : cnt ? sz / cnt : 0;
+    weights.set(key, w);
+    return w;
+  };
 
   // FX differences and interest on arrears depend on the waterfall: iterate the tax pass on the previous pass
   let fxDiff = new Array(n).fill(0) as number[];
@@ -352,7 +435,17 @@ export function runLedger(inp: BessInputs, ops: OpsResult, capex: CapexBuild, ca
   let out: LedgerResult | null = null;
   for (let pass = 0; pass < 6; pass++) {
     const pbt = months.map((_m, i) => pnlOperating[i]! - dep[i]! - interestEur[i]! * fx[i]! + fxDiff[i]!);
-    const tax = taxSchedule(cal, pbt, revenue);
+    const tax = taxSchedule(cal, taxBase(pbt), revenue);
+    // the contract bucket's cash tax: each payment at its assessment's weight, net of earlier credits at theirs (FIFO)
+    const cTax = new Array(n).fill(0) as number[];
+    if (rl) {
+      for (const ev of tax.events) {
+        cTax[ev.month]! += contractWeight(ev.y, ev.q) * ev.due;
+        for (const u of ev.uses) cTax[ev.month]! -= contractWeight(u.y, u.q) * u.amount;
+      }
+    }
+    const contractCfads = new Array(n).fill(0) as number[];
+    let periodC = 0;
     const fxD = new Array(n).fill(0) as number[];
     const intD = new Array(n).fill(0) as number[];
 
@@ -465,11 +558,12 @@ export function runLedger(inp: BessInputs, ops: OpsResult, capex: CapexBuild, ca
           if (dsra < target - 0.01) dsraShort = true;
           if (dscr !== null) dscrs.push(dscr);
           periods.push({
-            day: m.start, lastMonth: i - 1, cfadsEur: periodCfads, debtServiceEur: scheduledDs, interestEur: interestPaid,
-            principalEur: principalPaid, openingEur: opening, dscr, dsraDrawEur: draw, shortfallEur: due - paid,
-            lockedUp: false,
+            day: m.start, lastMonth: i - 1, cfadsEur: periodCfads, cfadsContractEur: periodC, debtServiceEur: scheduledDs,
+            interestEur: interestPaid, principalEur: principalPaid, openingEur: opening, dscr, dsraDrawEur: draw,
+            shortfallEur: due - paid, lockedUp: false,
           });
           periodCfads = 0;
+          periodC = 0;
           if (i === maturityPay) debtAfterMaturity = debt;
         }
       }
@@ -550,6 +644,19 @@ export function runLedger(inp: BessInputs, ops: OpsResult, capex: CapexBuild, ca
       taxLiab += tax.expense[i]! - taxPaid;
       if (i >= pc) periodCfads += (opCash[i]! - taxPaid) / x;
       if (i >= cod) cfadsM.push({ day: m.last, amount: (opCash[i]! - taxPaid) / x });
+      // v1.1a: sponsor equity for the escrow, the contract liquidity reserve and the fill; restricted cash moves; the
+      // contract bucket of the month after its share of cash tax (outside operating CFADS: equity and restricted cash)
+      if (rl) {
+        const eq = rl.equityCall[i]!;
+        if (eq > 0) {
+          cash += eq;
+          shareCap += eq;
+          investor.push({ day: m.last, amount: -eq / x });
+        }
+        cash += rl.restrictedIn[i]! - rl.restrictedOut[i]!;
+        contractCfads[i] = rl.contractCash[i]! - cTax[i]!;
+        if (i >= pc) periodC += contractCfads[i]! / x;
+      }
 
       // 6. the DSRA is kept at the next debt service: topped up from cash every month until the loan matures
       if (D > 0 && i >= pc && i < maturityPay && debt <= sched[i]! + 0.01) {
@@ -578,6 +685,7 @@ export function runLedger(inp: BessInputs, ops: OpsResult, capex: CapexBuild, ca
         cash -= settle;
         taxLiab -= settle;
         mTax[i]! += settle;
+        if (rl) contractCfads[i]! -= contractWeight(m.year, 4) * settle;
         // the final year's tax is settled now, so its profit may be distributed
         const finalDiv = Math.max(0, Math.min(cash - payable - Math.max(0, shareCap), re, capacity(i)));
         if (finalDiv > 1e-8) {
@@ -626,8 +734,13 @@ export function runLedger(inp: BessInputs, ops: OpsResult, capex: CapexBuild, ca
       mDsra[i] = dsra;
       mRe[i] = re;
       if (i < last) {
-        const assets = ppe - accDep + cash + dsra * x + liq + vatRec + cRec + sRec + Math.max(0, -taxLiab);
-        const liabilities = (debt + accrued) * x + Math.max(0, taxLiab) + payable;
+        let assets = ppe - accDep + cash + dsra * x + liq + vatRec + cRec + sRec + Math.max(0, -taxLiab);
+        let liabilities = (debt + accrued) * x + Math.max(0, taxLiab) + payable;
+        if (rl) {
+          // v1.1a balances: restricted escrow and liquidity reserve, stock at cost, AS/BSP claims and debts, VAT
+          assets += rl.escrow[i]! + rl.liquidity[i]! + rl.inventory[i]! + rl.arAs[i]! + rl.arBsp[i]! + Math.max(0, -rl.vat[i]!);
+          liabilities += rl.apAs[i]! + rl.apBsp[i]! + Math.max(0, rl.vat[i]!);
+        }
         maxErr = Math.max(maxErr, Math.abs(assets - liabilities - (shareCap + re)));
       }
     }
@@ -642,7 +755,9 @@ export function runLedger(inp: BessInputs, ops: OpsResult, capex: CapexBuild, ca
     const post: DatedFlowRow[] = [];
     for (let i = 0; i < n; i++) {
       const x = fx[i]!;
-      const v = -c.capexEur[i]! - c.vatPaidUah[i]! / x + c.vatRefundUah[i]! / x + opCash[i]! / x;
+      let v = -c.capexEur[i]! - c.vatPaidUah[i]! / x + c.vatRefundUah[i]! / x + opCash[i]! / x;
+      // v1.1a: the unlevered project funds the escrow and the contract liquidity reserve itself (spec v1.1 §13)
+      if (rl) v += (rl.restrictedIn[i]! - rl.restrictedOut[i]!) / x;
       const vTax = v - unlev.pay[i]! / x;
       if (v !== 0) pre.push({ day: months[i]!.last, amount: v });
       if (vTax !== 0) post.push({ day: months[i]!.last, amount: vTax });
@@ -662,6 +777,7 @@ export function runLedger(inp: BessInputs, ops: OpsResult, capex: CapexBuild, ca
       dsraShortAfterTopUp: dsraShort, repatriationCapBound: capBound, remittanceTailMonths: tailMonths,
       blockedAtEndEur: blockedEur, thinCapMax, dividendsDeclaredUah: declared, vintageCapacityUah: vintageCap,
       receivablesWrittenOffUah: writtenOff, tail, heldAtEndUah, dividendAllocations: allocations,
+      reserve: rl, contractCfadsUah: contractCfads, taxWeights: Object.fromEntries(weights),
       monthly: { opCashUah: mOp, taxPaidUah: mTax, dsUah: mDs, divGrossUah: mDiv, investorNetEur: mInv, cashUah: mCash, dsraEur: mDsra, retainedUah: mRe, fx },
     };
     if (converged) break;
