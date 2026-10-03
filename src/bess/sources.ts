@@ -117,7 +117,7 @@ export const BESS_SOURCES: Record<string, BessSource> = {
     group: "reserves",
   },
   lazardLcos: {
-    title: "Lazard: Levelized Cost of Energy+ (storage), 2025",
+    title: "Lazard: Levelized Cost of Energy+ (storage), 2026 (LCOS v11)",
     url: "https://www.lazard.com/media/kcfconhf/lazards-lcoeplus_vf.pdf",
     date: "2026-10-01",
     used: "Round-trip efficiency of 87–91% for two-hour systems; extended warranty costs.",

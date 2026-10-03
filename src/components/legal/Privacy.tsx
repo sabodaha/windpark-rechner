@@ -5,6 +5,7 @@ import { Placeholder } from "@/components/site/Placeholder";
 import type { Locale } from "@/lib/i18n";
 import { CONTACT, PAGE_PATHS, SITE } from "@/lib/site";
 import { bessEn } from "@/bess/messages";
+import { DE_STORAGE_KEY } from "@/bess/de/url-state";
 import { BESS_STORAGE_KEY } from "@/bess/url-state";
 import { STORAGE_KEY } from "@/lib/url-state";
 import { MESSAGES } from "@/messages";
@@ -35,13 +36,14 @@ export function PrivacyEn() {
       <h2 id="en-summary">In short</h2>
       <p>
         This site sets no cookies, uses no analytics or tracking and loads no content from third parties; its fonts are
-        served from this site. There is no contact form. The <Link href={PAGE_PATHS.en.calculator}>wind farm</Link> and{" "}
-        <Link href={PAGE_PATHS.en.bess}>battery storage</Link> calculators run entirely in your browser: what you enter is
+        served from this site. There is no contact form. The <Link href={PAGE_PATHS.en.calculator}>wind farm</Link> and the
+        battery storage calculators for <Link href={PAGE_PATHS.en.bess}>Ukraine</Link> and{" "}
+        <Link href={PAGE_PATHS.en.bessDe}>Germany</Link> run entirely in your browser: what you enter is
         calculated there and not sent to the server. Only when an address that contains inputs is loaded — when you, or
         someone you shared it with, open or reload a calculator link with inputs after the “?” — does that address, inputs
-        included, reach the server like any page address (see “Hosting and server logs”). When you change an input of the
-        battery storage calculator, your browser downloads its revenue data, a file of this site; that request contains
-        no inputs.
+        included, reach the server like any page address (see “Hosting and server logs”). When you change an input of a
+        battery storage calculator, your browser downloads its revenue data, a file of this site; with your own inputs, the
+        German calculator’s comparison tab also downloads the Ukrainian revenue data. These requests contain no inputs.
       </p>
 
       <h2 id="en-controller">Controller</h2>
@@ -66,7 +68,8 @@ export function PrivacyEn() {
       <p>
         Only if you tick “{MESSAGES.en.actions.remember}” in a calculator does it keep your latest inputs in your
         browser’s local storage (key <code>{STORAGE_KEY}</code> for the wind farm calculator,{" "}
-        <code>{BESS_STORAGE_KEY}</code> for the battery storage calculator), so they are still there on your next visit;
+        <code>{BESS_STORAGE_KEY}</code> and <code>{DE_STORAGE_KEY}</code> for the battery storage calculators for Ukraine
+        and Germany), so they are still there on your next visit;
         without the tick nothing is stored. Local storage itself is never sent to the server; a calculator address with inputs reaches
         the server only when it is loaded, as described above. The stored inputs are deleted when you untick the box or
         clear this site’s data in your browser. Legal basis: § 25 (2) no. 2 TDDDG — storage you have expressly asked for.
@@ -118,13 +121,15 @@ export function PrivacyDe({ standalone = false }: { standalone?: boolean }) {
       <H id={standalone ? "de-summary" : undefined}>Kurz gesagt</H>
       <p>
         Diese Website setzt keine Cookies, nutzt keine Analyse- oder Tracking-Dienste und lädt keine Inhalte von Dritten;
-        die Schriften werden von dieser Website geladen. Es gibt kein Kontaktformular. Der {calculator} und der
-        Batteriespeicher-Rechner (auf Englisch) laufen vollständig in Ihrem Browser: Ihre Eingaben werden dort berechnet
+        die Schriften werden von dieser Website geladen. Es gibt kein Kontaktformular. Der {calculator} und die
+        Batteriespeicher-Rechner für die Ukraine und Deutschland (auf Englisch) laufen vollständig in Ihrem Browser: Ihre
+        Eingaben werden dort berechnet
         und nicht an den Server übertragen. Nur wenn eine Adresse mit Eingaben aufgerufen wird – wenn Sie oder eine Person,
         an die Sie den Link weitergegeben haben, einen Rechner-Link mit Eingaben nach dem „?“ öffnen oder neu laden –,
         erreicht diese Adresse samt Eingaben den Server wie jede Seitenadresse (siehe „Hosting und Server-Logfiles“). Ändern
-        Sie eine Eingabe im Batteriespeicher-Rechner, lädt Ihr Browser dessen Erlösdaten, eine Datei dieser Website; diese
-        Anfrage enthält keine Eingaben.
+        Sie eine Eingabe in einem Batteriespeicher-Rechner, lädt Ihr Browser dessen Erlösdaten, eine Datei dieser Website;
+        mit eigenen Eingaben lädt der Vergleichsreiter des Rechners für Deutschland zusätzlich die ukrainischen Erlösdaten.
+        Diese Anfragen enthalten keine Eingaben.
       </p>
 
       <H id={standalone ? "de-controller" : undefined}>Verantwortlicher</H>
@@ -152,7 +157,8 @@ export function PrivacyDe({ standalone = false }: { standalone?: boolean }) {
         Nur wenn Sie im Rechner „{remember}“ anhaken
         {standalone && <> (im Batteriespeicher-Rechner „{bessEn.actions.remember}“)</>}, speichert er Ihre zuletzt
         verwendeten Eingaben im lokalen Speicher Ihres Browsers (Schlüssel <code>{STORAGE_KEY}</code> für den
-        Windpark-Rechner, <code>{BESS_STORAGE_KEY}</code> für den Batteriespeicher-Rechner), damit sie beim nächsten Besuch
+        Windpark-Rechner, <code>{BESS_STORAGE_KEY}</code> und <code>{DE_STORAGE_KEY}</code> für die Batteriespeicher-Rechner
+        für die Ukraine und Deutschland), damit sie beim nächsten Besuch
         erhalten bleiben; ohne den Haken wird nichts gespeichert. Der lokale Speicher selbst wird nicht an den Server
         übertragen; eine Rechner-Adresse mit Eingaben erreicht den Server nur beim Aufruf, wie oben beschrieben. Die gespeicherten Eingaben werden gelöscht,
         wenn Sie den Haken entfernen oder die Websitedaten in Ihrem Browser löschen. Rechtsgrundlage ist §&nbsp;25

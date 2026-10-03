@@ -3,7 +3,8 @@
 import { ChevronDown, Info, RotateCcw, TriangleAlert } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import type { BessInputs } from "@/bess/engine";
-import { BESS_FIELDS, BESS_GROUPS, baseValue, type BessFieldDef, type BessFieldValue, type BessGroupId, fromDisplay, sameValue, toDisplay } from "@/bess/fields";
+import { baseValue, type FieldDef, type FieldValue, fromDisplay, sameValue, toDisplay } from "@/bess/field-kit";
+import { BESS_FIELDS, BESS_GROUPS, type BessGroupId } from "@/bess/fields";
 import type { BessMessages } from "@/bess/messages";
 import { BESS_SOURCES } from "@/bess/sources";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -13,28 +14,54 @@ import { Switch } from "@/components/ui/switch";
 import { useFormat } from "@/components/site/LocaleProvider";
 import { cn } from "@/lib/utils";
 
-type OnChange = (f: BessFieldDef, v: BessFieldValue) => void;
-
-interface Props {
-  inputs: BessInputs;
-  base: BessInputs;
-  onChange: OnChange;
-  t: BessMessages;
+/** The texts an input panel needs: group titles, field labels and hints, option and unit names. */
+export interface InputTexts {
+  groups: Record<string, string>;
+  inputs: { less: string; more: string; sources: string; source: string; assumption: string; help: (label: string) => string; reset: string; outsideUsual: string };
+  fields: Record<string, { label: string; hint?: string } | undefined>;
+  options: Record<string, Record<string, string> | undefined>;
+  units: Record<string, string | undefined>;
 }
 
-export function BessInputsPanel({ inputs, base, onChange, t }: Props) {
+/** A source a field cites (the calculator's source list). */
+export interface FieldSource {
+  url: string;
+  title: string;
+  date: string;
+}
+
+type OnChange<I> = (f: FieldDef<I>, v: FieldValue) => void;
+
+interface PanelProps<I> {
+  inputs: I;
+  base: I;
+  onChange: OnChange<I>;
+  t: InputTexts;
+  fields: FieldDef<I>[];
+  groups: readonly string[];
+  sources: Record<string, FieldSource | undefined>;
+}
+
+/** The Ukrainian calculator's panel. */
+export function BessInputsPanel({ inputs, base, onChange, t }: { inputs: BessInputs; base: BessInputs; onChange: OnChange<BessInputs>; t: BessMessages }) {
+  return <InputsPanel<BessInputs> inputs={inputs} base={base} onChange={onChange} t={t} fields={BESS_FIELDS} groups={BESS_GROUPS satisfies BessGroupId[]} sources={BESS_SOURCES} />;
+}
+
+/** Inputs by group: quick fields first, the rest behind "More"; any calculator's fields, texts and sources. */
+export function InputsPanel<I>(props: PanelProps<I>) {
   return (
-    <Accordion type="multiple" defaultValue={[...BESS_GROUPS]} className="w-full">
-      {BESS_GROUPS.map((g) => (
-        <Group key={g} group={g} inputs={inputs} base={base} onChange={onChange} t={t} />
+    <Accordion type="multiple" defaultValue={[...props.groups]} className="w-full">
+      {props.groups.map((g) => (
+        <Group key={g} group={g} {...props} />
       ))}
     </Accordion>
   );
 }
 
-function Group({ group, inputs, base, onChange, t }: Props & { group: BessGroupId }) {
+function Group<I>({ group, ...props }: PanelProps<I> & { group: string }) {
+  const { inputs, base, onChange, t } = props;
   const [more, setMore] = useState(false);
-  const fields = BESS_FIELDS.filter((f) => f.group === group && !(f.hidden?.(inputs) ?? false));
+  const fields = props.fields.filter((f) => f.group === group && !(f.hidden?.(inputs) ?? false));
   const quick = fields.filter((f) => f.quick);
   const advanced = fields.filter((f) => !f.quick);
   const changed = fields.filter((f) => !sameValue(f.get(inputs), baseValue(f, inputs, base))).length;
@@ -53,7 +80,7 @@ function Group({ group, inputs, base, onChange, t }: Props & { group: BessGroupI
       </AccordionTrigger>
       <AccordionContent className="pb-2">
         {shown.map((f) => (
-          <FieldControl key={f.id} field={f} inputs={inputs} base={base} onChange={onChange} t={t} />
+          <FieldControl key={f.id} field={f} {...props} />
         ))}
         {hidden.length > 0 && (
           <>
@@ -69,7 +96,7 @@ function Group({ group, inputs, base, onChange, t }: Props & { group: BessGroupI
             {more && (
               <div className="mt-1 border-l-2 border-border pl-3">
                 {hidden.map((f) => (
-                  <FieldControl key={f.id} field={f} inputs={inputs} base={base} onChange={onChange} t={t} />
+                  <FieldControl key={f.id} field={f} {...props} />
                 ))}
               </div>
             )}
@@ -80,7 +107,7 @@ function Group({ group, inputs, base, onChange, t }: Props & { group: BessGroupI
   );
 }
 
-function SourcesNote({ field, t }: { field: BessFieldDef; t: BessMessages }) {
+function SourcesNote<I>({ field, t, sources }: { field: FieldDef<I>; t: InputTexts; sources: Record<string, FieldSource | undefined> }) {
   const f = useFormat();
   const keys = field.sources ?? [];
   if (keys.length === 0) return null;
@@ -89,7 +116,7 @@ function SourcesNote({ field, t }: { field: BessFieldDef; t: BessMessages }) {
       <div className="mb-1 font-medium text-muted-foreground">{keys.length > 1 ? t.inputs.sources : t.inputs.source}</div>
       <ul className="space-y-1">
         {keys.map((k) => {
-          const s = BESS_SOURCES[k];
+          const s = sources[k];
           if (k === "assumption" || !s)
             return (
               <li key={k} className="text-muted-foreground">
@@ -110,7 +137,7 @@ function SourcesNote({ field, t }: { field: BessFieldDef; t: BessMessages }) {
   );
 }
 
-function FieldHelp({ field, t, label }: { field: BessFieldDef; t: BessMessages; label: string }) {
+function FieldHelp<I>({ field, t, label, sources }: { field: FieldDef<I>; t: InputTexts; label: string; sources: Record<string, FieldSource | undefined> }) {
   const hint = t.fields[field.id]?.hint;
   return (
     <Popover>
@@ -123,13 +150,13 @@ function FieldHelp({ field, t, label }: { field: BessFieldDef; t: BessMessages; 
       <PopoverContent>
         <div className="font-medium">{label}</div>
         {hint && <p className="mt-1 text-muted-foreground">{hint}</p>}
-        <SourcesNote field={field} t={t} />
+        <SourcesNote field={field} t={t} sources={sources} />
       </PopoverContent>
     </Popover>
   );
 }
 
-function FieldControl({ field: f, inputs, base, onChange, t }: Props & { field: BessFieldDef }) {
+function FieldControl<I>({ field: f, inputs, base, onChange, t, sources }: PanelProps<I> & { field: FieldDef<I> }) {
   const id = useId();
   const label = t.fields[f.id]?.label ?? f.id;
   const value = f.get(inputs);
@@ -141,7 +168,7 @@ function FieldControl({ field: f, inputs, base, onChange, t }: Props & { field: 
         <label id={`${id}-label`} htmlFor={id} className="min-w-0 flex-1 text-[13px] leading-snug text-foreground">
           {label}
         </label>
-        <FieldHelp field={f} t={t} label={label} />
+        <FieldHelp field={f} t={t} label={label} sources={sources} />
         {changed && (
           <button
             type="button"
@@ -176,7 +203,7 @@ function FieldControl({ field: f, inputs, base, onChange, t }: Props & { field: 
   );
 }
 
-const display = (f: BessFieldDef, v: number, intl: string) =>
+const display = <I,>(f: FieldDef<I>, v: number, intl: string) =>
   new Intl.NumberFormat(intl, { minimumFractionDigits: 0, maximumFractionDigits: f.decimals ?? 2, useGrouping: false }).format(v);
 
 /** Accepts "1.5", "1,5" and "1 500" regardless of locale. */
@@ -187,7 +214,7 @@ function parseNumber(text: string): number | null {
   return Number.isFinite(v) ? v : null;
 }
 
-function NumberInput({
+function NumberInput<I>({
   id,
   field: f,
   value,
@@ -196,10 +223,10 @@ function NumberInput({
   changed,
 }: {
   id: string;
-  field: BessFieldDef;
+  field: FieldDef<I>;
   value: number;
-  onChange: OnChange;
-  t: BessMessages;
+  onChange: OnChange<I>;
+  t: InputTexts;
   changed: boolean;
 }) {
   const intl = useFormat().intl;

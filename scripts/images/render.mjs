@@ -74,6 +74,7 @@ const jobs = [
   ["og.html", join(root, "public", "og.png"), 1200, 630, true],
   ["og.de.html", join(root, "public", "og-de.png"), 1200, 630, true],
   ["og-bess.html", join(root, "public", "og-bess.png"), 1200, 630, true],
+  ["og-bess-de.html", join(root, "public", "og-bess-de.png"), 1200, 630, true],
   ["apple-icon.html", join(root, "src", "app", "apple-icon.png"), 180, 180, false],
 ];
 for (const [template, out, width, height, inter] of jobs) {

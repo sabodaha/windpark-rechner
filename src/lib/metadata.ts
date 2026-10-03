@@ -32,6 +32,7 @@ export type OgImage = (typeof OG_IMAGE)[Locale];
 
 /** The sharing image of the battery storage pages (scripts/images/og-bess.html). */
 export const BESS_OG_IMAGE: OgImage = { url: "/og-bess.png", width: 1200, height: 630, alt: "Igor Sabodakha — Battery Storage Investment Calculator" };
+export const BESS_DE_OG_IMAGE: OgImage = { url: "/og-bess-de.png", width: 1200, height: 630, alt: "Igor Sabodakha — Battery Storage Investment Calculator, Germany" };
 
 /** The language of a page follows from its address (PAGE_PATHS); its hreflang alternates too. */
 export function pageMetadata({

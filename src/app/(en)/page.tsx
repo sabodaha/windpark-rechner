@@ -216,6 +216,9 @@ export default function Home() {
             <Link href={PATHS.bessSources} className="text-link hover:underline">
               All sources →
             </Link>
+            <Link href={PATHS.bessDe} className="text-link hover:underline">
+              The same battery in Germany →
+            </Link>
           </div>
         </div>
       </section>

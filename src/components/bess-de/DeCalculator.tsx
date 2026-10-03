@@ -2,11 +2,15 @@
 
 import { Check, CircleAlert, Link2, RotateCcw, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
-import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
-import { BESS_DATA_AS_OF, BESS_SPEC_REVISION, type PriceStats } from "@/bess/data";
-import { BESS_BASE } from "@/bess/engine";
-import { BESS_FIELDS } from "@/bess/fields";
-import { bessEn } from "@/bess/messages";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { DE_DATA_AS_OF, DE_SPEC_REVISION, type DePriceStats } from "@/bess/de/data";
+import { DE_FIELDS, DE_GROUPS } from "@/bess/de/fields";
+import { deEn } from "@/bess/de/messages";
+import { DE_BASE } from "@/bess/de/registry";
+import { DE_SOURCES } from "@/bess/de/sources";
+import type { DeInputs } from "@/bess/de/types";
+import { InputsPanel } from "@/components/bess/BessInputs";
+import { MarketSwitch } from "@/components/bess/MarketSwitch";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,52 +18,47 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFormat } from "@/components/site/LocaleProvider";
 import { PATHS } from "@/lib/site";
-import { BessBattery } from "./BessBattery";
-import { BessChecks } from "./BessChecks";
-import { BessContract, StatusCard } from "./BessContract";
-import { BessDebt } from "./BessDebt";
-import { BessInputsPanel } from "./BessInputs";
-import { BessKpis } from "./BessKpis";
-import { BessOverview } from "./BessOverview";
-import { BessRevenue } from "./BessRevenue";
-import { BessRisks } from "./BessRisks";
-import { BessSensitivity } from "./BessSensitivity";
-import { BessTable } from "./BessTable";
-import { ContractCard } from "./ContractCard";
-import { MarketSwitch } from "./MarketSwitch";
-import { blockedStatus } from "./contractText";
-import { type BessInitial, useBessCalculator } from "./useBessCalculator";
-import { WhatItTakes } from "./WhatItTakes";
+import { DeBreakEven } from "./DeBreakEven";
+import { DeChecks } from "./DeChecks";
+import { DeCompare } from "./DeCompare";
+import { DeDebt } from "./DeDebt";
+import { DeKpis } from "./DeKpis";
+import { DeOverview } from "./DeOverview";
+import { DeRevenue } from "./DeRevenue";
+import { DeSensitivity } from "./DeSensitivity";
+import { DeTables } from "./DeTables";
+import { DeToll } from "./DeToll";
+import { type DeInitial, useDeCalculator } from "./useDeCalculator";
 
-type Tab = keyof typeof bessEn.tabs;
+type Tab = keyof typeof deEn.tabs;
 
-/** The contract switch (spec v1.1 §15): the first screen's card turns it on. */
-const CONTRACT_FIELD = BESS_FIELDS.find((f) => f.id === "ctr")!;
-/** The reserve contract's chart colour, a sixth categorical series. Scoped to this calculator: the shared stylesheet
- *  is also what the wind farm's published PDF report is printed from. */
-const CONTRACT_SERIES = { "--series-6": "#7c5cc4" } as CSSProperties;
-/** Tabs that still mean something when a contract case has no result: why not, and the checks behind it. */
-const WITHOUT_RESULT: Tab[] = ["contract", "checks"];
+/** Tabs that still mean something when a case has no result: the comparison (fixed rows) and the checks behind it. */
+const WITHOUT_RESULT: Tab[] = ["compare", "checks"];
 
 interface Props {
-  initial: BessInitial;
-  /** Price statistics per snapshot (derived; ua-stats). */
-  stats: Record<string, PriceStats>;
+  initial: DeInitial;
+  /** Price statistics per snapshot (derived; de-stats). */
+  stats: Record<string, DePriceStats>;
   libraryVersion: number;
 }
 
-export function BessCalculator({ initial, stats, libraryVersion }: Props) {
-  const t = bessEn;
+export function DeCalculator({ initial, stats, libraryVersion }: Props) {
+  const t = deEn;
   const f = useFormat();
-  const calc = useBessCalculator(initial);
+  const calc = useDeCalculator(initial);
   const { core, inputs } = calc;
   const [tab, setTab] = useState<Tab>("overview");
   const [copied, setCopied] = useState(false);
   // a soft note once the price data is more than two months old (the static page cannot know today's date)
   const [oldData, setOldData] = useState(false);
-  useEffect(() => setOldData(Date.now() - Date.parse(BESS_DATA_AS_OF) > 61 * 86_400_000), []);
-  const tb2 = Object.fromEntries(Object.entries(stats).map(([k, s]) => [k, s.tb2.meanEUR]));
-  const onTornado = useCallback((open: boolean) => calc.requestTornado(open), [calc.requestTornado]);
+  useEffect(() => setOldData(Date.now() - Date.parse(DE_DATA_AS_OF) > 61 * 86_400_000), []);
+  // a tab named in the address opens on arrival (the Ukrainian page links to #compare)
+  useEffect(() => {
+    const named = window.location.hash.slice(1);
+    if (named in t.tabs) setTab(named as Tab);
+  }, [t.tabs]);
+  const onSensitivity = useCallback((open: boolean) => calc.requestSensitivity(open), [calc.requestSensitivity]);
+  const onCompare = useCallback((open: boolean) => calc.requestCompare(open), [calc.requestCompare]);
 
   const copy = async () => {
     try {
@@ -71,31 +70,28 @@ export function BessCalculator({ initial, stats, libraryVersion }: Props) {
     }
   };
 
-  const panel = <BessInputsPanel inputs={inputs} base={BESS_BASE} onChange={calc.setField} t={t} />;
-  const shownInputs = core.inputs;
-  const blocked = blockedStatus(core);
-  const award = shownInputs.contract?.enabled ? shownInputs.contract.acceptedMW : null;
+  const panel = (
+    <InputsPanel<DeInputs> inputs={inputs} base={DE_BASE} onChange={calc.setField} t={t} fields={DE_FIELDS} groups={DE_GROUPS} sources={DE_SOURCES} />
+  );
+  const shown = core.inputs;
+  const blocked = core.status.primary !== "ok" || !core.kpis;
   const results = useRef<HTMLElement>(null);
-  const openContract = () => {
-    setTab("contract");
+  const openToll = () => {
+    setTab("toll");
     results.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-  const addContract = () => {
-    calc.setField(CONTRACT_FIELD, true);
-    openContract();
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-4 px-4 py-5 sm:px-6 lg:py-8" style={CONTRACT_SERIES}>
+    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-4 px-4 py-5 sm:px-6 lg:py-8">
       <header className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{t.header.title}</h1>
-          <MarketSwitch current="ukraine" ukraine={t.header.ukraine} germany={t.header.germany} label={t.header.switchLabel} />
+          <MarketSwitch current="germany" ukraine={t.header.ukraine} germany={t.header.germany} label={t.header.switchLabel} />
           <Badge variant={calc.isCustom ? "neutral" : "outline"}>{calc.isCustom ? t.header.customInputs : t.header.baseCase}</Badge>
           {calc.restored && <span className="text-xs text-muted-foreground">{t.header.restored}</span>}
         </div>
         <p className="text-sm text-muted-foreground">
-          {t.header.subtitle(shownInputs.powerMW, shownInputs.powerMW * shownInputs.durationH, shownInputs.durationH, award)}
+          {t.header.subtitle(shown.powerMW, shown.powerMW * shown.durationHours, shown.durationHours, shown.tollEnabled && shown.tollShare > 0)}
         </p>
         {calc.ignored.length > 0 && (
           <p role="status" className="w-fit rounded-md border border-border bg-card px-2.5 py-1.5 text-xs">
@@ -103,24 +99,21 @@ export function BessCalculator({ initial, stats, libraryVersion }: Props) {
           </p>
         )}
         <p className="text-xs text-muted-foreground">
-          {t.header.disclaimer} {t.header.dataAsOf} {f.dateLabel(BESS_DATA_AS_OF)}.
+          {t.header.disclaimer} {t.header.dataAsOf} {f.dateLabel(DE_DATA_AS_OF)}.
           {oldData && <span className="text-warning"> {t.header.oldData}</span>}
         </p>
         <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          <Link href={PATHS.bessMethodology} className="font-medium text-link hover:underline">
+          <Link href={PATHS.bessDeMethodology} className="font-medium text-link hover:underline">
             {t.header.methodology} →
           </Link>
-          <Link href={PATHS.bessSources} className="font-medium text-link hover:underline">
+          <Link href={PATHS.bessDeSources} className="font-medium text-link hover:underline">
             {t.header.sources} →
-          </Link>
-          <Link href={`${PATHS.bessDe}#compare`} className="font-medium text-link hover:underline">
-            {t.header.compare} →
           </Link>
         </p>
       </header>
 
       <div className="z-20 -mx-4 bg-background/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 lg:sticky lg:top-0">
-        <BessKpis core={core} t={t} pending={calc.pending} onChecks={() => setTab("checks")} />
+        <DeKpis core={core} t={t} pending={calc.pending} onChecks={() => setTab("checks")} />
       </div>
 
       {calc.error && (
@@ -136,9 +129,7 @@ export function BessCalculator({ initial, stats, libraryVersion }: Props) {
         </Card>
       )}
 
-      <WhatItTakes core={core} extras={calc.extras} tb2={tb2} t={t} onAlternatives={() => setTab("sensitivity")} />
-
-      <ContractCard core={core} pstar={calc.pstar} t={t} onAdd={addContract} onDetails={openContract} />
+      <DeBreakEven core={core} extras={calc.extras} t={t} onDetails={openToll} />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
         <div className="no-print flex flex-wrap items-center gap-2">
@@ -192,31 +183,31 @@ export function BessCalculator({ initial, stats, libraryVersion }: Props) {
               ))}
             </TabsList>
             {blocked && !WITHOUT_RESULT.includes(tab) && (
-              <div className="mt-4">
-                <StatusCard core={core} pstar={calc.pstar} t={t} />
-              </div>
+              <Card className="mt-4 border-l-4 border-l-critical">
+                <CardContent className="flex flex-col gap-1 py-4 text-sm">
+                  <div className="font-semibold">{t.caseStatus.title[core.status.primary] ?? core.status.primary}</div>
+                  <p className="text-muted-foreground">{t.caseStatus.text[core.status.primary] ?? ""}</p>
+                </CardContent>
+              </Card>
             )}
-            <TabsContent value="overview">{!blocked && <BessOverview core={core} t={t} />}</TabsContent>
-            <TabsContent value="revenue">{!blocked && <BessRevenue core={core} stats={stats} t={t} />}</TabsContent>
-            <TabsContent value="battery">{!blocked && <BessBattery core={core} t={t} />}</TabsContent>
-            <TabsContent value="debt">{!blocked && <BessDebt core={core} t={t} />}</TabsContent>
-            <TabsContent value="risks">{!blocked && <BessRisks core={core} t={t} />}</TabsContent>
-            <TabsContent value="contract">
-              <BessContract core={core} pstar={calc.pstar} t={t} onSwitchOn={() => calc.setField(CONTRACT_FIELD, true)} />
-            </TabsContent>
-            <TabsContent value="sensitivity">
-              {!blocked && <BessSensitivity core={core} extras={calc.extras} tornado={calc.tornado} onShow={onTornado} t={t} />}
+            <TabsContent value="overview">{!blocked && <DeOverview core={core} t={t} />}</TabsContent>
+            <TabsContent value="revenue">{!blocked && <DeRevenue core={core} stats={stats} t={t} />}</TabsContent>
+            <TabsContent value="toll">{!blocked && <DeToll core={core} extras={calc.extras} t={t} />}</TabsContent>
+            <TabsContent value="debt">{!blocked && <DeDebt core={core} t={t} />}</TabsContent>
+            <TabsContent value="sensitivity">{!blocked && <DeSensitivity core={core} result={calc.sensitivity} onShow={onSensitivity} t={t} />}</TabsContent>
+            <TabsContent value="compare">
+              <DeCompare result={calc.compare} onShow={onCompare} t={t} />
             </TabsContent>
             <TabsContent value="checks">
-              <BessChecks core={core} t={t} />
+              <DeChecks core={core} t={t} />
             </TabsContent>
-            <TabsContent value="tables">{!blocked && <BessTable core={core} t={t} />}</TabsContent>
+            <TabsContent value="tables">{!blocked && <DeTables core={core} t={t} />}</TabsContent>
           </Tabs>
         </section>
       </div>
 
       <p className="text-xs text-muted-foreground">
-        {t.footer.author} · {t.footer.data} · <span className="tabular">{t.footer.version(BESS_SPEC_REVISION, String(libraryVersion))}</span>
+        {t.footer.author} · {t.footer.data} · <span className="tabular">{t.footer.version(DE_SPEC_REVISION, String(libraryVersion))}</span>
       </p>
     </div>
   );

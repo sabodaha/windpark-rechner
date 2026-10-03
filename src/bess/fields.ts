@@ -5,34 +5,13 @@
 import { withDuration, type BessInputs, type ContractInputs } from "./engine";
 import type { Duration } from "./engine/library";
 import { CONTRACT_DEFAULTS, CONTRACT_PRESET_MW } from "./engine/registry";
+import type { FieldDef, FieldKind, FieldValue } from "./field-kit";
 
 export type BessGroupId = "scenario" | "battery" | "revenue" | "contract" | "contractOps" | "costs" | "grid" | "war" | "financing" | "valuation";
-export type BessFieldKind = "number" | "select" | "switch";
-export type BessFieldValue = number | string | boolean;
-
-export interface BessFieldDef {
-  /** Also the name of the URL parameter: short and never reused for something else. */
-  id: string;
-  group: BessGroupId;
-  kind: BessFieldKind;
-  quick?: boolean;
-  unit?: string;
-  scale?: number;
-  decimals?: number;
-  min?: number;
-  max?: number;
-  usual?: [number, number];
-  step?: number;
-  options?: string[];
-  /** Source ids (BESS_SOURCES) or "assumption". */
-  sources?: string[];
-  hidden?: (i: BessInputs) => boolean;
-  /** The value this field has when left alone, if it follows other inputs (the award's preset follows the duration);
-   *  otherwise the base case's. */
-  follows?: (i: BessInputs) => BessFieldValue;
-  get: (i: BessInputs) => BessFieldValue;
-  set: (i: BessInputs, v: BessFieldValue) => BessInputs;
-}
+export type BessFieldKind = FieldKind;
+export type BessFieldValue = FieldValue;
+/** A field of the Ukrainian calculator; source ids are BESS_SOURCES keys. */
+export type BessFieldDef = FieldDef<BessInputs, BessGroupId>;
 
 type NumKey = { [K in keyof BessInputs]-?: BessInputs[K] extends number ? K : never }[keyof BessInputs];
 type BoolKey = { [K in keyof BessInputs]-?: BessInputs[K] extends boolean ? K : never }[keyof BessInputs];
@@ -221,20 +200,4 @@ export const BESS_FIELDS: BessFieldDef[] = [
 
 export const BESS_GROUPS: BessGroupId[] = ["scenario", "battery", "revenue", "contract", "contractOps", "costs", "grid", "war", "financing", "valuation"];
 
-/** What a field counts as unchanged against: the value it follows, else the base case's. */
-export function baseValue(f: BessFieldDef, inputs: BessInputs, base: BessInputs): BessFieldValue {
-  return f.follows ? f.follows(inputs) : f.get(base);
-}
-
-export function toDisplay(f: BessFieldDef, v: BessFieldValue): BessFieldValue {
-  return typeof v === "number" ? v * (f.scale ?? 1) : v;
-}
-
-export function fromDisplay(f: BessFieldDef, v: number): number {
-  return v / (f.scale ?? 1);
-}
-
-export function sameValue(a: BessFieldValue, b: BessFieldValue): boolean {
-  if (typeof a === "number" && typeof b === "number") return Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
-  return a === b;
-}
+export { baseValue, fromDisplay, sameValue, toDisplay } from "./field-kit";

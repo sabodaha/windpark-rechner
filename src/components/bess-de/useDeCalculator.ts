@@ -1,57 +1,52 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BessClient, SUPERSEDED } from "@/bess/client";
-import { BESS_BASE, type BessInputs } from "@/bess/engine";
+import { DeClient, SUPERSEDED } from "@/bess/de/client";
+import { DE_BASE } from "@/bess/de/registry";
+import type { DeInputs } from "@/bess/de/types";
+import { clearDeInputs, decodeDeInputs, deLinkHasInputs, encodeDeInputs, ignoredDeParams, loadDeInputs, saveDeInputs } from "@/bess/de/url-state";
+import type { DeCompare, DeCore, DeExtras, DeSensitivity } from "@/bess/de/view";
 import type { FieldDef, FieldValue } from "@/bess/field-kit";
-import {
-  bessLinkHasInputs,
-  clearBessInputs,
-  decodeBessInputs,
-  encodeBessInputs,
-  ignoredBessParams,
-  loadBessInputs,
-  saveBessInputs,
-} from "@/bess/url-state";
-import type { BessCore, BessExtras, BessPStar, BessTornado } from "@/bess/view";
 
-export interface BessInitial {
-  core: BessCore;
-  extras: BessExtras;
-  tornado: BessTornado;
-  pstar: BessPStar;
+export interface DeInitial {
+  core: DeCore;
+  extras: DeExtras;
+  sensitivity: DeSensitivity;
+  compare: DeCompare;
 }
 
 /** Everything computed for one set of inputs; the parts arrive one after the other. */
 interface Entry {
-  core: BessCore;
-  extras?: BessExtras;
-  tornado?: BessTornado;
-  pstar?: BessPStar;
+  core: DeCore;
+  extras?: DeExtras;
+  sensitivity?: DeSensitivity;
+  compare?: DeCompare;
 }
 
-const keyOf = (i: BessInputs) => encodeBessInputs(i, BESS_BASE);
+const keyOf = (i: DeInputs) => encodeDeInputs(i, DE_BASE);
 const CACHE_SIZE = 12;
 
 /**
- * Battery calculator state. The first render shows the base case computed at build time (the static HTML has it);
+ * German calculator state. The first render shows the base case computed at build time (the static HTML has it);
  * after mounting, inputs from the link — or the last session, if the visitor asked to remember it — are applied and
- * calculated in a worker. Until a result arrives, the previous one stays on screen, marked as recalculating.
+ * calculated in a worker. Until a result arrives, the previous one stays on screen, marked as recalculating. The
+ * break-even toll price follows every main run; sensitivity and the comparison only while their tab is open.
  */
-export function useBessCalculator(initial: BessInitial) {
-  const [inputs, setInputs] = useState<BessInputs>(BESS_BASE);
+export function useDeCalculator(initial: DeInitial) {
+  const [inputs, setInputs] = useState<DeInputs>(DE_BASE);
   const [restored, setRestored] = useState(false);
   const [remember, setRemember] = useState(false);
   const [ignored, setIgnored] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const [wantTornado, setWantTornado] = useState(false);
+  const [wantSensitivity, setWantSensitivity] = useState(false);
+  const [wantCompare, setWantCompare] = useState(false);
   // results by input key; the base case is there from the start
   const cache = useRef(new Map<string, Entry>([["", { ...initial }]]));
   const [shownKey, setShownKey] = useState("");
   const [, setTick] = useState(0);
   const bump = () => setTick((t) => t + 1);
-  const client = useRef<BessClient | null>(null);
+  const client = useRef<DeClient | null>(null);
   const key = useMemo(() => keyOf(inputs), [inputs]);
   const latest = useRef(key);
   latest.current = key;
@@ -70,7 +65,7 @@ export function useBessCalculator(initial: BessInitial) {
     bump();
   }, []);
 
-  const worker = () => (client.current ??= new BessClient());
+  const worker = () => (client.current ??= new DeClient());
   useEffect(() => () => client.current?.dispose(), []);
 
   // the main run for the current inputs
@@ -96,14 +91,15 @@ export function useBessCalculator(initial: BessInitial) {
   }, [key, attempt, put]);
 
   const entry = cache.current.get(shownKey) ?? cache.current.get("")!;
+  const supported = entry.core.status.primary === "ok";
 
-  // break-even and alternatives for what is shown
+  // the break-even toll price (or spread multiplier) for what is shown: slow, after the main run
   useEffect(() => {
-    if (entry.extras) return;
+    if (entry.extras || !supported) return;
     let live = true;
     const k = shownKey;
     worker()
-      .extras(entry.core.inputs, entry.core.result.funding)
+      .extras(entry.core.inputs)
       .then((extras) => {
         if (extras !== SUPERSEDED && live) put(k, { extras });
       })
@@ -111,52 +107,52 @@ export function useBessCalculator(initial: BessInitial) {
     return () => {
       live = false;
     };
-  }, [shownKey, entry.extras === undefined, attempt]);
-
-  // the reserve contract's break-even price and the largest award: slow, after the main run and the break-even spread
-  useEffect(() => {
-    if (entry.pstar) return;
-    let live = true;
-    const k = shownKey;
-    worker()
-      .pstar(entry.core.inputs)
-      .then((pstar) => {
-        if (pstar !== SUPERSEDED && live) put(k, { pstar });
-      })
-      .catch((e: Error) => live && setError(e.message));
-    return () => {
-      live = false;
-    };
-  }, [shownKey, entry.pstar === undefined, attempt]);
+  }, [shownKey, entry.extras === undefined, supported, attempt]);
 
   // sensitivity only while its tab is open
   useEffect(() => {
-    if (!wantTornado || entry.tornado) return;
+    if (!wantSensitivity || entry.sensitivity || !supported) return;
     let live = true;
     const k = shownKey;
     worker()
-      .tornado(entry.core.inputs, entry.core.result.funding)
-      .then((tornado) => {
-        if (tornado !== SUPERSEDED && live) put(k, { tornado });
+      .sensitivity(entry.core.inputs, entry.core.funding)
+      .then((sensitivity) => {
+        if (sensitivity !== SUPERSEDED && live) put(k, { sensitivity });
       })
       .catch((e: Error) => live && setError(e.message));
     return () => {
       live = false;
     };
-  }, [shownKey, wantTornado, entry.tornado === undefined, attempt]);
+  }, [shownKey, wantSensitivity, entry.sensitivity === undefined, supported, attempt]);
+
+  // the comparison with Ukraine only while its tab is open (it loads the Ukrainian library)
+  useEffect(() => {
+    if (!wantCompare || entry.compare) return;
+    let live = true;
+    const k = shownKey;
+    worker()
+      .compare(entry.core.inputs)
+      .then((compare) => {
+        if (compare !== SUPERSEDED && live) put(k, { compare });
+      })
+      .catch((e: Error) => live && setError(e.message));
+    return () => {
+      live = false;
+    };
+  }, [shownKey, wantCompare, entry.compare === undefined, attempt]);
 
   // inputs from the link, else the remembered ones
   useEffect(() => {
-    const stored = loadBessInputs();
+    const stored = loadDeInputs();
     if (stored !== null) setRemember(true);
     const query = window.location.search.slice(1);
-    if (bessLinkHasInputs(query)) {
-      setIgnored(ignoredBessParams(query));
-      const fromUrl = decodeBessInputs(query, BESS_BASE);
+    if (deLinkHasInputs(query)) {
+      setIgnored(ignoredDeParams(query));
+      const fromUrl = decodeDeInputs(query, DE_BASE);
       if (fromUrl) setInputs(fromUrl);
       return;
     }
-    const fromStorage = stored ? decodeBessInputs(stored, BESS_BASE) : null;
+    const fromStorage = stored ? decodeDeInputs(stored, DE_BASE) : null;
     if (fromStorage) {
       setInputs(fromStorage);
       setRestored(true);
@@ -171,18 +167,18 @@ export function useBessCalculator(initial: BessInitial) {
     }
     const url = `${window.location.pathname}${key ? `?${key}` : ""}${window.location.hash}`;
     window.history.replaceState(null, "", url);
-    if (remember) saveBessInputs(key);
-    else clearBessInputs();
+    if (remember) saveDeInputs(key);
+    else clearDeInputs();
   }, [key, remember]);
 
-  const setField = useCallback((f: FieldDef<BessInputs>, v: FieldValue) => {
+  const setField = useCallback((f: FieldDef<DeInputs>, v: FieldValue) => {
     setInputs((prev) => f.set(prev, v));
     setRestored(false);
     setIgnored([]);
   }, []);
 
   const reset = useCallback(() => {
-    setInputs(BESS_BASE);
+    setInputs(DE_BASE);
     setRestored(false);
     setIgnored([]);
   }, []);
@@ -206,11 +202,12 @@ export function useBessCalculator(initial: BessInitial) {
     /** What is on screen: the result of `core.inputs`, which lag behind `inputs` while pending. */
     core: entry.core,
     extras: entry.extras ?? null,
-    tornado: entry.tornado ?? null,
-    pstar: entry.pstar ?? null,
+    sensitivity: entry.sensitivity ?? null,
+    compare: entry.compare ?? null,
     pending: shownKey !== key && !error,
     error,
     retry,
-    requestTornado: setWantTornado,
+    requestSensitivity: setWantSensitivity,
+    requestCompare: setWantCompare,
   };
 }

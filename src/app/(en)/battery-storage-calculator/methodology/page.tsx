@@ -619,7 +619,10 @@ downtime        = ${pct((WAR.marketPremium * WAR.lossRatio) / WAR.severity, 0)} 
             </li>
             <li>The network tariff after April 2037 and the surcharges from 2030 are assumptions.</li>
             <li>Currency restrictions are kept for the whole life; their end is not assumed.</li>
-            <li>Germany and the comparison of the two markets follow in the next version.</li>
+            <li>
+              Germany is a calculator of its own, with a comparison of the two markets:{" "}
+              <Link href={PATHS.bessDe}>battery storage calculator for Germany</Link>.
+            </li>
             <li>The battery is fictional and the results are illustrative.</li>
           </ul>
         </article>

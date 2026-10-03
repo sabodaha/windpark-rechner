@@ -13,8 +13,10 @@ export const bessEn = {
   },
   header: {
     title: "Battery Storage Investment Calculator",
-    market: "Ukraine · day-ahead market",
-    marketNext: "Germany follows in the next version",
+    ukraine: "Ukraine",
+    germany: "Germany",
+    switchLabel: "Market",
+    compare: "Ukraine against Germany",
     subtitle: (mw: number, mwh: number, h: number, awardMw: number | null) =>
       `Fictional project “Zoria Storage” · ${mw} MW / ${mwh} MWh (${h} h) · Kyiv region, Ukraine · ` +
       (awardMw === null ? "revenue from day-ahead trading only" : `revenue from day-ahead trading and a ${awardMw} MW reserve contract`),

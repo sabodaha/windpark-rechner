@@ -44,6 +44,9 @@ export type PageId =
   | "bess"
   | "bessMethodology"
   | "bessSources"
+  | "bessDe"
+  | "bessDeMethodology"
+  | "bessDeSources"
   | "about"
   | "impressum"
   | "privacy";
@@ -61,6 +64,10 @@ export const PAGE_PATHS: Record<Locale, Record<PageId, string>> = {
     bess: "/battery-storage-calculator/",
     bessMethodology: "/battery-storage-calculator/methodology/",
     bessSources: "/battery-storage-calculator/sources/",
+    /** The German battery calculator (v1.2): a tolling contract and the day-ahead market; English only so far. */
+    bessDe: "/battery-storage-calculator/germany/",
+    bessDeMethodology: "/battery-storage-calculator/germany/methodology/",
+    bessDeSources: "/battery-storage-calculator/germany/sources/",
     about: "/about/",
     impressum: "/impressum/",
     privacy: "/privacy/",
@@ -75,6 +82,9 @@ export const PAGE_PATHS: Record<Locale, Record<PageId, string>> = {
     bess: "/de/batteriespeicher-rechner/",
     bessMethodology: "/de/batteriespeicher-rechner/methodik/",
     bessSources: "/de/batteriespeicher-rechner/quellen/",
+    bessDe: "/de/batteriespeicher-rechner/deutschland/",
+    bessDeMethodology: "/de/batteriespeicher-rechner/deutschland/methodik/",
+    bessDeSources: "/de/batteriespeicher-rechner/deutschland/quellen/",
     about: "/de/ueber-mich/",
     impressum: "/de/impressum/",
     privacy: "/de/datenschutz/",
@@ -122,11 +132,14 @@ export const SITEMAP: { page: PageId; priority: number }[] = [
   { page: "home", priority: 1 },
   { page: "calculator", priority: 0.9 },
   { page: "bess", priority: 0.9 },
+  { page: "bessDe", priority: 0.9 },
   { page: "methodology", priority: 0.8 },
   { page: "bessMethodology", priority: 0.7 },
+  { page: "bessDeMethodology", priority: 0.7 },
   { page: "about", priority: 0.8 },
   { page: "sources", priority: 0.6 },
   { page: "bessSources", priority: 0.5 },
+  { page: "bessDeSources", priority: 0.5 },
   { page: "impressum", priority: 0.2 },
   { page: "privacy", priority: 0.2 },
 ];
@@ -147,6 +160,7 @@ export const PERSON_ID = `${SITE.url}/#person`;
 export const WEBSITE_ID = `${SITE.url}/#website`;
 export const CALCULATOR_ID = `${absoluteUrl(PATHS.calculator)}#app`;
 export const BESS_ID = `${absoluteUrl(PATHS.bess)}#app`;
+export const BESS_DE_ID = `${absoluteUrl(PATHS.bessDe)}#app`;
 
 /** The person in the words of one language; the same @id on every page. */
 const PERSON_TEXT: Record<Locale, { jobTitle: string; knowsAbout: string[] }> = {
