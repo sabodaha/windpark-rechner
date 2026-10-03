@@ -1,0 +1,459 @@
+{
+ "schema": "bess-de-library",
+ "market": "DE",
+ "currency": "EUR",
+ "priceBase": 2025,
+ "version": 1,
+ "algorithmVersion": 2,
+ "created": "2026-10-03",
+ "spec": "German pack v1.2, specification R2 §13 (revenue library)",
+ "attribution": "Bundesnetzagentur | SMARD.de via Energy-Charts (Fraunhofer ISE), CC BY 4.0; changes: hourly averaging",
+ "license": "https://creativecommons.org/licenses/by/4.0/",
+ "sources": {
+  "prices2025Sha256": "6027e994c2e73fc1aec3b9a226a027676349e0d5c47957995b63a1ff35a7404a",
+  "prices2026Sha256": "2d89f9678b12285c81e0523a14d7b6262c28bb32d01d5827d6712c8e0146bc24",
+  "resolution": "hourly comparable: mean of four quarter-hours per UTC hour from 2025-10-01; local days Europe/Berlin"
+ },
+ "problem": {
+  "resolution": "hourly",
+  "boundary": "dailyReset (empty at start and end of each local day)",
+  "losses": "all on charge (RTE on charging)",
+  "auxiliary": "inside RTE",
+  "poiLimits": "1.0 x power",
+  "availability": "1.0 (derated in the engine)",
+  "objective": "max sales - purchases - fee x import",
+  "fee": "signed effective fee in real 2025 EUR/MWh; outside the axis the engine reports unsupportedLibraryInput",
+  "tieBreak": "minimum discharge within 1e-9 x |V*| + 1e-6",
+  "mipRelGap": 1e-06,
+  "perMW": true
+ },
+ "axes": {
+  "snapshot": [
+   "DE-2025",
+   "DE-LTM-2026-09"
+  ],
+  "durationHoursBoL": [
+   2,
+   4
+  ],
+  "usableHours": {
+   "2": [
+    1.2,
+    1.3,
+    1.4,
+    1.5,
+    1.6,
+    1.7,
+    1.8,
+    1.9,
+    2.0,
+    2.1
+   ],
+   "4": [
+    2.4,
+    2.5,
+    2.6,
+    2.7,
+    2.8,
+    2.9,
+    3.0,
+    3.1,
+    3.2,
+    3.3,
+    3.4,
+    3.5,
+    3.6,
+    3.7,
+    3.8,
+    3.9,
+    4.0,
+    4.1,
+    4.2
+   ]
+  },
+  "cycleCap": [
+   1.0,
+   1.5
+  ],
+  "rte": [
+   0.85,
+   0.88,
+   0.9
+  ],
+  "importFeeEUR": [
+   -15.0,
+   -10.0,
+   -5.0,
+   0.0,
+   5.0,
+   10.0,
+   15.0,
+   20.0,
+   25.0,
+   30.0,
+   35.0
+  ]
+ },
+ "nodeOrder": [
+  "snapshot",
+  "durationHoursBoL",
+  "cycleCap",
+  "rte",
+  "importFeeEUR",
+  "usableHours"
+ ],
+ "fields": [
+  "salesEUR",
+  "purchasesEUR",
+  "importMWh",
+  "exportMWh"
+ ],
+ "months": 12,
+ "perNodeExtra": [
+  "peakDayPurchasesEUR"
+ ],
+ "dtype": "float32",
+ "doublesPerNode": 49,
+ "nodes": 3828,
+ "payload": "de-library-v1.bin",
+ "payloadSha256": "d0ad17d6fe813da985e83cb5a97a76e11570a6951240b88e75561dec110a153e",
+ "snapshots": {
+  "DE-2025": {
+   "from": "2025-01-01",
+   "to": "2025-12-31",
+   "days": 365,
+   "hours": 8760,
+   "avgPriceEUR": 89.321723,
+   "tb2EurPerMw": 84737.505,
+   "monthly": [
+    {
+     "month": 1,
+     "days": 31,
+     "hours": 744,
+     "avgPriceEUR": 114.140161
+    },
+    {
+     "month": 2,
+     "days": 28,
+     "hours": 672,
+     "avgPriceEUR": 128.522366
+    },
+    {
+     "month": 3,
+     "days": 31,
+     "hours": 743,
+     "avgPriceEUR": 94.727497
+    },
+    {
+     "month": 4,
+     "days": 30,
+     "hours": 720,
+     "avgPriceEUR": 77.935653
+    },
+    {
+     "month": 5,
+     "days": 31,
+     "hours": 744,
+     "avgPriceEUR": 67.338629
+    },
+    {
+     "month": 6,
+     "days": 30,
+     "hours": 720,
+     "avgPriceEUR": 63.9875
+    },
+    {
+     "month": 7,
+     "days": 31,
+     "hours": 744,
+     "avgPriceEUR": 87.795228
+    },
+    {
+     "month": 8,
+     "days": 31,
+     "hours": 744,
+     "avgPriceEUR": 76.990255
+    },
+    {
+     "month": 9,
+     "days": 30,
+     "hours": 720,
+     "avgPriceEUR": 83.511083
+    },
+    {
+     "month": 10,
+     "days": 31,
+     "hours": 745,
+     "avgPriceEUR": 84.402034
+    },
+    {
+     "month": 11,
+     "days": 30,
+     "hours": 720,
+     "avgPriceEUR": 101.881497
+    },
+    {
+     "month": 12,
+     "days": 31,
+     "hours": 744,
+     "avgPriceEUR": 93.469446
+    }
+   ]
+  },
+  "DE-LTM-2026-09": {
+   "from": "2025-10-01",
+   "to": "2026-09-30",
+   "days": 365,
+   "hours": 8760,
+   "avgPriceEUR": 104.045007,
+   "tb2EurPerMw": 97716.575,
+   "monthly": [
+    {
+     "month": 1,
+     "days": 31,
+     "hours": 744,
+     "avgPriceEUR": 110.090383
+    },
+    {
+     "month": 2,
+     "days": 28,
+     "hours": 672,
+     "avgPriceEUR": 96.576391
+    },
+    {
+     "month": 3,
+     "days": 31,
+     "hours": 743,
+     "avgPriceEUR": 99.287598
+    },
+    {
+     "month": 4,
+     "days": 30,
+     "hours": 720,
+     "avgPriceEUR": 78.515556
+    },
+    {
+     "month": 5,
+     "days": 31,
+     "hours": 744,
+     "avgPriceEUR": 97.535853
+    },
+    {
+     "month": 6,
+     "days": 30,
+     "hours": 720,
+     "avgPriceEUR": 109.515788
+    },
+    {
+     "month": 7,
+     "days": 31,
+     "hours": 744,
+     "avgPriceEUR": 105.446895
+    },
+    {
+     "month": 8,
+     "days": 31,
+     "hours": 744,
+     "avgPriceEUR": 126.894241
+    },
+    {
+     "month": 9,
+     "days": 30,
+     "hours": 720,
+     "avgPriceEUR": 144.820122
+    },
+    {
+     "month": 10,
+     "days": 31,
+     "hours": 745,
+     "avgPriceEUR": 84.402034
+    },
+    {
+     "month": 11,
+     "days": 30,
+     "hours": 720,
+     "avgPriceEUR": 101.881497
+    },
+    {
+     "month": 12,
+     "days": 31,
+     "hours": 744,
+     "avgPriceEUR": 93.469446
+    }
+   ]
+  }
+ },
+ "golden": {
+  "1": {
+   "value": 42910.9807,
+   "target": 42911,
+   "ok": true
+  },
+  "2": {
+   "value": 79765.6996,
+   "target": 79766,
+   "ok": true
+  },
+  "4": {
+   "value": 134415.5706,
+   "target": 134416,
+   "ok": true
+  }
+ },
+ "releaseGate": {
+  "metric": "net objective, EUR (sales - purchases - fee x import)",
+  "interpolation": {
+   "usableHours": "linear",
+   "importFee": "better adjacent node per month"
+  },
+  "monthlyDenominator": "max(|exact|, 5 % of the average month, EUR 1)",
+  "annualHours": 0.000898076055924933,
+  "monthlyHours": 0.0017120687195867211,
+  "annualFee": 0.0008183881822636897,
+  "monthlyFee": 0.008785379128218217,
+  "gateAnnual": 0.005,
+  "gateMonthly": 0.015,
+  "passed": true,
+  "checks": 1212,
+  "worstCases": [
+   {
+    "snapshot": "DE-2025",
+    "durationH": 4,
+    "cycleCap": 1.5,
+    "rte": 0.85,
+    "feeEUR": 35.0,
+    "usableH": 2.55,
+    "axis": "Hours",
+    "annualError": 0.000898,
+    "monthlyError": 0.001458
+   },
+   {
+    "snapshot": "DE-2025",
+    "durationH": 4,
+    "cycleCap": 1.0,
+    "rte": 0.85,
+    "feeEUR": 35.0,
+    "usableH": 2.55,
+    "axis": "Hours",
+    "annualError": 0.000874,
+    "monthlyError": 0.001458
+   },
+   {
+    "snapshot": "DE-2025",
+    "durationH": 4,
+    "cycleCap": 1.5,
+    "rte": 0.85,
+    "feeEUR": 22.5,
+    "usableH": 4.0,
+    "axis": "Fee",
+    "annualError": 0.000818,
+    "monthlyError": 0.003847
+   },
+   {
+    "snapshot": "DE-LTM-2026-09",
+    "durationH": 4,
+    "cycleCap": 1.5,
+    "rte": 0.85,
+    "feeEUR": 35.0,
+    "usableH": 2.55,
+    "axis": "Hours",
+    "annualError": 0.000815,
+    "monthlyError": 0.001023
+   },
+   {
+    "snapshot": "DE-LTM-2026-09",
+    "durationH": 4,
+    "cycleCap": 1.0,
+    "rte": 0.85,
+    "feeEUR": 35.0,
+    "usableH": 2.55,
+    "axis": "Hours",
+    "annualError": 0.000795,
+    "monthlyError": 0.001027
+   },
+   {
+    "snapshot": "DE-2025",
+    "durationH": 4,
+    "cycleCap": 1.5,
+    "rte": 0.85,
+    "feeEUR": -15.0,
+    "usableH": 2.55,
+    "axis": "Hours",
+    "annualError": 0.000763,
+    "monthlyError": 0.001067
+   },
+   {
+    "snapshot": "DE-2025",
+    "durationH": 4,
+    "cycleCap": 1.5,
+    "rte": 0.85,
+    "feeEUR": 10.0,
+    "usableH": 2.55,
+    "axis": "Hours",
+    "annualError": 0.00076,
+    "monthlyError": 0.001122
+   },
+   {
+    "snapshot": "DE-2025",
+    "durationH": 4,
+    "cycleCap": 1.5,
+    "rte": 0.85,
+    "feeEUR": 17.5,
+    "usableH": 4.0,
+    "axis": "Fee",
+    "annualError": 0.000757,
+    "monthlyError": 0.005039
+   },
+   {
+    "snapshot": "DE-2025",
+    "durationH": 4,
+    "cycleCap": 1.5,
+    "rte": 0.88,
+    "feeEUR": 22.5,
+    "usableH": 4.0,
+    "axis": "Fee",
+    "annualError": 0.000755,
+    "monthlyError": 0.006728
+   },
+   {
+    "snapshot": "DE-LTM-2026-09",
+    "durationH": 4,
+    "cycleCap": 1.5,
+    "rte": 0.85,
+    "feeEUR": -15.0,
+    "usableH": 2.55,
+    "axis": "Hours",
+    "annualError": 0.000738,
+    "monthlyError": 0.000914
+   },
+   {
+    "snapshot": "DE-2025",
+    "durationH": 4,
+    "cycleCap": 1.5,
+    "rte": 0.9,
+    "feeEUR": 32.5,
+    "usableH": 4.0,
+    "axis": "Fee",
+    "annualError": 0.000714,
+    "monthlyError": 0.002692
+   },
+   {
+    "snapshot": "DE-2025",
+    "durationH": 4,
+    "cycleCap": 1.5,
+    "rte": 0.88,
+    "feeEUR": 27.5,
+    "usableH": 4.0,
+    "axis": "Fee",
+    "annualError": 0.000711,
+    "monthlyError": 0.004248
+   }
+  ]
+ },
+ "build": {
+  "python": "3.12.10",
+  "scipy": "1.18.0",
+  "numpy": "2.4.6",
+  "seconds": 3956.6
+ }
+}
