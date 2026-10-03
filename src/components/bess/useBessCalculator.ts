@@ -13,12 +13,13 @@ import {
   loadBessInputs,
   saveBessInputs,
 } from "@/bess/url-state";
-import type { BessCore, BessExtras, BessTornado } from "@/bess/view";
+import type { BessCore, BessExtras, BessPStar, BessTornado } from "@/bess/view";
 
 export interface BessInitial {
   core: BessCore;
   extras: BessExtras;
   tornado: BessTornado;
+  pstar: BessPStar;
 }
 
 /** Everything computed for one set of inputs; the parts arrive one after the other. */
@@ -26,6 +27,7 @@ interface Entry {
   core: BessCore;
   extras?: BessExtras;
   tornado?: BessTornado;
+  pstar?: BessPStar;
 }
 
 const keyOf = (i: BessInputs) => encodeBessInputs(i, BESS_BASE);
@@ -111,6 +113,22 @@ export function useBessCalculator(initial: BessInitial) {
     };
   }, [shownKey, entry.extras === undefined, attempt]);
 
+  // the reserve contract's break-even price and the largest award: slow, after the main run and the break-even spread
+  useEffect(() => {
+    if (entry.pstar) return;
+    let live = true;
+    const k = shownKey;
+    worker()
+      .pstar(entry.core.inputs)
+      .then((pstar) => {
+        if (pstar !== SUPERSEDED && live) put(k, { pstar });
+      })
+      .catch((e: Error) => live && setError(e.message));
+    return () => {
+      live = false;
+    };
+  }, [shownKey, entry.pstar === undefined, attempt]);
+
   // sensitivity only while its tab is open
   useEffect(() => {
     if (!wantTornado || entry.tornado) return;
@@ -189,6 +207,7 @@ export function useBessCalculator(initial: BessInitial) {
     core: entry.core,
     extras: entry.extras ?? null,
     tornado: entry.tornado ?? null,
+    pstar: entry.pstar ?? null,
     pending: shownKey !== key && !error,
     error,
     retry,

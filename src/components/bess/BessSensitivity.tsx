@@ -44,6 +44,12 @@ export function BessSensitivity({
   const fmt = (v: number) => (measure === "npv" ? f.meur(v * 1e6, 1) : f.pct(v, 1));
   const base = tornado ? valueOf(tornado.base, measure) : null;
   const irr = (m: Metric) => metricText(m, (v) => f.pct(v, 1), t, f).text;
+  // contract settings the battery cannot hold are named with their status, not drawn (spec v1.1 §15)
+  const noResult = (tornado?.bars ?? []).flatMap((b) =>
+    (["low", "high"] as const)
+      .filter((side) => b[side]?.status)
+      .map((side) => `${S.drivers[b.id]?.label ?? b.id} ${S.drivers[b.id]?.[side] ?? ""} — ${S.statusShort[b[side]!.status!] ?? b[side]!.status}`),
+  );
   return (
     <div className="flex flex-col gap-4">
       <Card>
@@ -67,7 +73,7 @@ export function BessSensitivity({
             <p className="py-10 text-center text-sm text-muted-foreground">{tornado ? t.kpis.statusHint.notDefined : S.calculating}</p>
           ) : (
             <TornadoChart
-              rows={tornado.bars.map((b) => ({
+              rows={tornado.bars.filter((b) => !(b.high.status && (b.low === null || b.low.status))).map((b) => ({
                 label: S.drivers[b.id]?.label ?? b.id,
                 lowLabel: S.drivers[b.id]?.low ?? "",
                 highLabel: S.drivers[b.id]?.high ?? "",
@@ -81,6 +87,7 @@ export function BessSensitivity({
               ariaLabel={S.title}
             />
           )}
+          {noResult.length > 0 && <p className="mt-2 text-xs text-muted-foreground">{S.noResult(noResult.join("; "))}</p>}
         </CardContent>
       </Card>
       <Card>
@@ -112,7 +119,9 @@ export function BessSensitivity({
                   {extras.variants.map((v) => (
                     <tr key={v.id} className="border-b border-border last:border-0">
                       <td className="py-1.5 pr-3">{S.variants[v.id] ?? v.id}</td>
-                      <td className={cn("px-2 py-1.5 text-right", (v.investorNpv ?? -1) >= 0 && "font-semibold text-good-text")}>{irr(v.investorIrr)}</td>
+                      <td className={cn("px-2 py-1.5 text-right", (v.investorNpv ?? -1) >= 0 && "font-semibold text-good-text")}>
+                        {v.status ? S.statusShort[v.status] ?? v.status : irr(v.investorIrr)}
+                      </td>
                       <td className="px-2 py-1.5 text-right">{f.meur(v.investorNpv, 1)}</td>
                       <td className="py-1.5 pl-2 text-right">{f.meur(v.debtEur, 1)}</td>
                     </tr>

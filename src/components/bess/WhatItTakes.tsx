@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useFormat } from "@/components/site/LocaleProvider";
 import { cn } from "@/lib/utils";
 import { metricText } from "./BessKpis";
+import { blockedStatus } from "./contractText";
 
 const HIGHLIGHT = ["fourHours", "high", "noWar", "favourable"] as const;
 
@@ -35,6 +36,8 @@ export function WhatItTakes({
   const { inputs, result } = core;
   const npv = result.kpis.investorNpv?.value ?? null;
   const short = npv === null || npv < 0;
+  const contract = inputs.contract?.enabled === true;
+  const blocked = blockedStatus(core) !== null;
   const path = t.scenarioName[inputs.scenario] ?? inputs.scenario;
   const m2029 = SPREAD_PATHS[inputs.scenario][2029];
   const now = m2029 * (tb2[inputs.snapshot] ?? 0);
@@ -43,6 +46,16 @@ export function WhatItTakes({
   const times = (k: number) => `${f.num(k, 2)} times`;
   const variants = extras ? HIGHLIGHT.map((id) => extras.variants.find((v) => v.id === id)).filter((v) => v !== undefined) : [];
 
+  if (blocked) {
+    return (
+      <Card className="border-l-4 border-l-border">
+        <CardContent className="flex flex-col gap-2 py-4">
+          <h2 className="text-base font-semibold">{W.title}</h2>
+          <p className="text-sm text-muted-foreground">{W.blocked}</p>
+        </CardContent>
+      </Card>
+    );
+  }
   return (
     <Card className={cn("border-l-4", short ? "border-l-critical" : "border-l-good")}>
       <CardContent className="flex flex-col gap-3 py-4 lg:flex-row lg:gap-6">
@@ -50,7 +63,7 @@ export function WhatItTakes({
           <h2 className="text-base font-semibold">{W.title}</h2>
           <p className="flex items-start gap-1.5 text-sm font-medium">
             {short ? <CircleAlert className="mt-0.5 size-4 shrink-0 text-critical" aria-hidden /> : <CircleCheck className="mt-0.5 size-4 shrink-0 text-good-text" aria-hidden />}
-            {short ? W.short : W.enough}
+            {contract ? (short ? W.shortContract : W.enoughContract) : short ? W.short : W.enough}
           </p>
           <div className="text-sm leading-relaxed text-foreground/85" aria-live="polite">
             {be === null ? (

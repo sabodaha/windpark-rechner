@@ -2,7 +2,7 @@
 // link carries exactly the inputs that differ from the base case.
 import { describe, expect, it } from "vitest";
 import { BESS_BASE } from "../src/bess/engine";
-import { BESS_FIELDS, BESS_GROUPS, type BessFieldDef, type BessFieldValue, sameValue, toDisplay } from "../src/bess/fields";
+import { BESS_FIELDS, BESS_GROUPS, baseValue, type BessFieldDef, type BessFieldValue, sameValue, toDisplay } from "../src/bess/fields";
 import { bessEn } from "../src/bess/messages";
 import { BESS_SOURCES } from "../src/bess/sources";
 import { BESS_STORAGE_KEY, decodeBessInputs, encodeBessInputs, ignoredBessParams } from "../src/bess/url-state";
@@ -46,10 +46,11 @@ describe("battery calculator fields", () => {
   });
 
   it("set one input without touching the others", () => {
+    // a field that follows another input (the award's preset follows the duration) stays at what it follows
     for (const f of BESS_FIELDS) {
       const next = f.set(BESS_BASE, otherValue(f));
       expect(sameValue(f.get(next), f.get(BESS_BASE)), f.id).toBe(false);
-      for (const g of BESS_FIELDS) if (g !== f) expect(sameValue(g.get(next), g.get(BESS_BASE)), `${f.id} → ${g.id}`).toBe(true);
+      for (const g of BESS_FIELDS) if (g !== f) expect(sameValue(g.get(next), baseValue(g, next, BESS_BASE)), `${f.id} → ${g.id}`).toBe(true);
     }
   });
 });

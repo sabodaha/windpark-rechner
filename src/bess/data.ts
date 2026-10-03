@@ -11,11 +11,12 @@ export const BESS_FILES = {
 /** Day-ahead prices run to this date (the last-12-months snapshot ends here). */
 export const BESS_DATA_AS_OF = "2026-09-30";
 
-/** Last change of the battery pages (sitemap, dateModified). */
-export const BESS_UPDATED = "2026-10-02";
+/** First publication and last change of the battery pages (datePublished, dateModified). */
+export const BESS_PUBLISHED = "2026-10-02";
+export const BESS_UPDATED = "2026-10-03";
 
-/** Methodology revision the engine implements. */
-export const BESS_SPEC_REVISION = "S1.3";
+/** Methodology revision the engine implements: the base model and the reserve contract (v1.1a). */
+export const BESS_SPEC_REVISION = "S1.3 · contract R3.1";
 
 export const BESS_CASE_NAME = "Zoria Storage";
 

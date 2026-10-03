@@ -1,8 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { BESS_CASE_NAME, BESS_DATA_AS_OF, BESS_SPEC_REVISION, BESS_UPDATED } from "@/bess/data";
+import { BESS_CASE_NAME, BESS_DATA_AS_OF, BESS_PUBLISHED, BESS_SPEC_REVISION, BESS_UPDATED } from "@/bess/data";
+import { BESS_BASE, runBess } from "@/bess/engine";
 import { buildCapex } from "@/bess/engine/capex";
-import { CAPEX, CASE, FINANCE, MACRO, OPEX, PRICE_LEVEL_EUR, REVENUE, SPREAD_PATHS, TAX, TECH, WAR } from "@/bess/engine/registry";
+import {
+  CAPEX, CASE, CONTRACT_DEFAULTS, CONTRACT_PRESET_MW, FINANCE, MACRO, OPEX, PRICE_LEVEL_EUR, RESERVE, REVENUE, SPREAD_PATHS, TAX, TECH, WAR,
+} from "@/bess/engine/registry";
 import { bessEn } from "@/bess/messages";
 import { bessBase, loadLibrary } from "@/bess/server";
 import { JsonLd } from "@/components/site/JsonLd";
@@ -15,7 +18,7 @@ const TITLE = "How the battery storage model works";
 const DESCRIPTION =
   "Methodology of the Battery Storage Investment Calculator for Ukraine: perfect-foresight day-ahead dispatch on derived " +
   "price data, spread paths, degradation, war risk, network tariffs, a euro loan sculpted on a lender's case, Ukrainian " +
-  "tax and currency rules, KPIs and checks — with formulas.";
+  "tax and currency rules, an optional Ukrenergo reserve contract, KPIs and checks — with formulas.";
 
 export const metadata = pageMetadata({ title: "Battery storage model methodology", description: DESCRIPTION, path: PATHS.bessMethodology, type: "article", image: BESS_OG_IMAGE });
 
@@ -29,6 +32,7 @@ const SECTIONS = [
   ["financing", "Financing"],
   ["taxes", "Taxes"],
   ["currency", "Currency and cash out"],
+  ["contract", "Reserve contract (option)"],
   ["results", "Results"],
   ["sensitivity", "Sensitivity and break-even"],
   ["checks", "Checks and verification"],
@@ -42,7 +46,7 @@ function H2({ id, children }: { id: (typeof SECTIONS)[number][0]; children: Reac
 const eur = (v: number, d = 0) => `€${num(v, d)}`;
 
 export default function BessMethodologyPage() {
-  const { core, extras } = bessBase();
+  const { core, extras, pstar } = bessBase();
   const r = core.result;
   const k = r.kpis;
   const inp = core.inputs;
@@ -54,6 +58,12 @@ export default function BessMethodologyPage() {
   const y29 = r.annual.find((a) => a.year === 2029)!;
   const P = inp.powerMW;
   const paths = (["reference", "low", "high"] as const).map((id) => [id, SPREAD_PATHS[id]] as const);
+  // the base battery with the default reserve contract (v1.1a): the numbers of section 10 come from this run
+  const cd = CONTRACT_DEFAULTS;
+  const withAward = runBess({ ...BESS_BASE, contract: { ...cd } }, loadLibrary());
+  const award = withAward.contract!;
+  const ak = withAward.kpis;
+  const pBe = pstar.breakEven;
   return (
     <>
       <JsonLd
@@ -67,7 +77,7 @@ export default function BessMethodologyPage() {
             inLanguage: "en",
             author: { "@id": PERSON_ID },
             about: { "@id": BESS_ID },
-            datePublished: BESS_UPDATED,
+            datePublished: BESS_PUBLISHED,
             dateModified: BESS_UPDATED,
           },
           breadcrumbJsonLd([
@@ -102,7 +112,10 @@ export default function BessMethodologyPage() {
               one site in the Kyiv region, connected to the 110 kV distribution network
             </dd>
             <dt>Revenue</dt>
-            <dd>Day-ahead trading only: buying in cheap hours, selling in dear ones; no contracts, no ancillary services</dd>
+            <dd>
+              Day-ahead trading only: buying in cheap hours, selling in dear ones. A multi-year reserve contract with
+              Ukrenergo is an option, off in the base case (section 10)
+            </dd>
             <dt>Timeline</dt>
             <dd>
               Financial close {dateLabel(CASE.financialClose)} → {CASE.constructionMonths} months of construction → commercial
@@ -155,9 +168,10 @@ export default function BessMethodologyPage() {
               in euros.
             </li>
             <li>
-              <strong>Honest about what is missing.</strong> v1 values day-ahead trading only. Balancing and ancillary
-              services, the intraday market and Ukrenergo’s multi-year auctions are not in it, and the result is shown as
-              it is: the first screen of the calculator says what it would take to break even.
+              <strong>Honest about what is missing.</strong> The base case values day-ahead trading only, and the result is
+              shown as it is: the first screen of the calculator says what it would take to break even. A special-auction
+              reserve contract with Ukrenergo can be added; daily reserve auctions, the balancing market and the intraday
+              market are not in the model.
             </li>
             <li>
               <strong>No raw prices on the site.</strong> The revenue comes from a library computed in advance on the
@@ -404,7 +418,108 @@ downtime        = ${pct((WAR.marketPremium * WAR.lossRatio) / WAR.severity, 0)} 
             </li>
           </ul>
 
-          <H2 id="results">10. Results</H2>
+          <H2 id="contract">10. Reserve contract (option)</H2>
+          <p>
+            Ukrenergo buys reserve capacity in special auctions: an award of 13 months to five years, paid for availability
+            at a euro price per MW and hour. The price is fixed at the National Bank’s average rate of the auction month and
+            paid in hryvnias at each month’s rate. Rounds for symmetric aFRR — automatic frequency restoration reserve, up
+            and down — cleared at about €17–29 in 2024–2025; none was held in 2026. The calculator can add one award and,
+            as a hypothesis, a second one after it. It is off in the base case. By default: {cd.acceptedMW} MW for the
+            2-hour battery ({CONTRACT_PRESET_MW[1]} and {CONTRACT_PRESET_MW[4]} MW for 1 and 4 hours),{" "}
+            {eur(cd.eurPerMWHour)} per MW-hour, {cd.tenorMonths} months from March 2028. This is a screen of expected cash
+            flows, not a simulation of hourly operation.
+          </p>
+          <h3>What the award takes from the battery</h3>
+          <pre>{`σ_P = C · (1 + ρ + λ) / P                power: the command, the recovery margin, the standing load
+σ_E = C · (h_up + h_down) / (u · P)         energy: full activation held h hours each way; u = usable hours
+σ*  = max(σ_P, σ_E)                         the share of the battery the award takes
+σ_a = 1 − σ* · Z − τ                        the share left for day-ahead trading`}</pre>
+          <p>
+            C is the award and P the battery’s power; ρ = {pct(cd.recoveryPowerShare, 0)} is power kept free to restore the
+            energy stock, and h = {num(cd.sustainHours, 0)} hour is the minimum full activation for aFRR. Z is the share of
+            the award still in force: a hit ends the contract for the share hit (an option suspends it instead), and that
+            share trades again after its repair. τ withholds one day in the months the stock is filled and sold. The
+            revenue library is scaled by σ_a. With the default award the contract takes {pct(award.summary.sigmaStarMax, 0)}{" "}
+            of the battery; in 2029 {pct(award.summary.daShare2029, 0)} is left for trading.
+          </p>
+          <p>The award must fit on every day of service and on the days the stock is filled and sold, on the selected path and on the lender’s:</p>
+          <ul>
+            <li>
+              on the busiest day — activation {num(cd.peakDayFactor, 0)} times the month’s average over a 25-hour day — the
+              energy the reserve delivers and exports stays within its share of the daily warranty quota;
+            </li>
+            <li>on that day, the energy bought or exported to keep the stock constant fits through the recovery margin;</li>
+            <li>the stock is bought on the last day before service and sold on the first day after it, within C · (1 + ρ) over a 23-hour day.</li>
+          </ul>
+          <p>
+            A failed check rejects the case instead of shrinking the award, and the calculator shows the largest award that
+            passes every check: {num(pstar.cMax, 0)} MW for the base battery. After a full command, restoring the stock
+            takes h / (RTE · ρ) = {num(award.summary.recoveryHoursUp, 1)} hours up and RTE · h / ρ ={" "}
+            {num(award.summary.recoveryHoursDown, 1)} hours down; repeated commands beyond the stock are not modelled.
+          </p>
+          <h3>Money</h3>
+          <ul>
+            <li>
+              <strong>Availability fee:</strong> price × the month’s exchange rate × awarded MW × hours × the share in
+              service; invoiced with VAT and paid the next month.
+            </li>
+            <li>
+              <strong>Activation energy:</strong> {pct(cd.activationUp, 0)} of the award per hour each way, of which{" "}
+              {pct(cd.nettingShare, 0)} is left after up and down commands in the same hour cancel out. It is paid at the
+              month’s day-ahead price level, because balanced hours are settled at the day-ahead price; an option uses the
+              balancing prices of 2025. Claims on and debts to Ukrenergo offset within a month; a remaining claim is paid
+              after {cd.balancingLagMonths} months.
+            </li>
+            <li>
+              <strong>Energy stock:</strong> bought before service, kept topped up at day-ahead prices with network
+              charges and market fees, sold when the contract ends.
+            </li>
+            <li>
+              <strong>Security and cash:</strong> €{num(RESERVE.collateralEurPerMW, 0)} per MW in escrow from the auction to
+              the end of service, paid in by the owner; a liquidity reserve of {cd.liquidityDays} days of reserve purchases
+              and balancing payables. A start up to {RESERVE.deferralMaxMonths} months late costs a{" "}
+              {pct(RESERVE.deferralTopUpShare, 0)} top-up, of which a quarter is kept each month; a later start cancels the
+              award and the security is kept.
+            </li>
+            <li>
+              <strong>Penalties:</strong> {cd.failureEvents} failures a year without wartime relief, each charged at{" "}
+              {RESERVE.penaltyFactorAfrr} times the fee over {cd.penaltyHours} hour — an expected cost, not the rules’
+              look-back window. The certificate is renewed every {RESERVE.certificateMonths} months for €
+              {num(RESERVE.certificateCostEur2026, 0)} (2026 prices).
+            </li>
+            <li>
+              <strong>VAT and tax:</strong> the contract’s VAT is tracked by source; penalties, the security kept and
+              written-off claims reduce taxable profit — an assumption the calculator can switch off.
+            </li>
+          </ul>
+          <h3>The loan</h3>
+          <p>
+            The lender splits the cash available for debt service into the contract’s share and the trading share. Each
+            instalment may not exceed the contract’s cash divided by {num(FINANCE.targetDscrContracted, 2)} plus the trading
+            cash divided by {num(FINANCE.targetDscrMerchant, 2)}, on the lender’s low case — without a second contract and
+            with activation energy at day-ahead prices. The security is equity and does not count towards the debt share.
+            With the default award the loan is {meur(ak.debtEur?.value ?? null, 1)} and the investor IRR{" "}
+            {ak.investorIrr?.status === "valid" && ak.investorIrr.value !== null ? pct(ak.investorIrr.value, 1) : "n/a"}, NPV{" "}
+            {meur(ak.investorNpv?.value ?? null, 1)}.
+          </p>
+          <h3>Break-even contract price</h3>
+          <p>
+            p* is the contract price at which the investor NPV at the hurdle is zero, with the loan sized again at every
+            price. Every whole euro from €0 to €{RESERVE.pStarDomain[1]} per MW-hour is calculated; between neighbouring
+            prices whose NPVs have opposite signs, bisection narrows the price until the NPV is within €1 and the bracket
+            within {RESERVE.pStarBracket}, and every root is checked by a fresh run. The price is then compared with the
+            auction cap: {num(RESERVE.auctionCapUah, 2)} UAH per MW-hour for 2027, {eur(pBe.capEur, 2)} at the auction
+            month’s rate.
+            {pBe.outcome === "found" && pBe.value !== null && (
+              <>
+                {" "}For the base battery with the default award p* = {eur(pBe.value, 2)}:{" "}
+                {pBe.admissibility === "aboveAuctionCap" ? "above the cap, so no bid could win it" : "within the cap"}.
+              </>
+            )}{" "}
+            The search runs on a grid of €1, so another crossing between grid points cannot be ruled out.
+          </p>
+
+          <H2 id="results">11. Results</H2>
           <ul>
             <li>
               <strong>Investor IRR and NPV</strong> in euros: share capital paid in against the dividends and capital
@@ -427,9 +542,14 @@ downtime        = ${pct((WAR.marketPremium * WAR.lossRatio) / WAR.severity, 0)} 
             <li>
               <strong>Cash held in the company</strong> at each year end beyond the reserves.
             </li>
+            <li>
+              <strong>With a contract:</strong> its lines in 2029 per MW, its share of the cash for debt service, the
+              escrow and the liquidity reserve; LCOS counts the energy delivered on command. A case whose contract inputs
+              lie outside the model, or which the battery cannot hold, shows its status and no figures.
+            </li>
           </ul>
 
-          <H2 id="sensitivity">11. Sensitivity and break-even</H2>
+          <H2 id="sensitivity">12. Sensitivity and break-even</H2>
           <p>
             The tornado moves one driver at a time with the loan as signed: spreads ±20%, the realism factor 0.65 / 0.85,
             investment −10% / +11%, the expected war loss 1.6% / 4.0%, the interest rate ±1.5 points, a weaker hryvnia,
@@ -437,11 +557,18 @@ downtime        = ${pct((WAR.marketPremium * WAR.lossRatio) / WAR.severity, 0)} 
             alternative cases change the battery or the market before investing and size the loan again.
           </p>
           <p>
+            With a contract, the tornado adds its own drivers: the price ±20%, activation 0 and 10%, netting 0 and 100%,
+            1.5 hours of full activation, a recovery margin of 25%, a peak day three times the average, 0 and 12 failures a
+            year, a 720-hour penalty window, other loss of the contract 5% a year, a 2% balancing fee, the fee paid after
+            four months, 90% of balancing claims collected, penalties not deductible and a standing load of 0.5%. A setting
+            the battery cannot hold is reported as such, not as a number.
+          </p>
+          <p>
             Break-even is the multiplier k on the spread path at which the investor NPV at the hurdle is zero, with the loan
             fixed: a scan from 0.5 to 3.0 in steps of 0.1, then bisection in the first bracket the library supports.
           </p>
 
-          <H2 id="checks">12. Checks and verification</H2>
+          <H2 id="checks">13. Checks and verification</H2>
           <p>
             Every run checks that the balance sheet balances each month, loan draws equal the loan, cash never turns negative,
             the loan is repaid with no arrears, the debt share holds, and the reserve account is topped up; it reports
@@ -461,10 +588,28 @@ downtime        = ${pct((WAR.marketPremium * WAR.lossRatio) / WAR.severity, 0)} 
             root of each IRR, the NPVs, the loan, the cover ratios, LCOS, payback, break-even and the cash in the company at
             each year end. The investor’s cash flows agree date by date to within €51.
           </p>
+          <p>
+            The contract was checked the same way: a separate implementation, written from the specification without the
+            calculator’s code, on 54 cases — the default award, the late starts, both strike scenarios, the second
+            contract, the cases the model must reject, and the break-even searches. Each difference was traced to its cause
+            and corrected on the side that was wrong, in the calculator or in the second implementation, and recorded.
+            Every field of every case was then compared, about one million values: the statuses, dates and events exactly, the contract’s own monthly flows to the cent or
+            kopiyka, flows read from the revenue library within 0.1%, the loans within €35, the investor NPVs within €69
+            and the break-even prices within €0.0001 per MW-hour. With the
+            contract on, each run also checks that activation energy balances, the energy stock and its cost close, the
+            escrow and the claims settle, VAT reconciles, and the contract and trading cash add up.
+          </p>
 
-          <H2 id="limitations">13. Limitations</H2>
+          <H2 id="limitations">14. Limitations</H2>
           <ul>
-            <li>Day-ahead trading only: no balancing, ancillary services, intraday trading or Ukrenergo’s auctions (next version).</li>
+            <li>
+              Day-ahead trading and, as an option, one special-auction contract for symmetric aFRR: no daily reserve
+              auctions, balancing market, FCR, upward-only aFRR or intraday trading (next version).
+            </li>
+            <li>
+              The contract’s activation, netting, balancing prices and peak day are assumptions, not yet calibrated to
+              Ukrenergo’s minute data; the 30% failure threshold and the certificate rules are not modelled.
+            </li>
             <li>Perfect foresight scaled by one realism factor; the schedule is historical, not a forecast of hourly trades.</li>
             <li>One site; no portfolio effects, no correlation between sites.</li>
             <li>War risk as an expected loss; no dated scenario of a strike.</li>

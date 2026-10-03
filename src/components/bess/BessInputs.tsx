@@ -3,7 +3,7 @@
 import { ChevronDown, Info, RotateCcw, TriangleAlert } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import type { BessInputs } from "@/bess/engine";
-import { BESS_FIELDS, BESS_GROUPS, type BessFieldDef, type BessFieldValue, type BessGroupId, fromDisplay, sameValue, toDisplay } from "@/bess/fields";
+import { BESS_FIELDS, BESS_GROUPS, baseValue, type BessFieldDef, type BessFieldValue, type BessGroupId, fromDisplay, sameValue, toDisplay } from "@/bess/fields";
 import type { BessMessages } from "@/bess/messages";
 import { BESS_SOURCES } from "@/bess/sources";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -37,10 +37,12 @@ function Group({ group, inputs, base, onChange, t }: Props & { group: BessGroupI
   const fields = BESS_FIELDS.filter((f) => f.group === group && !(f.hidden?.(inputs) ?? false));
   const quick = fields.filter((f) => f.quick);
   const advanced = fields.filter((f) => !f.quick);
-  const changed = fields.filter((f) => !sameValue(f.get(inputs), f.get(base))).length;
+  const changed = fields.filter((f) => !sameValue(f.get(inputs), baseValue(f, inputs, base))).length;
   // a group without quick fields shows everything at once
   const shown = quick.length > 0 ? quick : advanced;
   const hidden = quick.length > 0 ? advanced : [];
+  // a group whose every field is hidden (the contract's details while it is off) is not shown
+  if (fields.length === 0) return null;
   return (
     <AccordionItem value={group}>
       <AccordionTrigger>
@@ -131,7 +133,8 @@ function FieldControl({ field: f, inputs, base, onChange, t }: Props & { field: 
   const id = useId();
   const label = t.fields[f.id]?.label ?? f.id;
   const value = f.get(inputs);
-  const changed = !sameValue(value, f.get(base));
+  const initial = baseValue(f, inputs, base);
+  const changed = !sameValue(value, initial);
   return (
     <div className="py-2">
       <div className="flex items-center gap-1.5">
@@ -142,7 +145,7 @@ function FieldControl({ field: f, inputs, base, onChange, t }: Props & { field: 
         {changed && (
           <button
             type="button"
-            onClick={() => onChange(f, f.get(base))}
+            onClick={() => onChange(f, initial)}
             className="rounded p-0.5 text-muted-foreground hover:text-foreground"
             aria-label={`${t.inputs.reset}: ${label}`}
             title={t.inputs.reset}

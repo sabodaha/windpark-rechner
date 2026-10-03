@@ -17,6 +17,7 @@ export const metadata = pageMetadata({ title: "Battery storage model sources", d
 
 const GROUP_TITLES: Record<BessSource["group"], string> = {
   prices: "Prices",
+  reserves: "Reserve contract (Ukrenergo special auctions)",
   technology: "Technology",
   costs: "Investment costs",
   grid: "Grid, tariffs and market rules",

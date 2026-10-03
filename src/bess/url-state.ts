@@ -1,7 +1,7 @@
 // Battery inputs <-> URL query: only fields that differ from the base case are written, in engine units. Same rules
 // as the wind calculator (lib/url-state.ts), with its own fields and its own storage entry.
 import type { BessInputs } from "./engine";
-import { BESS_FIELDS, type BessFieldDef, type BessFieldValue, sameValue } from "./fields";
+import { BESS_FIELDS, baseValue, type BessFieldDef, type BessFieldValue, sameValue } from "./fields";
 
 /** Where the battery calculator keeps the inputs when the visitor asks it to remember them (Privacy names this key). */
 export const BESS_STORAGE_KEY = "battery-storage-calculator:v1:inputs";
@@ -33,7 +33,7 @@ export function encodeBessInputs(inputs: BessInputs, base: BessInputs): string {
   const params = new URLSearchParams();
   for (const f of BESS_FIELDS) {
     const v = f.get(inputs);
-    if (!sameValue(v, f.get(base))) params.set(f.id, encodeValue(v));
+    if (!sameValue(v, baseValue(f, inputs, base))) params.set(f.id, encodeValue(v));
   }
   return params.toString();
 }

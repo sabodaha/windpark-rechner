@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { BESS_FILES, type StatsFile } from "./data";
 import { BESS_BASE, parseLibrary, type Library, type LibraryManifest } from "./engine";
-import { computeCore, computeExtras, computeTornado, type BessCore, type BessExtras, type BessTornado } from "./view";
+import { computeCore, computeExtras, computePStar, computeTornado, type BessCore, type BessExtras, type BessPStar, type BessTornado } from "./view";
 
 const file = (p: string) => join(process.cwd(), "public", p);
 
@@ -26,6 +26,7 @@ export interface BessBase {
   core: BessCore;
   extras: BessExtras;
   tornado: BessTornado;
+  pstar: BessPStar;
 }
 
 let base: BessBase | null = null;
@@ -34,7 +35,12 @@ export function bessBase(): BessBase {
   if (!base) {
     const lib = loadLibrary();
     const core = computeCore(BESS_BASE, lib);
-    base = { core, extras: computeExtras(BESS_BASE, lib, core.result.funding), tornado: computeTornado(BESS_BASE, lib, core.result.funding) };
+    base = {
+      core,
+      extras: computeExtras(BESS_BASE, lib, core.result.funding),
+      tornado: computeTornado(BESS_BASE, lib, core.result.funding),
+      pstar: computePStar(BESS_BASE, lib),
+    };
   }
   return base;
 }

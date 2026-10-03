@@ -24,12 +24,14 @@ function Bridge({ core, t }: { core: BessCore; t: BessMessages }) {
   const a = core.result.annual.find((x) => x.year === 2029);
   if (!a) return null;
   const net = a.netRevenueEur;
-  const other = a.ebitdaEur - (net - a.opexEur - a.tariffsEur - a.warExpectedEur);
+  const reserve = a.contractNetEur ?? 0;
+  const other = a.ebitdaEur - (net + reserve - a.opexEur - a.tariffsEur - a.warExpectedEur);
   const rows: { label: string; v: number; total?: boolean }[] = [
     { label: R.pf, v: a.pfMarginEur, total: true },
     { label: R.capture, v: a.capturedMarginEur - a.pfMarginEur },
     { label: R.fee, v: -a.optimiserFeeEur },
     { label: R.net, v: net, total: true },
+    ...(a.contractNetEur !== undefined ? [{ label: R.contract, v: reserve }] : []),
     { label: R.opex, v: -a.opexEur },
     { label: R.tariffs, v: -a.tariffsEur },
     { label: R.war, v: -a.warExpectedEur },

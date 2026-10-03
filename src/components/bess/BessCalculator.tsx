@@ -2,9 +2,10 @@
 
 import { Check, CircleAlert, Link2, RotateCcw, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import { BESS_DATA_AS_OF, BESS_SPEC_REVISION, type PriceStats } from "@/bess/data";
 import { BESS_BASE } from "@/bess/engine";
+import { BESS_FIELDS } from "@/bess/fields";
 import { bessEn } from "@/bess/messages";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import { useFormat } from "@/components/site/LocaleProvider";
 import { PATHS } from "@/lib/site";
 import { BessBattery } from "./BessBattery";
 import { BessChecks } from "./BessChecks";
+import { BessContract, StatusCard } from "./BessContract";
 import { BessDebt } from "./BessDebt";
 import { BessInputsPanel } from "./BessInputs";
 import { BessKpis } from "./BessKpis";
@@ -23,10 +25,20 @@ import { BessRevenue } from "./BessRevenue";
 import { BessRisks } from "./BessRisks";
 import { BessSensitivity } from "./BessSensitivity";
 import { BessTable } from "./BessTable";
+import { ContractCard } from "./ContractCard";
+import { blockedStatus } from "./contractText";
 import { type BessInitial, useBessCalculator } from "./useBessCalculator";
 import { WhatItTakes } from "./WhatItTakes";
 
 type Tab = keyof typeof bessEn.tabs;
+
+/** The contract switch (spec v1.1 §15): the first screen's card turns it on. */
+const CONTRACT_FIELD = BESS_FIELDS.find((f) => f.id === "ctr")!;
+/** The reserve contract's chart colour, a sixth categorical series. Scoped to this calculator: the shared stylesheet
+ *  is also what the wind farm's published PDF report is printed from. */
+const CONTRACT_SERIES = { "--series-6": "#7c5cc4" } as CSSProperties;
+/** Tabs that still mean something when a contract case has no result: why not, and the checks behind it. */
+const WITHOUT_RESULT: Tab[] = ["contract", "checks"];
 
 interface Props {
   initial: BessInitial;
@@ -60,9 +72,20 @@ export function BessCalculator({ initial, stats, libraryVersion }: Props) {
 
   const panel = <BessInputsPanel inputs={inputs} base={BESS_BASE} onChange={calc.setField} t={t} />;
   const shownInputs = core.inputs;
+  const blocked = blockedStatus(core);
+  const award = shownInputs.contract?.enabled ? shownInputs.contract.acceptedMW : null;
+  const results = useRef<HTMLElement>(null);
+  const openContract = () => {
+    setTab("contract");
+    results.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  const addContract = () => {
+    calc.setField(CONTRACT_FIELD, true);
+    openContract();
+  };
 
   return (
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-4 px-4 py-5 sm:px-6 lg:py-8">
+    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-4 px-4 py-5 sm:px-6 lg:py-8" style={CONTRACT_SERIES}>
       <header className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{t.header.title}</h1>
@@ -73,7 +96,7 @@ export function BessCalculator({ initial, stats, libraryVersion }: Props) {
           {calc.restored && <span className="text-xs text-muted-foreground">{t.header.restored}</span>}
         </div>
         <p className="text-sm text-muted-foreground">
-          {t.header.subtitle(shownInputs.powerMW, shownInputs.powerMW * shownInputs.durationH, shownInputs.durationH)}
+          {t.header.subtitle(shownInputs.powerMW, shownInputs.powerMW * shownInputs.durationH, shownInputs.durationH, award)}
         </p>
         {calc.ignored.length > 0 && (
           <p role="status" className="w-fit rounded-md border border-border bg-card px-2.5 py-1.5 text-xs">
@@ -112,6 +135,8 @@ export function BessCalculator({ initial, stats, libraryVersion }: Props) {
       )}
 
       <WhatItTakes core={core} extras={calc.extras} tb2={tb2} t={t} onAlternatives={() => setTab("sensitivity")} />
+
+      <ContractCard core={core} pstar={calc.pstar} t={t} onAdd={addContract} onDetails={openContract} />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
         <div className="no-print flex flex-wrap items-center gap-2">
@@ -155,7 +180,7 @@ export function BessCalculator({ initial, stats, libraryVersion }: Props) {
           </Card>
         </aside>
 
-        <section className="min-w-0" aria-label={t.resultsLabel}>
+        <section ref={results} className="min-w-0 scroll-mt-28" aria-label={t.resultsLabel}>
           <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
             <TabsList>
               {(Object.keys(t.tabs) as Tab[]).map((key) => (
@@ -164,30 +189,26 @@ export function BessCalculator({ initial, stats, libraryVersion }: Props) {
                 </TabsTrigger>
               ))}
             </TabsList>
-            <TabsContent value="overview">
-              <BessOverview core={core} t={t} />
-            </TabsContent>
-            <TabsContent value="revenue">
-              <BessRevenue core={core} stats={stats} t={t} />
-            </TabsContent>
-            <TabsContent value="battery">
-              <BessBattery core={core} t={t} />
-            </TabsContent>
-            <TabsContent value="debt">
-              <BessDebt core={core} t={t} />
-            </TabsContent>
-            <TabsContent value="risks">
-              <BessRisks core={core} t={t} />
+            {blocked && !WITHOUT_RESULT.includes(tab) && (
+              <div className="mt-4">
+                <StatusCard core={core} pstar={calc.pstar} t={t} />
+              </div>
+            )}
+            <TabsContent value="overview">{!blocked && <BessOverview core={core} t={t} />}</TabsContent>
+            <TabsContent value="revenue">{!blocked && <BessRevenue core={core} stats={stats} t={t} />}</TabsContent>
+            <TabsContent value="battery">{!blocked && <BessBattery core={core} t={t} />}</TabsContent>
+            <TabsContent value="debt">{!blocked && <BessDebt core={core} t={t} />}</TabsContent>
+            <TabsContent value="risks">{!blocked && <BessRisks core={core} t={t} />}</TabsContent>
+            <TabsContent value="contract">
+              <BessContract core={core} pstar={calc.pstar} t={t} onSwitchOn={() => calc.setField(CONTRACT_FIELD, true)} />
             </TabsContent>
             <TabsContent value="sensitivity">
-              <BessSensitivity core={core} extras={calc.extras} tornado={calc.tornado} onShow={onTornado} t={t} />
+              {!blocked && <BessSensitivity core={core} extras={calc.extras} tornado={calc.tornado} onShow={onTornado} t={t} />}
             </TabsContent>
             <TabsContent value="checks">
               <BessChecks core={core} t={t} />
             </TabsContent>
-            <TabsContent value="tables">
-              <BessTable core={core} t={t} />
-            </TabsContent>
+            <TabsContent value="tables">{!blocked && <BessTable core={core} t={t} />}</TabsContent>
           </Tabs>
         </section>
       </div>

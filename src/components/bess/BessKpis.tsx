@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useFormat } from "@/components/site/LocaleProvider";
 import type { Format } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { blockedStatus, reasonText } from "./contractText";
 
 /** A metric as text: its value when valid, else the word for its status and why. */
 export function metricText(m: Metric | undefined, show: (v: number) => string, t: BessMessages, f: Format): { text: string; hint?: string; flagged: boolean } {
@@ -30,6 +31,9 @@ export function BessKpis({ core, t, pending, onChecks }: Props) {
   const f = useFormat();
   const { result, inputs, noDebt } = core;
   const k = result.kpis;
+  // a contract case without a result shows no numbers, only why (spec v1.1 §14)
+  const blocked = blockedStatus(core);
+  const bridge = result.contract?.bridge2029PerMW;
   const irr = metricText(k.investorIrr, (v) => f.pct(v, 1), t, f);
   const plainIrr = noDebt ? metricText(noDebt.investorIrr, (v) => f.pct(v, 1), t, f).text : null;
   const npv = k.investorNpv?.value ?? null;
@@ -50,10 +54,13 @@ export function BessKpis({ core, t, pending, onChecks }: Props) {
       sub: lender !== null ? `${t.kpis.lenderCase}: ${f.ratio(lender)}` : "",
       critical: (k.minDscr?.value ?? Infinity) < 1.05,
     },
-    { key: "netRevenue", value: f.eurCompact(k.netRevenue2029PerMW?.value ?? null), sub: t.kpis.perMw },
+    bridge
+      ? { key: "netRevenueContract", value: f.eurCompact(bridge.net), sub: `${t.kpis.perMw} · ${t.kpis.contractShort}` }
+      : { key: "netRevenue", value: f.eurCompact(k.netRevenue2029PerMW?.value ?? null), sub: t.kpis.perMw },
     { key: "lcos", value: lcosText(k.lcos?.value ?? null, f), sub: "" },
     { key: "payback", value: payback === null ? t.kpis.notReached : `${f.num(payback, 1)} ${t.kpis.years}`, sub: "" },
   ];
+  if (blocked) for (const tile of tiles) Object.assign(tile, { value: "—", sub: "", critical: false, extra: undefined });
   return (
     <div className={cn("grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6", pending && "opacity-60 transition-opacity")} aria-busy={pending}>
       {tiles.map((tile) => {
@@ -68,16 +75,35 @@ export function BessKpis({ core, t, pending, onChecks }: Props) {
             <PopoverContent className="w-72">
               {tile.extra && <p className="mb-1 font-medium">{tile.extra}</p>}
               {meta.hint}
-              {tile.key === "investorIrr" && noDebt && <p className="mt-2 text-muted-foreground">{t.kpis.noDebtHint}</p>}
+              {tile.key === "investorIrr" && noDebt && !blocked && <p className="mt-2 text-muted-foreground">{t.kpis.noDebtHint}</p>}
             </PopoverContent>
           </Popover>
         );
       })}
       <span className="sr-only" aria-live="polite">
-        {pending ? t.kpis.stale : `${t.kpis.investorIrr.label} ${irr.text}`}
+        {pending ? t.kpis.stale : blocked ? t.caseStatus.title[blocked] : `${t.kpis.investorIrr.label} ${irr.text}`}
       </span>
-      <ValidityLine core={core} t={t} onClick={onChecks} />
+      {blocked ? <StatusLine core={core} t={t} onClick={onChecks} /> : <ValidityLine core={core} t={t} onClick={onChecks} />}
     </div>
+  );
+}
+
+/** For a contract case without a result: its status and the reasons, in place of the numbers. */
+function StatusLine({ core, t, onClick }: { core: BessCore; t: BessMessages; onClick: () => void }) {
+  const { primary, reasons } = core.result.status;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="col-span-2 flex items-start gap-1.5 rounded-lg px-1 text-left text-xs text-critical sm:col-span-3 lg:col-span-6"
+    >
+      <CircleAlert className="mt-px size-4 shrink-0" aria-hidden />
+      <span>
+        <span className="font-medium">{t.caseStatus.title[primary] ?? primary}: </span>
+        {reasons.map((r) => reasonText(t, r)).join("; ")}
+        <span className="text-muted-foreground underline-offset-2 hover:underline"> · {t.validity.details}</span>
+      </span>
+    </button>
   );
 }
 

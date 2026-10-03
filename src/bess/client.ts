@@ -2,7 +2,7 @@
 // is kept (an older one resolves as SUPERSEDED), and the main run goes before break-even and sensitivity.
 import type { BessInputs, LockedFunding } from "./engine";
 import type { JobKind, WorkerRequest, WorkerResponse } from "./protocol";
-import type { BessCore, BessExtras, BessTornado } from "./view";
+import type { BessCore, BessExtras, BessPStar, BessTornado } from "./view";
 
 export const SUPERSEDED = Symbol("superseded");
 export type Superseded = typeof SUPERSEDED;
@@ -15,7 +15,7 @@ interface Job {
   reject: (e: Error) => void;
 }
 
-const PRIORITY: JobKind[] = ["core", "extras", "tornado"];
+const PRIORITY: JobKind[] = ["core", "extras", "pstar", "tornado"];
 
 export class BessClient {
   private worker: Worker | null = null;
@@ -33,6 +33,10 @@ export class BessClient {
 
   tornado(inputs: BessInputs, funding: LockedFunding) {
     return this.submit<BessTornado>("tornado", { inputs, funding });
+  }
+
+  pstar(inputs: BessInputs) {
+    return this.submit<BessPStar>("pstar", { inputs });
   }
 
   dispose() {

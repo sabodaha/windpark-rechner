@@ -19,6 +19,7 @@ export function BessTable({ core, t }: { core: BessCore; t: BessMessages }) {
     { label: L.captured, values: col((r) => r.capturedMarginEur), indent: true },
     { label: L.fee, values: col((r) => -r.optimiserFeeEur), indent: true },
     { label: L.net, values: col((r) => r.netRevenueEur), bold: true },
+    ...(a.some((r) => r.contractNetEur !== undefined) ? [{ label: L.contract, values: col((r) => r.contractNetEur ?? 0) }] : []),
     { label: L.opex, values: col((r) => -r.opexEur) },
     { label: L.tariffs, values: col((r) => -r.tariffsEur) },
     { label: L.war, values: col((r) => -r.warExpectedEur) },

@@ -7,7 +7,7 @@ export interface BessSource {
   date: string;
   /** What the model takes from it, for the Sources page. */
   used: string;
-  group: "prices" | "technology" | "costs" | "grid" | "war" | "finance" | "tax" | "macro";
+  group: "prices" | "reserves" | "technology" | "costs" | "grid" | "war" | "finance" | "tax" | "macro";
 }
 
 export const BESS_SOURCES: Record<string, BessSource> = {
@@ -38,6 +38,83 @@ export const BESS_SOURCES: Record<string, BessSource> = {
     date: "2026-10-02",
     used: "Daily top-two-hour spreads of the neighbouring EU markets in 2025 (average €140.52 per MWh against €181.75 in Ukraine): where the spread paths converge.",
     group: "prices",
+  },
+  marketRules: {
+    title: "Market Rules (NEURC resolution 307), edition of 11 June 2026",
+    url: "https://zakon.rada.gov.ua/laws/show/v0307874-18",
+    date: "2026-10-02",
+    used:
+      "Special auctions for ancillary services: awards of 13 months to five years at a euro price fixed at the National " +
+      "Bank’s average rate of the auction month; a performance security of €30,000 per MW; a start up to four months late " +
+      "against a 20% top-up, a quarter of which is kept each month; availability penalties at twice the fee for aFRR; " +
+      "offset of a balancing provider’s claims and debts within the same month; payment terms.",
+    group: "reserves",
+  },
+  tsc: {
+    title: "Transmission System Code (NEURC resolution 309), edition of 1 September 2026",
+    url: "https://zakon.rada.gov.ua/laws/show/v0309874-18",
+    date: "2026-10-02",
+    used: "aFRR must hold full activation for at least one hour each way; a provider’s certificate is valid for 60 months.",
+    group: "reserves",
+  },
+  ukrenergoCaps: {
+    title: "Ukrenergo: price caps for ancillary services, 2027",
+    url: "https://ua.energy/wp-content/uploads/2026/09/granychni-tsiny-na-DP-2027.pdf",
+    date: "2026-10-02",
+    used:
+      "Cap of 1,339.82 UAH per MW-hour for symmetric aFRR, unchanged since 2022: about €25 at the rate of the auction " +
+      "month. The model keeps it for later auctions as a scenario.",
+    group: "reserves",
+  },
+  ukrenergoAuctions: {
+    title: "Ukrenergo: ancillary services market, winners of the special auctions",
+    url: "https://ua.energy/dopomizhni-poslugy/",
+    date: "2026-10-03",
+    used:
+      "Special auctions for aFRR on 22 August and 24 December 2024 and 27 May 2025 (for FCR on 15 August 2024), priced in " +
+      "euros at the average rate of the auction month; none since.",
+    group: "reserves",
+  },
+  ukrenergoRoundMay2025: {
+    title: "Ukrenergo (official Telegram channel): final results of the special auction of 27 May 2025",
+    url: "https://t.me/Ukrenergo/3998",
+    date: "2026-10-03",
+    used:
+      "Symmetric aFRR at a weighted average of 786.95 UAH per MW-hour, about €17 at the rate of May 2025: the default " +
+      "price of a new award.",
+    group: "reserves",
+  },
+  ukrenergoRoundDec2024: {
+    title: "Ukrenergo (official Telegram channel): results of the special auction of 24 December 2024",
+    url: "https://t.me/Ukrenergo/3654",
+    date: "2026-10-03",
+    used: "Symmetric aFRR at an average of 1,263.08 UAH per MW-hour, about €29 at the rate of December 2024.",
+    group: "reserves",
+  },
+  ukrenergoRoundAug2024: {
+    title: "Ukrenergo (official Telegram channel): results of the special auction of 22 August 2024",
+    url: "https://t.me/Ukrenergo/3305",
+    date: "2026-10-03",
+    used: "Symmetric aFRR at a weighted average of 1,219.41 UAH per MW-hour, about €27 at the rate of August 2024.",
+    group: "reserves",
+  },
+  neurc1294: {
+    title: "NEURC resolution 1294 of 3 August 2026: wartime relief for ancillary-service providers",
+    url: "https://www.nerc.gov.ua/acts/pro-vnesennia-zminy-do-postanovy-nkrekp-vid-25-liutoho-2022-roku-332",
+    date: "2026-10-02",
+    used:
+      "From 1 September 2026, documented emergency outages and grid constraints are relieved of non-compliance fees: the " +
+      "model counts only failures without relief.",
+    group: "reserves",
+  },
+  neurcOpenData: {
+    title: "NEURC: open data on the electricity market during the war",
+    url: "https://www.nerc.gov.ua/storage/app/sites/1/Docs/Monitoryng/Vidkryti_dani/Open_Data_During_the_War%20_01.09.2026.xlsx",
+    date: "2026-10-02",
+    used:
+      "Balancing energy of 2025: up at 8,482 UAH per MWh and down at 662 UAH against a day-ahead average of 5,292 — the " +
+      "“balancing prices of 2025” switch (all products, so an upper bound for aFRR).",
+    group: "reserves",
   },
   lazardLcos: {
     title: "Lazard: Levelized Cost of Energy+ (storage), 2025",
@@ -223,4 +300,4 @@ export const BESS_SOURCES: Record<string, BessSource> = {
   },
 };
 
-export const BESS_SOURCE_GROUPS: BessSource["group"][] = ["prices", "technology", "costs", "grid", "war", "finance", "tax", "macro"];
+export const BESS_SOURCE_GROUPS: BessSource["group"][] = ["prices", "reserves", "technology", "costs", "grid", "war", "finance", "tax", "macro"];

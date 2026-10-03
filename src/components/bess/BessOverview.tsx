@@ -23,6 +23,9 @@ export function BessOverview({ core, t }: { core: BessCore; t: BessMessages }) {
   const debt = k.debtEur?.value ?? 0;
   const years = operatingYears(core);
   const M = millions(f);
+  // v1.1a: the reserve contract's 2029 lines and its yearly cash, when one runs (spec v1.1 §13)
+  const bridge = result.contract && !result.contract.cancelled ? result.contract.bridge2029PerMW : null;
+  const contractCash = years.some((a) => a.contractNetEur !== undefined);
   return (
     <div className="flex flex-col gap-4">
       <Card>
@@ -33,6 +36,7 @@ export function BessOverview({ core, t }: { core: BessCore; t: BessMessages }) {
           {y29 && (
             <>
               <p>{O.revenue(perMw(y29.pfMarginEur), perMw(y29.netRevenueEur), f.pct(inputs.captureFactor, 0), f.pct(inputs.optimiserFeeRate, 0))}</p>
+              {bridge && <p>{O.contract(f.eurCompact(bridge.capacity), f.eurCompact(bridge.net - bridge.daNet))}</p>}
               <p>{O.costs(perMw(y29.opexEur + y29.tariffsEur + y29.warExpectedEur), perMw(y29.ebitdaEur))}</p>
             </>
           )}
@@ -56,6 +60,7 @@ export function BessOverview({ core, t }: { core: BessCore; t: BessMessages }) {
             years={years.map((a) => a.year)}
             bars={[
               { id: "net", label: O.netRevenue, color: SERIES[0]!, values: years.map((a) => M.m(a.netRevenueEur)) },
+              ...(contractCash ? [{ id: "reserve", label: O.reserve, color: "var(--series-6)", values: years.map((a) => M.m(a.contractNetEur ?? 0)) }] : []),
               { id: "opex", label: O.opex, color: SERIES[1]!, values: years.map((a) => M.m(-a.opexEur)) },
               { id: "tariffs", label: O.tariffs, color: SERIES[2]!, values: years.map((a) => M.m(-a.tariffsEur)) },
               { id: "war", label: O.war, color: SERIES[3]!, values: years.map((a) => M.m(-a.warExpectedEur)) },

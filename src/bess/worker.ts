@@ -3,7 +3,7 @@
 import { BESS_FILES } from "./data";
 import { parseLibrary, type Library, type LibraryManifest } from "./engine";
 import type { WorkerRequest, WorkerResponse } from "./protocol";
-import { computeCore, computeExtras, computeTornado } from "./view";
+import { computeCore, computeExtras, computePStar, computeTornado } from "./view";
 
 const scope = globalThis as unknown as {
   postMessage(message: WorkerResponse): void;
@@ -39,9 +39,11 @@ scope.onmessage = async (e) => {
     const value =
       req.kind === "core"
         ? computeCore(req.inputs, lib)
-        : req.kind === "extras"
-          ? computeExtras(req.inputs, lib, req.funding)
-          : computeTornado(req.inputs, lib, req.funding);
+        : req.kind === "pstar"
+          ? computePStar(req.inputs, lib)
+          : req.kind === "extras"
+            ? computeExtras(req.inputs, lib, req.funding)
+            : computeTornado(req.inputs, lib, req.funding);
     scope.postMessage({ id: req.id, ok: true, value });
   } catch (err) {
     scope.postMessage({ id: req.id, ok: false, error: err instanceof Error ? err.message : String(err) });
