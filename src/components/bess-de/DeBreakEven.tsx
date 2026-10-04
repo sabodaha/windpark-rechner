@@ -78,7 +78,13 @@ export function DeBreakEven({ core, extras, t, onDetails }: { core: DeCore; extr
           <div className="text-sm leading-relaxed text-foreground/85" aria-live="polite">
             {answer}
             {toll && <p className="mt-1 text-muted-foreground">{B.market(eur(DE_TOLL_MARKET.lowEur), eur(DE_TOLL_MARKET.highEur))}</p>}
-            {stack && core.stack && <p className="mt-1 text-muted-foreground">{B.reserveStart(f.dateLabel(`${core.stack.reserveStart}-01`).replace(/^\d+\s/, ""))}</p>}
+            {stack && core.stack && (
+              <p className="mt-1 text-muted-foreground">
+                {core.stack.firstOffer
+                  ? B.reserveStart(f.dateLabel(`${core.stack.firstOffer}-01`).replace(/^\d+\s/, ""), core.stack.heldYears.join(", "))
+                  : B.reserveNever}
+              </p>
+            )}
             {stack && extras?.market2030PerMwEur != null && (
               <p className="mt-1 text-muted-foreground">{B.benchmark(kEur(extras.market2030PerMwEur), kEur(DE_MARKET_2030.ffePwcEur), kEur(DE_MARKET_2030.modoEur))}</p>
             )}

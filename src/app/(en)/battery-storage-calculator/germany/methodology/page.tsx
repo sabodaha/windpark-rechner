@@ -162,6 +162,8 @@ export default function GermanBessMethodologyPage() {
   const perDirection = inp.activationShare * 8760;
   const cycleBudget = core.checks.find((c) => c.id === "afrrCycleBudget");
   const m2030 = extras.market2030PerMwEur;
+  // the wholesale share of 2029: during the toll, less the aFRR share in a year that holds aFRR
+  const wholesale2029 = (1 - s) * (held.includes(2029) ? 1 - inp.afrrShare : 1);
 
   // calendar
   const contractCod = addMonths(DE_CASE.financialClose.slice(0, 7), DE_CASE.constructionMonths);
@@ -647,9 +649,10 @@ aFRR share      = (1 − s) · f          f = ${pct(inp.afrrShare, 0)} in a year
               2026 implies about the same — a revenue equivalent, not an observed split.
             </li>
             <li>
-              aFRR starts three months after commercial operation{reserveStart ? `, in ${reserveStart} in the base case` : ""}:
+              aFRR may start three months after commercial operation{reserveStart ? ` — in the base case from ${reserveStart}` : ""}:
               prequalification decides a complete application within three months, and the model assumes it is filed before the
-              plant starts. A delay moves the start; the intraday uplift runs from commercial operation.
+              plant starts. From then on aFRR is offered only in the years it is held. A delay moves the start; the intraday
+              uplift runs from commercial operation.
             </li>
             <li>
               The battery bids through its optimiser’s prequalified pool, which provides recharging, a reserve against outages,
@@ -705,11 +708,13 @@ aFRR revenue = offer · (π+ + π−) · φ · R(y) · ρ · 24 · days · avail
 w(y) = Σ [captured + u · max(captured, 0) − fee · (1 + u) · max(captured, 0)] / P
 aFRR is held in year y   if   a(y) ≥ w(y)`}</pre>
           <p>
-            The sums run over the year’s months of operation from the start of aFRR; a year without them holds no aFRR. The rule
-            is decided in advance and does not depend on the toll price, so the break-even toll price stays well defined; at the
-            switch both choices earn the same, so the result moves smoothly with k. It leaves out the wear of activation, so
-            day-ahead only is a floor of the market revenue up to that wear and the fee. Over the life of every acceptance case
-            the stack earns at least 99% of day-ahead only, and in the base case aFRR is held in {heldText}.
+            The sums run over the year’s months of operation from the start of aFRR; a year without them holds no aFRR, and a
+            tie holds it. The rule is decided in advance and does not depend on the toll price, so the break-even toll price
+            stays well defined. At the switch both choices earn the same on this comparison — which does not make the case’s
+            own cash flows or NPV move smoothly with k: the case’s history differs from the LCOS run, and the market share
+            changes within the year the toll ends. The rule leaves out the wear of activation, so day-ahead only is a floor of
+            the market revenue up to that wear and the fee. Over the life of every acceptance case the stack earns at least 99%
+            of day-ahead only, and in the base case aFRR is held in {heldText}.
           </p>
           <h3>Activation</h3>
           <pre>{`activation, each direction = offer · ${pct(inp.activationShare, 0)} · 24 · days · availability          MWh`}</pre>
@@ -737,7 +742,7 @@ aFRR is held in year y   if   a(y) ≥ w(y)`}</pre>
             head={["2029", "€ per MW"]}
             num={[1]}
             rows={[
-              [`${deEn.revenue.sales} (${pct(1 - s, 0)} of the battery)`, seur(bridge.salesEur)],
+              [`${deEn.revenue.sales} (${pct(wholesale2029, 0)} of the battery)`, seur(bridge.salesEur)],
               [deEn.revenue.purchases, seur(-bridge.purchasesEur)],
               [deEn.revenue.margin, seur(bridge.marginEur)],
               [deEn.revenue.capture, seur(bridge.captureEur)],

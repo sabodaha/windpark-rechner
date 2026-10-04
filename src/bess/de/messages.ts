@@ -142,7 +142,9 @@ export const deEn = {
       "A scenario of the day-ahead market only, without the intraday market and reserves, which gave the main revenue of German batteries in 2026. Nothing is tuned to reach a target.",
     honestStack:
       "Reserves and intraday trading on cautious assumptions: aFRR capacity only in the years it pays more than trading, intraday as a fixed uplift on the day-ahead margin; no FCR and no income from aFRR activation. Nothing is tuned to reach a target.",
-    reserveStart: (month: string) => `aFRR capacity starts in ${month}, three months after commercial operation (prequalification).`,
+    reserveStart: (month: string, years: string) =>
+      `aFRR capacity is offered from ${month} — prequalification takes three months after commercial operation — and only in the years it pays more than trading: ${years}.`,
+    reserveNever: "aFRR capacity is never offered: trading pays more in every year.",
     benchmark: (model: string, ffe: string, modo: string) =>
       `Market revenue of the whole battery in 2030: ${model} per MW in the model, against ${ffe} in FfE/PwC’s forecast (September 2026) and ${modo} in Modo Energy’s (March 2026; its April update cut lifetime revenue by 16%).`,
     pathsTitle: "The three reserve saturation paths",
@@ -218,8 +220,8 @@ export const deEn = {
     rev: {
       label: "Revenue scenario",
       hint:
-        "With reserves, the market share also offers aFRR capacity in the years that pays more than trading, and trades " +
-        "intraday as well as day-ahead. The paths differ in how fast reserve prices fall as batteries flood the market: " +
+        "With reserves, the market share also offers aFRR capacity in the years when that pays more than trading, and " +
+        "trades intraday as well as day-ahead. The paths differ in how fast reserve prices fall as batteries flood the market: " +
         "central (after FfE/PwC, September 2026), fast exit, slow. Day-ahead only is the calculation of the previous version.",
     },
     idu: {

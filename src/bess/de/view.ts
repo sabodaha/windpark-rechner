@@ -121,16 +121,22 @@ export interface DeCore {
   firstDeficit: string | null;
   /** With a loan: the same project without one — what the asset earns before leverage. */
   noDebt: { investorIrr: DeMetric; investorNpv: number | null } | null;
-  /** The revenue stack of the case (spec R3.1): the first aFRR month and the years aFRR is held; null without it. */
-  stack: { reserveStart: string; heldYears: number[] } | null;
+  /** The revenue stack of the case (spec R3.1): the earliest eligible aFRR month (COD + 3), the first month aFRR is
+   *  actually offered (null if never) and the years aFRR is held; null without the stack. */
+  stack: { reserveStart: string; firstOffer: string | null; heldYears: number[] } | null;
 }
 
 export function computeDeCore(inputs: DeInputs, lib: DeLibrary): DeCore {
   const r = runDe(inputs, lib, { funding: contractualFunding(inputs, lib) });
   const plain = inputs.debt && r.status.primary === "ok" ? runDe({ ...inputs, debt: false }, lib) : null;
   const noDebt = plain?.kpis ? { investorIrr: plain.kpis.investorIrr!, investorNpv: plain.kpis.investorNpvEur!.value } : null;
+  const firstOffer = r.ops?.months.find((o) => o.afrrSliceShare > 0) ?? null;
   const stack = r.stack && r.cal
-    ? { reserveStart: ym(r.stack.reserveStartIndex), heldYears: r.stack.years.filter((y) => y.held).map((y) => y.year) }
+    ? {
+        reserveStart: ym(r.stack.reserveStartIndex),
+        firstOffer: firstOffer ? ym(firstOffer.index) : null,
+        heldYears: r.stack.years.filter((y) => y.held).map((y) => y.year),
+      }
     : null;
   const base = { inputs, status: r.status, checks: r.checks, kpis: r.kpis, funding: r.funding, market: r.market ?? null, noDebt, stack };
   if (!r.cal || !r.ops || !r.ledger || !r.capex) {
