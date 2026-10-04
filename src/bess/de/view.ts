@@ -260,18 +260,21 @@ export interface DePathResult {
 
 /** The first screen's answer (spec §9.3): the break-even toll price T* with a toll, the break-even spread multiplier k
  *  without one. Slow (about forty full runs each); it follows the main run. With the revenue stack (spec R3.1 §8): the
- *  same for the three saturation paths, and the 2030 market revenue per MW of the whole battery without a toll — the
- *  number set beside the public forecasts. */
+ *  2030 market revenue per MW of the whole battery without a toll — the number set beside the public forecasts. The
+ *  three saturation paths follow, one at a time (`computeDePath`). */
 export interface DeExtras {
   tStar: TStarResult | null;
   k: KResult | null;
-  paths: DePathResult[] | null;
   market2030PerMwEur: number | null;
 }
 
-const PATH_ORDER: DeReservePath[] = ["central", "fast", "slow"];
+/** The break-even of one set of inputs: T* with a toll, k without one. */
+export type DeBreakEvenResult = Pick<DeExtras, "tStar" | "k">;
 
-function breakEven(inputs: DeInputs, lib: DeLibrary): { tStar: TStarResult | null; k: KResult | null } {
+/** The order of the paths in the first screen's table. */
+export const DE_PATH_ORDER: DeReservePath[] = ["central", "fast", "slow"];
+
+function breakEven(inputs: DeInputs, lib: DeLibrary): DeBreakEvenResult {
   const toll = inputs.tollEnabled && inputs.tollShare > 0;
   const delayedLoan = inputs.debt && inputs.codDelayMonths > 0;
   return { tStar: toll ? (delayedLoan ? tStarDelayed(inputs, lib) : tStarOfCase(inputs, lib)) : null, k: toll ? null : kOfCase(inputs, lib) };
@@ -279,18 +282,27 @@ function breakEven(inputs: DeInputs, lib: DeLibrary): { tStar: TStarResult | nul
 
 export function computeDeExtras(inputs: DeInputs, lib: DeLibrary): DeExtras {
   const own = breakEven(inputs, lib);
-  if (inputs.stackEnabled !== true) return { ...own, paths: null, market2030PerMwEur: null };
-  const paths = PATH_ORDER.map((path): DePathResult => {
-    const at = { ...inputs, reservePath: path };
-    const r = runDe(at, lib, { funding: contractualFunding(at, lib) });
-    const ok = r.status.primary === "ok" && r.kpis;
-    const be = path === inputs.reservePath ? own : breakEven(at, lib);
-    return { path, investorIrr: ok ? r.kpis!.investorIrr! : null, investorNpv: ok ? r.kpis!.investorNpvEur!.value : null, ...be };
-  });
+  if (inputs.stackEnabled !== true) return { ...own, market2030PerMwEur: null };
   // the whole battery on the market (the merchant variant, no loan), 2030: toll fee 0, so revenue = market revenue
   const merchant = runDe({ ...inputs, ...DE_VARIANTS.merchant }, lib);
   const y30 = merchant.ledger?.years.find((y) => y.year === 2030);
-  return { ...own, paths, market2030PerMwEur: merchant.status.primary === "ok" && y30 ? y30.revenueEur / inputs.powerMW : null };
+  return { ...own, market2030PerMwEur: merchant.status.primary === "ok" && y30 ? y30.revenueEur / inputs.powerMW : null };
+}
+
+/** One saturation path of the revenue stack — one job of the page's worker, so a new main run never waits long behind
+ *  the table: the investor's result with the loan sized for that path, and its break-even. The selected path keeps the
+ *  break-even already found (`own`, from the extras). */
+export function computeDePath(inputs: DeInputs, lib: DeLibrary, path: DeReservePath, own: DeBreakEvenResult): DePathResult {
+  const at = { ...inputs, reservePath: path };
+  const r = runDe(at, lib, { funding: contractualFunding(at, lib) });
+  const ok = r.status.primary === "ok" && r.kpis;
+  const be = path === inputs.reservePath ? own : breakEven(at, lib);
+  return { path, investorIrr: ok ? r.kpis!.investorIrr! : null, investorNpv: ok ? r.kpis!.investorNpvEur!.value : null, tStar: be.tStar, k: be.k };
+}
+
+/** All three paths at once (build time, for the static page's base case); null without the stack. */
+export function computeDePaths(inputs: DeInputs, lib: DeLibrary, own: DeBreakEvenResult): DePathResult[] | null {
+  return inputs.stackEnabled === true ? DE_PATH_ORDER.map((p) => computeDePath(inputs, lib, p, own)) : null;
 }
 
 /** T* of a delayed case with a loan: at each toll price the loan is sized on the contractual timing and the delay runs

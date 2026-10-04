@@ -3,7 +3,7 @@
 import { ArrowRight, CircleAlert, CircleCheck, Info } from "lucide-react";
 import { DE_MARKET_2030, DE_TOLL_MARKET } from "@/bess/de/data";
 import type { DeMessages } from "@/bess/de/messages";
-import type { DeCore, DeExtras } from "@/bess/de/view";
+import { DE_PATH_ORDER, type DeCore, type DeExtras, type DePathResult } from "@/bess/de/view";
 import { Card, CardContent } from "@/components/ui/card";
 import { useFormat } from "@/components/site/LocaleProvider";
 import { cn } from "@/lib/utils";
@@ -11,9 +11,22 @@ import { cn } from "@/lib/utils";
 /**
  * The first answer of the page (spec §9.3): the toll price at which the investor NPV turns zero, against what the
  * market pays; why it is higher, in four points; and the honest note on what the model leaves out (G17, K20). Without
- * a toll, the break-even spread multiplier instead.
+ * a toll, the break-even spread multiplier instead. With the revenue stack, the three reserve paths below it; their
+ * rows fill as the worker finds them.
  */
-export function DeBreakEven({ core, extras, t, onDetails }: { core: DeCore; extras: DeExtras | null; t: DeMessages; onDetails: () => void }) {
+export function DeBreakEven({
+  core,
+  extras,
+  paths,
+  t,
+  onDetails,
+}: {
+  core: DeCore;
+  extras: DeExtras | null;
+  paths: DePathResult[] | null;
+  t: DeMessages;
+  onDetails: () => void;
+}) {
   const f = useFormat();
   const B = t.breakEven;
   const { inputs } = core;
@@ -89,8 +102,8 @@ export function DeBreakEven({ core, extras, t, onDetails }: { core: DeCore; extr
               <p className="mt-1 text-muted-foreground">{B.benchmark(kEur(extras.market2030PerMwEur), kEur(DE_MARKET_2030.ffePwcEur), kEur(DE_MARKET_2030.modoEur))}</p>
             )}
           </div>
-          {stack && extras?.paths && (
-            <table className="w-full max-w-lg text-sm">
+          {stack && (
+            <table className="w-full max-w-lg text-sm" aria-busy={(paths?.length ?? 0) < DE_PATH_ORDER.length}>
               <caption className="pb-1 text-left text-xs font-medium text-muted-foreground">{B.pathsTitle}</caption>
               <thead>
                 <tr className="border-b border-border text-xs text-muted-foreground">
@@ -100,15 +113,19 @@ export function DeBreakEven({ core, extras, t, onDetails }: { core: DeCore; extr
                 </tr>
               </thead>
               <tbody>
-                {extras.paths.map((p) => {
-                  const irr = p.investorIrr;
-                  const be = toll
-                    ? p.tStar?.outcome === "found" && p.tStar.value !== null ? eur(p.tStar.value) : "—"
-                    : p.k?.status === "found" && p.k.value !== null ? B.times(f.num(p.k.value, 2)) : "—";
+                {DE_PATH_ORDER.map((id) => {
+                  const p = paths?.find((r) => r.path === id);
+                  const irr = p?.investorIrr;
+                  const irrText = !p ? B.pathPending : irr?.status === "valid" && irr.value !== null ? f.pct(irr.value, 1) : "—";
+                  const be = !p
+                    ? B.pathPending
+                    : toll
+                      ? p.tStar?.outcome === "found" && p.tStar.value !== null ? eur(p.tStar.value) : "—"
+                      : p.k?.status === "found" && p.k.value !== null ? B.times(f.num(p.k.value, 2)) : "—";
                   return (
-                    <tr key={p.path} className={cn("border-b border-border last:border-0", p.path === inputs.reservePath && "font-semibold")}>
-                      <td className="py-1 pr-3">{t.reservePathName[p.path] ?? p.path}</td>
-                      <td className="py-1 pr-3 text-right tabular">{irr?.status === "valid" && irr.value !== null ? f.pct(irr.value, 1) : "—"}</td>
+                    <tr key={id} className={cn("border-b border-border last:border-0", id === inputs.reservePath && "font-semibold")}>
+                      <td className="py-1 pr-3">{t.reservePathName[id] ?? id}</td>
+                      <td className="py-1 pr-3 text-right tabular">{irrText}</td>
                       <td className="py-1 text-right tabular">{be}</td>
                     </tr>
                   );

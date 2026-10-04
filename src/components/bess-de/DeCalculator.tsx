@@ -134,7 +134,7 @@ export function DeCalculator({ initial, stats, libraryVersion }: Props) {
         </Card>
       )}
 
-      <DeBreakEven core={core} extras={calc.extras} t={t} onDetails={openToll} />
+      <DeBreakEven core={core} extras={calc.extras} paths={calc.paths} t={t} onDetails={openToll} />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
         <div className="no-print flex flex-wrap items-center gap-2">

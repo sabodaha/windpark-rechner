@@ -5,12 +5,13 @@ import { DeClient, SUPERSEDED } from "@/bess/de/client";
 import { DE_BASE } from "@/bess/de/registry";
 import type { DeInputs } from "@/bess/de/types";
 import { clearDeInputs, deLinkHasInputs, encodeDeInputs, ignoredDeParams, loadDeInputs, readDeInputs, saveDeInputs } from "@/bess/de/url-state";
-import type { DeCompare, DeCore, DeExtras, DeSensitivity } from "@/bess/de/view";
+import { DE_PATH_ORDER, type DeCompare, type DeCore, type DeExtras, type DePathResult, type DeSensitivity } from "@/bess/de/view";
 import type { FieldDef, FieldValue } from "@/bess/field-kit";
 
 export interface DeInitial {
   core: DeCore;
   extras: DeExtras;
+  paths: DePathResult[] | null;
   sensitivity: DeSensitivity;
   compare: DeCompare;
 }
@@ -19,6 +20,8 @@ export interface DeInitial {
 interface Entry {
   core: DeCore;
   extras?: DeExtras;
+  /** The reserve paths found so far, in the order they arrived. */
+  paths?: DePathResult[] | null;
   sensitivity?: DeSensitivity;
   compare?: DeCompare;
 }
@@ -30,7 +33,8 @@ const CACHE_SIZE = 12;
  * German calculator state. The first render shows the base case computed at build time (the static HTML has it);
  * after mounting, inputs from the link — or the last session, if the visitor asked to remember it — are applied and
  * calculated in a worker. Until a result arrives, the previous one stays on screen, marked as recalculating. The
- * break-even toll price follows every main run; sensitivity and the comparison only while their tab is open.
+ * break-even toll price follows every main run, and with the revenue stack the three reserve paths, one job each;
+ * sensitivity and the comparison only while their tab is open.
  */
 export function useDeCalculator(initial: DeInitial) {
   const [inputs, setInputs] = useState<DeInputs>(DE_BASE);
@@ -110,6 +114,38 @@ export function useDeCalculator(initial: DeInitial) {
       live = false;
     };
   }, [shownKey, entry.extras === undefined, supported, attempt]);
+
+  // the reserve paths of the revenue stack after the break-even price, one job each so that a new main run waits at most
+  // one search: the selected path first (it reuses the price just found), then the others in table order. Paused while
+  // other inputs are pending; a path already asked for is not asked again, and its answer is kept whenever it arrives.
+  const pathJob = useRef<string | null>(null);
+  const pathsFound = entry.paths?.length ?? 0;
+  useEffect(() => {
+    const extras = entry.extras;
+    const inputs = entry.core.inputs;
+    if (!extras || !supported || inputs.stackEnabled !== true || key !== shownKey) return;
+    const order = [inputs.reservePath, ...DE_PATH_ORDER.filter((p) => p !== inputs.reservePath)];
+    const next = order.find((p) => !entry.paths?.some((r) => r.path === p));
+    const k = shownKey;
+    const job = `${attempt}|${k}|${next}`;
+    if (!next || pathJob.current === job) return;
+    pathJob.current = job;
+    const settle = () => {
+      if (pathJob.current === job) pathJob.current = null;
+    };
+    worker()
+      .path(inputs, next, { tStar: extras.tStar, k: extras.k })
+      .then((result) => {
+        settle();
+        if (result === SUPERSEDED) return;
+        const found = (cache.current.get(k)?.paths ?? []).filter((r) => r.path !== result.path);
+        put(k, { paths: [...found, result] });
+      })
+      .catch((e: Error) => {
+        settle();
+        setError(e.message);
+      });
+  }, [key, shownKey, entry.extras === undefined, pathsFound, supported, attempt]);
 
   // sensitivity only while its tab is open
   useEffect(() => {
@@ -209,6 +245,8 @@ export function useDeCalculator(initial: DeInitial) {
     /** What is on screen: the result of `core.inputs`, which lag behind `inputs` while pending. */
     core: entry.core,
     extras: entry.extras ?? null,
+    /** The reserve paths found so far (stack on); null before the first or without the stack. */
+    paths: entry.paths ?? null,
     sensitivity: entry.sensitivity ?? null,
     compare: entry.compare ?? null,
     pending: shownKey !== key && !error,

@@ -3,10 +3,11 @@
 // (gate 1c); the lower bound of day-ahead only (gate 1b); the cycle budget; the two output contracts.
 import { describe, expect, it } from "vitest";
 import { toDeOutput } from "@/bess/de/export";
-import { runDe, type DeResult } from "@/bess/de/index";
+import { contractualFunding, runDe, type DeResult } from "@/bess/de/index";
 import { reserveMultiplier } from "@/bess/de/operations";
 import { DE_BASE, DE_STACK, DE_STACK_INPUTS, DE_VARIANTS, idxDE } from "@/bess/de/registry";
 import type { DeInputs } from "@/bess/de/types";
+import { computeDePath, computeDePaths, DE_PATH_ORDER, type DeBreakEvenResult } from "@/bess/de/view";
 import { syntheticDeLibrary } from "../scripts/bess/de-synthetic";
 
 const lib = syntheticDeLibrary();
@@ -153,5 +154,17 @@ describe("German pack — revenue stack (spec R3.1)", () => {
       const rule = base.stack!.years.find((s) => s.year === y.year)!;
       expect([y.reserveHeld, y.reserveMultiplier]).toEqual([rule.held, rule.multiplier]);
     }
+  });
+
+  it("the first screen's paths: one run per path on its own loan, the selected path keeps the break-even found", () => {
+    const own = { tStar: { outcome: "found", value: 1, coverage: null, candidates: [], roots: [], brackets: [] }, k: null } as unknown as DeBreakEvenResult;
+    const p = computeDePath(DE_BASE, lib, DE_BASE.reservePath, own);
+    const fresh = runDe(DE_BASE, lib, { funding: contractualFunding(DE_BASE, lib) });
+    expect(p.path).toBe(DE_BASE.reservePath);
+    expect(p.tStar).toBe(own.tStar);
+    expect(p.investorIrr).toEqual(fresh.kpis!.investorIrr);
+    expect(p.investorNpv).toBe(fresh.kpis!.investorNpvEur!.value);
+    expect(DE_PATH_ORDER).toEqual(["central", "fast", "slow"]);
+    expect(computeDePaths(dayAhead, lib, own)).toBeNull();
   });
 });

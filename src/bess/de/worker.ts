@@ -6,7 +6,7 @@ import { parseLibrary, type Library, type LibraryManifest } from "../engine";
 import { DE_FILES } from "./data";
 import { parseDeLibrary, type DeLibrary, type DeLibraryManifest } from "./library";
 import type { DeWorkerRequest, DeWorkerResponse } from "./protocol";
-import { computeDeCompare, computeDeCore, computeDeExtras, computeDeSensitivity } from "./view";
+import { computeDeCompare, computeDeCore, computeDeExtras, computeDePath, computeDeSensitivity } from "./view";
 
 const scope = globalThis as unknown as {
   postMessage(message: DeWorkerResponse): void;
@@ -57,6 +57,7 @@ scope.onmessage = async (e) => {
     let value: unknown;
     if (req.kind === "core") value = computeDeCore(req.inputs, lib);
     else if (req.kind === "extras") value = computeDeExtras(req.inputs, lib);
+    else if (req.kind === "path") value = computeDePath(req.inputs, lib, req.path, req.own);
     else if (req.kind === "sensitivity") value = computeDeSensitivity(req.inputs, lib, req.funding);
     else value = computeDeCompare(req.inputs, lib, await loadUa());
     scope.postMessage({ id: req.id, ok: true, value });
