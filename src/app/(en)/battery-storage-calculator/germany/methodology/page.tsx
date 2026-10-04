@@ -1516,13 +1516,63 @@ f_j             = CFADS_j − planned reserve top-up_j − [j > t] · DSRA targe
                 <li>every ledger line within €0.12;</li>
                 <li>the break-even toll price and spread multiplier to the last digit.</li>
               </ul>
-              The project NPVs differ by up to €1,979, inside the €10,000 tolerance. One implementation dates the project’s
-              initial reserve on the first day of the first month of operation and the other on its last day. This is
-              recorded as an exception.
+              The project NPVs differed by up to €1,979, inside the €10,000 tolerance: one implementation dated the project’s
+              initial reserve on the first day of the first month of operation and the other on its last day, and this was
+              recorded as an exception. For version 1.3 the second implementation took the specification’s date, the first day.
+              The two now agree on the project NPVs within €0.07, and the exception is closed.
             </li>
             <li>
               The German modules sit beside the Ukrainian ones and leave its results unchanged: the Ukrainian calculator still reproduces
               its regression to the cent and its contract cases byte for byte.
+            </li>
+          </ul>
+          <h3>Acceptance of version 1.3</h3>
+          <ul>
+            <li>
+              Reserves and intraday trading went through the same procedure, under a specification of their own that extends the
+              frozen one and changes nothing in it. Before the freeze two independent reviewers checked the draft. Their main
+              finding replaced a fixed aFRR share, which left the base case worse than day-ahead trading alone, with the annual
+              rule of section 4. The second implementation’s author then reviewed the package twice: the first review asked for
+              five corrections, all to the rules of acceptance; the second found nothing that blocks the freeze.
+            </li>
+            <li>
+              The package was frozen with 23 further cases: the base case and its break-even search, the three saturation paths,
+              both price windows, the stack’s inputs at the ends of their ranges, a 4-hour battery, a delay, a full toll, heavier
+              wear, a price stress and a financial stress, locked funding, the lender’s case, the variants without a toll, and an
+              input outside the model. Analytical checks computed by hand cover the offer and its energy test, a month’s capacity
+              revenue, the paths and the derivation of the central one, the price index, activation, the uplift and the fee, the
+              start of aFRR, the annual rule with a year without operation, the shares, the cycle budget, the 2029 bridge,
+              the two output formats and the domain of the inputs.
+            </li>
+            <li>
+              Before the comparison each implementation checks three conditions on its own. With the stack switched off, the
+              calculator writes the documents of version 1.2 byte for byte (33 of 33), and the Ukrainian results stay unchanged. Over the life of
+              every stack case the market revenue is at least 99% of day-ahead trading alone; in fact it is at least 0.66% above
+              it (20 of 20). A loan sized afresh with the stack equals the loan without it to the cent (15 of 15), because the
+              lender sizes on day-ahead trading alone.
+            </li>
+            <li>
+              <strong>Result.</strong> The comparison found no difference in the results, and no exception is recorded on them. On
+              the second implementation’s library the calculator reproduced every field of the 23 cases within the frozen
+              tolerances, about 550,000 values, with investor NPVs within €0.0001 and the monthly ledger within €0.001. Each on its
+              own library, the two agree as follows:
+              <ul>
+                <li>investor NPVs within €0.02;</li>
+                <li>loans within €0.02;</li>
+                <li>every ledger line within €0.08, and a month’s aFRR and intraday revenue within €0.01;</li>
+                <li>the break-even toll price and spread multiplier to the last digit.</li>
+              </ul>
+              At the break-even spread multiplier a fresh run gives the same investor NPV on both sides, −€27. The search stops
+              once its bracket is narrow enough, not at exactly zero, and no year switches between trading and reserves inside
+              the bracket.
+            </li>
+            <li>
+              The second implementation’s author repeated the comparison with a comparator of their own and found no difference
+              either. Their review found a fault in the calculator’s acceptance tool. It compared the opening energy of the LCOS
+              run with a tolerance 1,000 times wider than the specification’s, so it would have passed a document wrong in that
+              field. The tool was corrected in a new version beside the frozen one, a control for that boundary was added, and
+              the corrected comparison again found no difference. The gate was accepted with two listed exceptions, both about
+              how the tolerances are documented.
             </li>
           </ul>
 
