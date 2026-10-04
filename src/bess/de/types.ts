@@ -72,7 +72,25 @@ export interface DeInputs {
   equityHurdle: number;
   projectDiscountRate: number;
   comparisonRate: number;
+  /** The revenue stack of spec R3.1: aFRR capacity with its activation and the intraday uplift. `false` is "day-ahead
+   *  only", the R2.4 calculation; a missing value (R2.4 inputs) reads as `false`. */
+  stackEnabled: boolean;
+  /** f_A: the share of the merchant slice offered as aFRR capacity in a held year, 0…0.5 (spec R3.1 §1.2). */
+  afrrShare: number;
+  reservePriceWindow: DeReservePriceWindow;
+  /** Multiplies both aFRR capacity prices of the window: 0 is the price stress, 1.2 the tornado's high end (spec R3.1 §3.1). */
+  reservePriceFactor: number;
+  reservePath: DeReservePath;
+  /** ρ: a haircut on aFRR capacity revenue, applied after availability and before the fee (spec R3.1 §3.3). */
+  reserveRealisation: number;
+  /** u: the intraday uplift on the positive captured day-ahead margin (spec R3.1 §5.2). */
+  intradayUplift: number;
+  /** Activated energy in each direction as a share of offered MW-hours: wear only, net margin 0 (spec R3.1 §4). */
+  activationShare: number;
 }
+
+export type DeReservePriceWindow = "ytd-2026" | "ltm-2026-09";
+export type DeReservePath = "central" | "fast" | "slow";
 
 /** Funding fixed by the sizing of a case; stresses reuse it (S1.3 §11, LockedFunding). */
 export interface DeLockedFunding {

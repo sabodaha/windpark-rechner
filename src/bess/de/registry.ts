@@ -71,7 +71,21 @@ export const DE_BASE: DeInputs = {
   equityHurdle: 0.12,
   projectDiscountRate: 0.08,
   comparisonRate: 0.12,
+  // the revenue stack (spec R3.1 §9, registry-stack.md): base "market with reserves, central saturation"
+  stackEnabled: true,
+  afrrShare: 0.5,
+  reservePriceWindow: "ytd-2026",
+  reservePriceFactor: 1,
+  reservePath: "central",
+  reserveRealisation: 0.9,
+  intradayUplift: 0.15,
+  activationShare: 0.05,
 };
+
+/** The fields spec R3.1 adds to the inputs; a document of the R2.4 contract carries none of them (§10.1). */
+export const DE_STACK_INPUTS = [
+  "stackEnabled", "afrrShare", "reservePriceWindow", "reservePriceFactor", "reservePath", "reserveRealisation", "intradayUplift", "activationShare",
+] as const satisfies readonly (keyof DeInputs)[];
 
 /** Presets that follow the duration (de-cases.json durationPresets): applied unless the case sets the field itself. */
 export const DE_DURATION_PRESETS: Record<2 | 4, Partial<DeInputs>> = {
@@ -170,6 +184,29 @@ export const DE_ENGINE = {
   tStarGrid: { from: 0, to: 500_000, step: 25_000 } as const,
   tStarMaxDivisions: 60,
   kDomain: [0.5, 3.0] as const,
+} as const;
+
+/** The revenue stack (spec R3.1, registry-stack.md R3.1, 4 October 2026). */
+export const DE_STACK = {
+  /** Average accepted aFRR capacity price (pay-as-bid), € per offered MW per hour, nominal 2026: simple means of the
+   *  4-hour blocks by delivery date — January–September 2026 (base) and October 2025 – September 2026 (registry AFRR). */
+  prices: {
+    "ytd-2026": { pos: 10.44, neg: 14.709 },
+    "ltm-2026-09": { pos: 12.738, neg: 13.255 },
+  },
+  /** Saturation multiplier R(y) against the base anchor by calendar year, held after the last column (spec §3.2). */
+  paths: {
+    central: { 2027: 0.51, 2028: 0.46, 2029: 0.43, 2030: 0.36, 2031: 0.34, 2032: 0.3, 2033: 0.25, 2034: 0.25, 2035: 0.25, 2036: 0.23, 2037: 0.23 },
+    fast: { 2027: 0.5, 2028: 0.25, 2029: 0.12, 2030: 0.05, 2031: 0.05, 2032: 0.05, 2033: 0.05, 2034: 0.05, 2035: 0.05, 2036: 0.05, 2037: 0.05 },
+    slow: { 2027: 0.875, 2028: 0.75, 2029: 0.625, 2030: 0.5, 2031: 0.47, 2032: 0.44, 2033: 0.41, 2034: 0.38, 2035: 0.35, 2036: 0.35, 2037: 0.35 },
+  },
+  pathYears: [2027, 2037] as const,
+  /** PQ §2.7.1: at least one hour of the offered MW in each direction; both directions are held at once. */
+  energyHoursPerDirection: 1,
+  /** aFRR from the actual COD + 3 months (prequalification, H02). */
+  reserveStartLagMonths: 3,
+  /** The reserve prices are 2026 money: idxDE(y) / idxDE(2026). */
+  priceYear: 2026,
 } as const;
 
 /** idxDE: German HICP, idxDE(2025) = 1 (registry MACRO): 2.9 % (2026), 2.7 % (2027), 1.9 % (2028), then 2.0 %. */

@@ -1,7 +1,8 @@
-// German acceptance export (spec v1.2 R2 §16): reads fixtures/de-resolved-inputs.json, runs every case and writes one
-// document per case in the output contract (fixtures/de-output.schema.json). The documents are the engine side of gate 3;
-// they are not shown to the independent reference before its own outputs are frozen.
-// Usage: npx tsx scripts/bess/run-de.ts <fixturesDir> <outDir> [--only=D01,B03] [--library=<dir>]
+// German acceptance export (spec v1.2 R2 §16; R3.1 §11): reads the resolved inputs of a fixtures directory, runs every
+// case and writes one document per case in its output contract (R2.4: de-output.schema.json; R3.1 with the stack:
+// de-output-v2.schema.json). The documents are the engine side of gate 3; they are not shown to the independent reference
+// before its own outputs are frozen.
+// Usage: npx tsx scripts/bess/run-de.ts <fixturesDir> <outDir> [--cases=de-stack-resolved-inputs.json] [--only=D01,B03] [--library=<dir>]
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -24,7 +25,9 @@ const library = { artifact: "de-library-v1", fileVersion: manifest.version, algo
   binSha256: sha(join(libDir, "de-library-v1.bin")), manifestSha256: sha(join(libDir, "de-library-v1.json")) };
 
 interface Resolved { inputs: DeInputs; run: { funding: string; lowerNode: boolean; tStar: boolean; kSearch: boolean } }
-const doc = JSON.parse(readFileSync(join(fixturesDir, "de-resolved-inputs.json"), "utf-8")) as { cases: Record<string, Resolved> };
+// --cases=<file> names the resolved-inputs file of the fixtures directory (R3.1: de-stack-resolved-inputs.json)
+const casesFile = process.argv.find((a) => a.startsWith("--cases="))?.slice(8) ?? "de-resolved-inputs.json";
+const doc = JSON.parse(readFileSync(join(fixturesDir, casesFile), "utf-8")) as { cases: Record<string, Resolved> };
 mkdirSync(outDir, { recursive: true });
 const results = new Map<string, DeResult>();
 const runCase = (id: string): DeResult => {

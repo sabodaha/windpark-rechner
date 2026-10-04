@@ -1,6 +1,7 @@
 // The German pack (spec v1.2 R2): one case run — input domain, operations, the lender case and debt sizing, the ledger,
 // KPIs and checks — plus the break-even toll price T* (shared solver of v1.1a, §9.2) and the merchant spread multiplier k
-// (S1.3 §15). Ukrainian modules are untouched; the shared helpers are imported read-only.
+// (S1.3 §15). Spec R3.1 adds the revenue stack: the LCOS run comes first, the annual opportunity rule reads it, the case
+// runs with the stack, the lender case without. Ukrainian modules are untouched; the shared helpers are imported read-only.
 import { xnpv, type DatedFlow } from "@/engine/finance";
 import { deIrrMetric } from "./irr";
 import { buildDeCalendar, type DeCalendar } from "./calendar";
@@ -8,8 +9,10 @@ import { buildDeCapex, type DeCapexBuild } from "./capex";
 import { sizeDeDebt } from "./funding";
 import { liquidityReserve, runDeLedger, type DeLedgerResult } from "./ledger";
 import type { DeLibrary } from "./library";
-import { effectiveFee, peakDayPurchases, runDeOperations, spreadM, type DeOpsResult } from "./operations";
-import { DE_DURATION_PRESETS, DE_ENGINE, DE_REVENUE, idxDE } from "./registry";
+import {
+  afrrEnergyFactor, effectiveFee, peakDayPurchases, reserveMultiplier, reserveRatePerMwh, runDeOperations, spreadM, type DeOpsResult, type DeStackPlan,
+} from "./operations";
+import { DE_DURATION_PRESETS, DE_ENGINE, DE_REVENUE, DE_STACK, idxDE } from "./registry";
 import type { DeCheck, DeInputs, DeLockedFunding, DeMetric, DeStatus } from "./types";
 
 export interface DeRunOptions {
@@ -29,9 +32,43 @@ export interface DeMarketBasis {
   liquidityTargetPostTollEur: number | null;
 }
 
+/** One calendar year of the annual opportunity rule (spec R3.1 §2), per MW of slice on the LCOS run. */
+export interface DeStackYear {
+  year: number;
+  /** Months of the year in A_y: operation from reserveStartIndex. */
+  activeMonths: number;
+  /** a(y): aFRR capacity after rho, availability, the energy test and the fee. */
+  oppReserveEurPerMw: number;
+  /** w(y): the captured day-ahead margin with the intraday uplift, after the fee. */
+  oppWholesaleEurPerMw: number;
+  held: boolean;
+  /** R(y), a parameter of the year. */
+  multiplier: number;
+}
+
+/** 2029 revenue per MW of connection by source (spec R3.1 §8); the fee is negative, the parts sum to revenue2029PerMwEur. */
+export interface DeRevenueBridge {
+  tollEur: number;
+  dayAheadEur: number;
+  intradayEur: number;
+  afrrEur: number;
+  feeEur: number;
+}
+
+export interface DeStackResult {
+  reserveStartIndex: number;
+  years: DeStackYear[];
+  /** The LCOS run the rule reads: the whole battery on day-ahead, the toll ignored, no stack. */
+  lcos: DeOpsResult;
+  revenue2029Bridge: DeRevenueBridge;
+}
+
 export interface DeResult {
   market?: DeMarketBasis;
   inputs: DeInputs;
+  /** stackEnabled and not the lender case as a full case (spec R3.1 §1.1); decides the output contract (§10.1). */
+  stackOn: boolean;
+  stack: DeStackResult | null;
   status: DeStatus;
   checks: DeCheck[];
   cal: DeCalendar | null;
@@ -44,7 +81,10 @@ export interface DeResult {
 }
 
 const INPUT = new Set(["notSupportedDuration", "merchantDebtUnsupported", "inputOutOfDomain", "libraryFeeAxis"]);
-const INTEGRITY = new Set(["sourcesUses", "drawsEqualDebt", "balanceSheet", "bucketsReconcile", "taxReconcile", "sharesSumToOne", "tollFeeWithinContract", "fundingConverged", "gearingCap"]);
+const INTEGRITY = new Set([
+  "sourcesUses", "drawsEqualDebt", "balanceSheet", "bucketsReconcile", "taxReconcile", "sharesSumToOne", "tollFeeWithinContract", "fundingConverged", "gearingCap",
+  "stackRevenueReconcile",
+]);
 
 function statusOf(checks: DeCheck[]): DeStatus {
   const failed = checks.filter((c) => c.status === "fail");
@@ -70,10 +110,14 @@ const ALL_CHECKS = [
   "cashNonNegative", "debtRepaid", "dsraFunded", "interestBarrier", "grandfatheringLost", "distributionCapped", "lockup", "default",
 ];
 
+/** Checks of a case with the stack (spec R3.1 §10.2), after the R2.4 list. */
+const STACK_CHECKS = ["afrrCycleBudget", "stackRevenueReconcile"];
+
 /** One entry per check id (semantics S1): the checks not evaluated in an early exit are `notApplicable`. */
-function complete(checks: DeCheck[]): DeCheck[] {
+function complete(checks: DeCheck[], stackOn: boolean): DeCheck[] {
   const have = new Set(checks.map((c) => c.id));
-  return [...checks, ...ALL_CHECKS.filter((id) => !have.has(id)).map((id) => check(id, null))];
+  const all = stackOn ? [...ALL_CHECKS, ...STACK_CHECKS] : ALL_CHECKS;
+  return [...checks, ...all.filter((id) => !have.has(id)).map((id) => check(id, null))];
 }
 
 /** The input domain of fixtures/de-cases.json (resolver.domain). */
@@ -84,11 +128,42 @@ export function deInputChecks(inp: DeInputs): DeCheck[] {
     Number.isInteger(inp.codDelayMonths) && inp.codDelayMonths >= 0 && inp.codDelayMonths <= 24 && (inp.repaymentCount === 20 || inp.repaymentCount === 30) &&
     inp.tollShare >= 0 && inp.tollShare <= 1 && Number.isInteger(inp.tollMonths) && inp.tollMonths >= 1 && inp.tollMonths <= 180 &&
     (inp.durationHours === 1 || inp.durationHours === 2 || inp.durationHours === 4);
+  // the stack fields count only with the stack enabled; a missing stackEnabled is an R2.4 input (spec R3.1 §9)
+  const stackDom = inp.stackEnabled === undefined || inp.stackEnabled === false || (inp.stackEnabled === true &&
+    inp.afrrShare >= 0 && inp.afrrShare <= 0.5 && (inp.reservePriceWindow === "ytd-2026" || inp.reservePriceWindow === "ltm-2026-09") &&
+    inp.reservePriceFactor >= 0 && inp.reservePriceFactor <= 2 &&
+    (inp.reservePath === "central" || inp.reservePath === "fast" || inp.reservePath === "slow") &&
+    inp.reserveRealisation >= 0.5 && inp.reserveRealisation <= 1 && inp.intradayUplift >= 0 && inp.intradayUplift <= 1 &&
+    inp.activationShare >= 0 && inp.activationShare <= 0.2);
   return [
     check("notSupportedDuration", inp.durationHours !== 1),
     check("merchantDebtUnsupported", !(inp.debt && (!inp.tollEnabled || inp.tollShare <= 0))),
-    check("inputOutOfDomain", dom),
+    check("inputOutOfDomain", dom && stackDom),
   ];
+}
+
+/** The annual opportunity rule (spec R3.1 §2): per MW of slice, a(y) for aFRR capacity and w(y) for wholesale trading
+ *  with the intraday uplift, both on the LCOS run over the year's operating months from reserveStartIndex;
+ *  held(y) = a(y) >= w(y), false for a year without such months. */
+export function deStackRule(inp: DeInputs, cal: DeCalendar, lcos: DeOpsResult): { plan: DeStackPlan; years: DeStackYear[] } {
+  const start = cal.codIndex + DE_STACK.reserveStartLagMonths;
+  const u = inp.intradayUplift;
+  const fee = inp.optimiserFeeRate;
+  const acc = new Map<number, { n: number; a: number; w: number }>();
+  for (const m of cal.months) {
+    if (!acc.has(m.year)) acc.set(m.year, { n: 0, a: 0, w: 0 });
+    if (m.phase !== "operation" || m.index < start) continue;
+    const o = lcos.months[m.index]!;
+    const t = acc.get(m.year)!;
+    t.n += 1;
+    t.a += reserveRatePerMwh(inp, m.year) * inp.reserveRealisation * 24 * m.days * o.availability! * afrrEnergyFactor(o.usableHours!) * (1 - fee);
+    const c = o.capturedEur;
+    t.w += (c + u * Math.max(c, 0) - fee * (1 + u) * Math.max(c, 0)) / inp.powerMW;
+  }
+  const years = [...acc].map(([year, t]) => ({
+    year, activeMonths: t.n, oppReserveEurPerMw: t.a, oppWholesaleEurPerMw: t.w, held: t.n > 0 && t.a >= t.w, multiplier: reserveMultiplier(inp.reservePath, year),
+  }));
+  return { plan: { held: new Map(years.map((y) => [y.year, y.held])), reserveStartIndex: start }, years };
 }
 
 /** M, a and the effective fee of a year on a path (spec §2.2–§2.3). */
@@ -98,18 +173,26 @@ function feeOf(inp: DeInputs, lib: DeLibrary, path: DeInputs["spreadPath"], year
 }
 
 export function runDe(inp: DeInputs, lib: DeLibrary, opts: DeRunOptions = {}): DeResult {
+  // the lender case as a full case (D14) has no stack: the lender does not count it (spec R3.1 §1.1, §6)
+  const stackOn = inp.stackEnabled === true && !opts.lowerNode;
   const checks: DeCheck[] = deInputChecks(inp);
-  const empty = { cal: null, capex: null, ops: null, ledger: null, lender: null, funding: null, kpis: null };
-  if (checks.some((c) => c.status === "fail")) return { inputs: inp, status: statusOf(checks), checks: complete(checks), ...empty };
+  const empty = { cal: null, capex: null, ops: null, ledger: null, lender: null, funding: null, kpis: null, stack: null };
+  if (checks.some((c) => c.status === "fail")) return { inputs: inp, stackOn, status: statusOf(checks), checks: complete(checks, stackOn), ...empty };
   const toll = inp.tollEnabled && inp.tollShare > 0;
   const cal = buildDeCalendar(inp.codDelayMonths, inp.repaymentCount, toll ? inp.tollMonths : null, inp.grandfathered);
   const capex = buildDeCapex(inp);
-  const ops = runDeOperations(inp, lib, cal, capex, { lowerNode: opts.lowerNode });
+  // LCOS run: the whole battery as merchant on the chosen path, the toll ignored, no stack (spec §9.1, K18; R3.1 §8);
+  // the opportunity rule reads it before the case runs (R3.1 §2)
+  const opsL = runDeOperations(inp, lib, cal, capex, { ignoreToll: true, lowerNode: opts.lowerNode });
+  const rule = stackOn ? deStackRule(inp, cal, opsL) : null;
+  const ops = runDeOperations(inp, lib, cal, capex, { lowerNode: opts.lowerNode, stack: rule?.plan });
   const sized = inp.debt && !opts.funding;
   const opsLender = sized ? runDeOperations(inp, lib, cal, capex, { spreadPath: "low", lowerNode: true }) : null;
   const libFail = ops.unsupported ?? opsLender?.unsupported ?? null;
   checks.push(check("libraryFeeAxis", libFail === null, libFail));
-  if (libFail) return { inputs: inp, status: statusOf(checks), checks: complete(checks), cal, capex, ops, ledger: null, lender: null, funding: null, kpis: null };
+  if (libFail) {
+    return { inputs: inp, stackOn, status: statusOf(checks), checks: complete(checks, stackOn), cal, capex, ops, ledger: null, lender: null, funding: null, kpis: null, stack: null };
+  }
 
   // liquidity reserve (spec §7.1): at the contractual COD with 2028 values and s = tollShare; after the toll with that
   // month's year and s = 0
@@ -165,7 +248,7 @@ export function runDe(inp: DeInputs, lib: DeLibrary, opts: DeRunOptions = {}): D
     check("balanceSheet", led.maxBalanceErrorEur <= 0.01, led.maxBalanceErrorEur),
     check("bucketsReconcile", led.months.every((m) => Math.abs(m.bucketCEur + m.bucketMEur - m.cfadsEur) <= 0.01)),
     check("taxReconcile", led.maxTaxRollErrorEur <= 0.01 && led.years.every((y) => y.gewPoolCloseEur >= -0.01 && y.kstPoolCloseEur >= -0.01), led.maxTaxRollErrorEur),
-    check("sharesSumToOne", ops.months.every((m) => m.s >= 0 && m.s <= 1)),
+    check("sharesSumToOne", stackOn ? ops.months.every((m) => sharesOk(m, cal.months[m.index]!.phase === "operation")) : ops.months.every((m) => m.s >= 0 && m.s <= 1)),
     check("tollFeeWithinContract", ops.maxTollFeeRatio <= 1 + 1e-12, ops.maxTollFeeRatio),
     check("fundingConverged", funding.sizingStatus !== "failed", funding.iterations),
     check("gearingCap", D <= inp.maxGearing * led.usesExVatEur + 0.01, led.usesExVatEur > 0 ? D / led.usesExVatEur : null),
@@ -178,6 +261,27 @@ export function runDe(inp: DeInputs, lib: DeLibrary, opts: DeRunOptions = {}): D
     check("lockup", D > 0 ? !led.distributions.some((d) => d.cappedBy === "lockup") : null, null, true),
     check("default", D > 0 ? led.periods.every((p) => p.dscr === null || p.dscr >= inp.defaultDscr) : null, Math.min(...led.periods.map((p) => p.dscr ?? Infinity))),
   );
+  if (stackOn) {
+    // the cycle budget of the aFRR slice (spec R3.1 §4): daily activation discharge over the slice's initial energy
+    let cycles: number | null = null;
+    for (const o of ops.months) {
+      if (o.afrrSliceShare <= 0) continue;
+      const v = o.activationDischargeMWh / cal.months[o.index]!.days / (o.afrrSliceShare * inp.durationHours * inp.powerMW);
+      cycles = Math.max(cycles ?? 0, v);
+    }
+    // §5.3, §5.4 and §7 as identities of the month (integrity)
+    let err = 0;
+    for (const o of ops.months) {
+      err = Math.max(err,
+        Math.abs(o.marketNetEur - (o.capturedEur + o.intradayUpliftEur + o.capRevAfrrEur - o.optimiserFeeEur)),
+        Math.abs(o.optimiserFeeEur - inp.optimiserFeeRate * (Math.max(o.capturedEur, 0) + o.intradayUpliftEur + o.capRevAfrrEur)),
+        Math.abs(o.dischargeMWh - (o.marketDischargeMWh + o.tollerDischargeMWh + o.activationDischargeMWh)));
+    }
+    checks.push(
+      check("afrrCycleBudget", cycles === null ? null : cycles <= inp.cycleCap + 1e-12, cycles, true),
+      check("stackRevenueReconcile", err <= 0.01, err),
+    );
+  }
 
   // KPIs (spec §9.1)
   const flows: DatedFlow[] = led.investorFlows.map((f) => ({ day: f.day, amount: f.amount }));
@@ -196,8 +300,7 @@ export function runDe(inp: DeInputs, lib: DeLibrary, opts: DeRunOptions = {}): D
   const contractualCod = cal.months[cal.plannedCodIndex]!.start;
   const maturityDay = cal.periods.length ? cal.periods[cal.periods.length - 1]!.day : contractualCod;
   const llcr = D > 0 ? xnpv(inp.interestRate, led.cfadsMonthly.filter((f) => f.day <= maturityDay), contractualCod) / D : null;
-  // LCOS: the whole battery as merchant on the chosen path, the toll ignored (spec §9.1, K18)
-  const opsL = runDeOperations(inp, lib, cal, capex, { ignoreToll: true, lowerNode: opts.lowerNode });
+  // LCOS on the run above: day-ahead only, also with the stack (spec R3.1 §8)
   const costFlows: DatedFlow[] = [];
   const mwhFlows: DatedFlow[] = [];
   for (const o of opsL.months) {
@@ -225,7 +328,30 @@ export function runDe(inp: DeInputs, lib: DeLibrary, opts: DeRunOptions = {}): D
     revenue2029PerMwEur: metric(rev2029 === null ? null : rev2029 / inp.powerMW), paybackYears: metric(payback),
     liquidationPayoutEur: metric(led.liquidationPayoutEur),
   };
-  return { market, inputs: inp, status: statusOf(checks), checks, cal, capex, ops, ledger: led, lender, funding, kpis };
+  let stack: DeStackResult | null = null;
+  if (rule) {
+    const b: DeRevenueBridge = { tollEur: 0, dayAheadEur: 0, intradayEur: 0, afrrEur: 0, feeEur: 0 };
+    for (const o of ops.months) {
+      if (cal.months[o.index]!.year !== 2029) continue;
+      b.tollEur += o.tollFeeAccruedEur;
+      b.dayAheadEur += o.capturedEur;
+      b.intradayEur += o.intradayUpliftEur;
+      b.afrrEur += o.capRevAfrrEur;
+      b.feeEur -= o.optimiserFeeEur;
+    }
+    const P = inp.powerMW;
+    stack = {
+      reserveStartIndex: rule.plan.reserveStartIndex, years: rule.years, lcos: opsL,
+      revenue2029Bridge: { tollEur: b.tollEur / P, dayAheadEur: b.dayAheadEur / P, intradayEur: b.intradayEur / P, afrrEur: b.afrrEur / P, feeEur: b.feeEur / P },
+    };
+  }
+  return { market, inputs: inp, stackOn, stack, status: statusOf(checks), checks, cal, capex, ops, ledger: led, lender, funding, kpis };
+}
+
+/** Spec R3.1 §10.2: every share in [0, 1]; in a month of operation s + wholesale + aFRR = 1 within 1e-12. */
+function sharesOk(m: DeOpsResult["months"][number], operating: boolean): boolean {
+  const inUnit = [m.s, m.wholesaleShare, m.afrrSliceShare].every((v) => v >= 0 && v <= 1);
+  return inUnit && (!operating || Math.abs(m.s + m.wholesaleShare + m.afrrSliceShare - 1) <= 1e-12);
 }
 
 /** A delay to commercial operation is a stress after financial close (spec §18, case B03): the loan stays the one

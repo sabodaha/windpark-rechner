@@ -1,8 +1,10 @@
-// The acceptance document of the German pack (fixtures/de-output.schema.json, de-output-v1): one per case, built from a
-// run's operations and ledger. Model months are 1-based in the document (1 = 2027-02, the FC month).
+// The acceptance document of the German pack: one per case, built from a run's operations and ledger. Model months are
+// 1-based in the document (1 = 2027-02, the FC month). Two contracts (spec R3.1 §10.1): a case without the stack writes
+// the R2.4 document (de-output-v1, fixtures/de-output.schema.json) with the R2.4 inputs only; a case with the stack writes
+// de-output-v2 (v1.3-de/fixtures/de-output-v2.schema.json): every v1 field plus the stack's.
 import { toIso } from "@/engine/dates";
 import type { DeResult, KResult, TStarResult } from "./index";
-import { idxDE } from "./registry";
+import { DE_STACK_INPUTS, idxDE } from "./registry";
 
 const ym = (i: number) => `${2027 + Math.floor((1 + i) / 12)}-${String(((1 + i) % 12) + 1).padStart(2, "0")}`;
 
@@ -27,6 +29,12 @@ export function toDeOutput(r: DeResult, x: DeOutputExtras): Record<string, unkno
   return clean(buildDeOutput(r, x)) as Record<string, unknown>;
 }
 
+/** The R2.4 inputs of a resolved input set, in their own order (spec R3.1 §10.1). */
+function r24Inputs(inputs: Record<string, unknown>): Record<string, unknown> {
+  const stack = new Set<string>(DE_STACK_INPUTS);
+  return Object.fromEntries(Object.entries(inputs).filter(([key]) => !stack.has(key)));
+}
+
 function buildDeOutput(r: DeResult, x: DeOutputExtras): Record<string, unknown> {
   const status = {
     primary: r.status.primary,
@@ -35,7 +43,10 @@ function buildDeOutput(r: DeResult, x: DeOutputExtras): Record<string, unknown> 
     failedChecks: r.checks.filter((c) => c.status === "fail").map((c) => c.id),
     funding: r.funding ? { mode: r.lender ? "sized" : r.funding.sizingStatus === "noDebt" ? "noDebt" : "locked", converged: r.funding.sizingStatus !== "failed", iterations: r.funding.iterations } : undefined,
   };
-  const head = { schema: "de-output-v1", case: x.caseId, spec: "R2.4", library: x.library, resolvedInputs: x.resolvedInputs, status };
+  const v2 = r.stackOn;
+  const head = v2
+    ? { schema: "de-output-v2", case: x.caseId, spec: "R3.1", library: x.library, resolvedInputs: x.resolvedInputs, status }
+    : { schema: "de-output-v1", case: x.caseId, spec: "R2.4", library: x.library, resolvedInputs: r24Inputs(x.resolvedInputs), status };
   if (r.status.primary === "inputUnsupported" || !r.cal || !r.ops || !r.ledger) return head;
   const cal = r.cal;
   const ops = r.ops.months;
@@ -43,7 +54,7 @@ function buildDeOutput(r: DeResult, x: DeOutputExtras): Record<string, unknown> 
   const months = cal.months.map((m, i) => {
     const o = ops[i]!;
     const l = led.months[i]!;
-    return {
+    const row = {
       month: ym(i), index: i + 1, year: m.year, days: m.days, phase: m.phase, idx: idxDE(m.year),
       s: o.s, availability: o.availability, usableMWhOpen: o.usableMWhOpen, usableHours: o.usableHours, contractUsableMWh: o.contractUsableMWh,
       sohInitial: o.sohInitial, sohAugmentation: o.sohAugmentation, spreadM: o.spreadM, levelShiftA: o.levelShiftA, importFee: o.importFee,
@@ -74,6 +85,12 @@ function buildDeOutput(r: DeResult, x: DeOutputExtras): Record<string, unknown> 
       fixedAssetsNetCloseEur: l.fixedAssetsNetCloseEur, capitalReserveCloseEur: l.capitalReserveCloseEur,
       retainedEarningsCloseEur: l.retainedEarningsCloseEur, bookNetAssetsCloseEur: l.bookNetAssetsCloseEur,
     };
+    if (!v2) return row;
+    return {
+      ...row, stackOn: o.stackOn, reserveHeld: o.reserveHeld, wholesaleShare: o.wholesaleShare, afrrSliceShare: o.afrrSliceShare, afrrMw: o.afrrMw,
+      reserveMultiplier: o.reserveMultiplier, capRevAfrrEur: o.capRevAfrrEur, activationDischargeMWh: o.activationDischargeMWh,
+      activationChargeMWh: o.activationChargeMWh, intradayUpliftEur: o.intradayUpliftEur,
+    };
   });
   const calendar = {
     fc: ym(0), contractualCod: ym(cal.plannedCodIndex), actualCod: ym(cal.codIndex),
@@ -82,6 +99,7 @@ function buildDeOutput(r: DeResult, x: DeOutputExtras): Record<string, unknown> 
     pcsOverhaulMonth: ym(cal.pcsOverhaulIndex), lastOperatingMonth: ym(cal.eolIndex - 1), lastSettlementMonth: ym(cal.months.length - 1),
     liquidationPaymentDate: toIso(cal.liquidationDay), grandfatheringApplied: cal.grandfatheringApplied,
     liquidityReserveTopUpMonth: cal.tollLast === null ? null : ym(cal.tollLast + 1),
+    ...(v2 && r.stack ? { reserveStartMonth: ym(r.stack.reserveStartIndex) } : {}),
   };
   const period = (p: (typeof led.periods)[number], budget: number | null) => ({
     paymentDate: toIso(p.day), openingEur: p.openingEur, interestDueEur: p.interestDueEur, scheduledPrincipalEur: p.scheduledPrincipalEur,
@@ -96,12 +114,30 @@ function buildDeOutput(r: DeResult, x: DeOutputExtras): Record<string, unknown> 
   const k = r.kpis!;
   const v = (name: string) => k[name]?.value ?? null;
   const irr = (name: string) => ({ value: k[name]!.value, status: k[name]!.status, roots: k[name]!.roots ?? [] });
+  // v2 years (spec R3.1 §10.2): money and energy summed, the offer averaged over operating hours (explicit denominator),
+  // R(y) and the opportunity rule as parameters of the year
+  const years = !v2 || !r.stack ? led.years : led.years.map((y) => {
+    const ms = cal.months.filter((m) => m.year === y.year);
+    const sum = (f: (o: (typeof ops)[number]) => number) => ms.reduce((acc, m) => acc + f(ops[m.index]!), 0);
+    const hours = ms.filter((m) => m.phase === "operation").reduce((acc, m) => acc + 24 * m.days, 0);
+    const rule = r.stack!.years.find((s) => s.year === y.year)!;
+    return {
+      ...y, capRevAfrrEur: sum((o) => o.capRevAfrrEur), intradayUpliftEur: sum((o) => o.intradayUpliftEur),
+      activationDischargeMWh: sum((o) => o.activationDischargeMWh), activationChargeMWh: sum((o) => o.activationChargeMWh),
+      operatingHours: hours, afrrMwAvg: hours > 0 ? ms.reduce((acc, m) => acc + ops[m.index]!.afrrMw * 24 * m.days, 0) / hours : 0,
+      reserveHeld: rule.held, reserveMultiplier: rule.multiplier, oppReserveEurPerMw: rule.oppReserveEurPerMw, oppWholesaleEurPerMw: rule.oppWholesaleEurPerMw,
+    };
+  });
+  // the LCOS run behind the rule (spec R3.1 §10.3), so a(y) and w(y) can be derived from the document
+  const lcosRun = v2 && r.stack
+    ? { months: r.stack.lcos.months.map((o, i) => ({ month: ym(i), usableMWhOpen: o.usableMWhOpen, capturedEur: o.capturedEur, availability: o.availability })) }
+    : undefined;
   return {
     ...head,
     market: r.market,
     calendar,
     months,
-    years: led.years,
+    years,
     assets: led.assets.map((a) => ({
       id: a.id, class: a.class, directEur: a.directEur, allocatedEur: a.allocatedEur, baseEur: a.baseEur, startMonth: ym(a.startIndex),
       lifeYears: a.lifeYears, monthlyEur: a.monthlyEur, afaByYear: Object.fromEntries(Object.entries(a.afaByYear).map(([y, val]) => [String(y), val])),
@@ -124,8 +160,10 @@ function buildDeOutput(r: DeResult, x: DeOutputExtras): Record<string, unknown> 
       dscrMin: v("dscrMin"), dscrAvg: v("dscrAvg"), lenderDscrMin: v("lenderDscrMin"), llcr: v("llcr"), debtEur: v("debtEur"), gearing: v("gearing"),
       lcosEurPerMWh: v("lcosEurPerMWh"), revenue2029PerMwEur: v("revenue2029PerMwEur"), paybackYears: v("paybackYears"),
       liquidationPayoutEur: v("liquidationPayoutEur"),
+      ...(v2 && r.stack ? { revenue2029Bridge: r.stack.revenue2029Bridge } : {}),
     },
     tStar: x.tStar ?? null,
     kSearch: x.kSearch ?? null,
+    ...(lcosRun ? { lcosRun } : {}),
   };
 }

@@ -102,7 +102,9 @@ describe("German pack — end to end on a synthetic library", () => {
     expect(base.status.primary).toBe("ok");
     for (const id of integrity) expect(base.checks.find((c) => c.id === id)!.status, id).toBe("pass");
     expect(base.funding!.sizingStatus).toBe("converged");
-    expect(base.checks).toHaveLength(21);
+    // the R2.4 list, plus the stack's two checks in the base with the stack (spec R3.1 §10.2)
+    expect(base.checks).toHaveLength(23);
+    expect(runDe({ ...DE_BASE, stackEnabled: false }, lib).checks).toHaveLength(21);
     for (const p of base.lender!.ledger.periods.filter((x) => x.debtServiceEur > 0.01)) {
       const budget = bucketBudget(p.cfadsCEur, p.cfadsMEur, 1.15, 2);
       expect(p.debtServiceEur).toBeLessThanOrEqual(budget + 0.01);
