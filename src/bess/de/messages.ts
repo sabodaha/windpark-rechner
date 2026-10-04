@@ -1,5 +1,5 @@
-// English texts of the German battery calculator (spec v1.2 R2.2). Kept apart from the Ukrainian calculator's
-// dictionary; numbers in the texts come from the engine or the registry, passed in as arguments.
+// English texts of the German battery calculator (spec v1.2 R2.2; the revenue stack of spec R3.1). Kept apart from the
+// Ukrainian calculator's dictionary; numbers in the texts come from the engine or the registry, passed in as arguments.
 
 export type DeKpiKey = "investorIrr" | "investorNpv" | "minDscr" | "revenue2029" | "lcos" | "payback";
 
@@ -8,19 +8,23 @@ export const deEn = {
     title: "Battery Storage Investment Calculator — Germany",
     description:
       "Open project-finance model of a fictional 50 MW battery in Germany: a tolling contract for 80% of the battery and " +
-      "day-ahead trading for the rest, revenue from derived price data, degradation, AgNes grid fees, German GmbH taxes, a " +
-      "bank loan sized on a lender’s case, and the toll price at which the investor breaks even.",
+      "the market for the rest — day-ahead and intraday trading and aFRR reserves — revenue from derived price data, " +
+      "degradation, AgNes grid fees, German GmbH taxes, a bank loan sized on a lender’s case, and the toll price at which " +
+      "the investor breaks even.",
     breadcrumb: "Germany",
   },
   header: {
     title: "Battery Storage Investment Calculator",
-    market: "Germany · tolling + day-ahead market",
+    market: "Germany · tolling + market with reserves",
     ukraine: "Ukraine",
     germany: "Germany",
     switchLabel: "Market",
-    subtitle: (mw: number, mwh: number, h: number, toll: boolean) =>
+    subtitle: (mw: number, mwh: number, h: number, toll: boolean, stack: boolean) =>
       `Fictional project “Batteriespeicher Musterfeld” · ${mw} MW / ${mwh} MWh (${h} h) · Germany · ` +
-      (toll ? "a tolling contract and day-ahead trading" : "day-ahead trading only"),
+      (toll ? (stack ? "a tolling contract and the market with reserves" : "a tolling contract and day-ahead trading") : stack ? "the market with reserves" : "day-ahead trading only"),
+    legacy:
+      "This link was made before the model counted reserves and intraday trading, so it opens as “day-ahead only” — the " +
+      "calculation it was made with. Choose another revenue scenario to see the market with reserves.",
     disclaimer: "Illustrative calculation — not investment, tax or legal advice. Fictional case.",
     dataAsOf: "Prices to",
     oldData: "The price data is more than two months old.",
@@ -54,15 +58,17 @@ export const deEn = {
     revenue2029: {
       label: "Revenue 2029",
       hint:
-        "The company’s revenue in 2029, the first full year: the toll fee earned plus the market share’s trading margin after " +
-        "the realism factor and the optimiser’s fee, per MW of grid connection, nominal euros.",
+        "The company’s revenue in 2029, the first full year: the toll fee earned plus the market share’s revenue — the " +
+        "day-ahead margin after the realism factor, the intraday uplift and aFRR capacity, less the optimiser’s fee — per MW " +
+        "of grid connection, nominal euros.",
     },
     lcos: {
       label: "LCOS",
       hint:
-        "Levelised cost of storage of the whole battery as if it traded alone: investment, operating costs, AgNes and other " +
-        "charges, the optimiser’s fee, charging power and decommissioning per MWh delivered, discounted at the project rate " +
-        "from financial close; before financing and income tax. The toll does not enter it.",
+        "Levelised cost of storage of the whole battery as if it traded day-ahead alone: investment, operating costs, AgNes " +
+        "and other charges, the optimiser’s fee, charging power and decommissioning per MWh delivered, discounted at the " +
+        "project rate from financial close; before financing and income tax. Neither the toll nor reserves and intraday " +
+        "trading enter it.",
     },
     payback: {
       label: "Payback",
@@ -126,8 +132,22 @@ export const deEn = {
       "Investment of about €765 per kW for 2 hours, against about €700 in Modo Energy’s benchmark.",
       "A 15-year life, with no value after it.",
     ],
+    whyStack: [
+      "A cautious market: intraday trading adds 15% to the day-ahead margin, where FfE/PwC’s forecast for 2030 implies about 100%; and reserve prices fall as batteries flood the market, so aFRR beats trading only in the first years.",
+      "A fully amortising 10-year loan instead of the usual 7-year mini-perm with 70–80% debt.",
+      "Investment of about €765 per kW for 2 hours, against about €700 in Modo Energy’s benchmark.",
+      "A 15-year life, with no value after it.",
+    ],
     honest:
       "A scenario of the day-ahead market only, without the intraday market and reserves, which gave the main revenue of German batteries in 2026. Nothing is tuned to reach a target.",
+    honestStack:
+      "Reserves and intraday trading on cautious assumptions: aFRR capacity only in the years it pays more than trading, intraday as a fixed uplift on the day-ahead margin; no FCR and no income from aFRR activation. Nothing is tuned to reach a target.",
+    reserveStart: (month: string) => `aFRR capacity starts in ${month}, three months after commercial operation (prequalification).`,
+    benchmark: (model: string, ffe: string, modo: string) =>
+      `Market revenue of the whole battery in 2030: ${model} per MW in the model, against ${ffe} in FfE/PwC’s forecast (September 2026) and ${modo} in Modo Energy’s (March 2026; its April update cut lifetime revenue by 16%).`,
+    pathsTitle: "The three reserve saturation paths",
+    pathCols: { path: "Path", irr: "Investor IRR", tStar: "Break-even toll", k: "Break-even spreads" },
+    pathPending: "…",
     merchantTitle: "What would the market have to pay?",
     merchantFound: (k: string, path: string) => `Without a toll, the investor breaks even if daily price spreads are ${k} the ${path} path.`,
     merchantNotReached: "Even spreads three times the path do not reach the hurdle.",
@@ -159,6 +179,7 @@ export const deEn = {
   },
   groups: {
     market: "Market",
+    stack: "Reserves and intraday",
     battery: "Battery",
     toll: "Tolling contract",
     grid: "Grid, fees and timing",
@@ -190,7 +211,43 @@ export const deEn = {
         "Share of the perfect-foresight margin a real optimiser captures — forecasts are not perfect. A loss is never " +
         "scaled down.",
     },
-    fee: { label: "Optimiser’s fee", hint: "Share of the positive margin, after the realism factor, that the trading optimiser keeps." },
+    fee: {
+      label: "Optimiser’s fee",
+      hint: "Share the trading optimiser keeps of each positive part of the market revenue: the day-ahead margin after the realism factor, the intraday uplift and aFRR capacity.",
+    },
+    rev: {
+      label: "Revenue scenario",
+      hint:
+        "With reserves, the market share also offers aFRR capacity in the years that pays more than trading, and trades " +
+        "intraday as well as day-ahead. The paths differ in how fast reserve prices fall as batteries flood the market: " +
+        "central (after FfE/PwC, September 2026), fast exit, slow. Day-ahead only is the calculation of the previous version.",
+    },
+    idu: {
+      label: "Intraday uplift",
+      hint:
+        "Extra margin from intraday trading as a share of the captured day-ahead margin, with the same cycling. An " +
+        "assumption: a study with the same cycle limit found 25–48% in 2024–2025; FfE/PwC’s 2030 forecast implies about 100%.",
+    },
+    afrr: {
+      label: "aFRR share",
+      hint:
+        "Share of the market share’s power and energy offered as aFRR capacity in a year the reserve is held. 50% is an " +
+        "equal-split assumption, the convention of RWTH Aachen’s battery revenue index for 2-hour batteries.",
+    },
+    rwin: {
+      label: "aFRR price period",
+      hint:
+        "Average accepted aFRR capacity prices of the German transmission system operators: January–September 2026 (€10.44 " +
+        "up and €14.71 down per MW an hour), or the 12 months to September 2026.",
+    },
+    rpf: { label: "aFRR price level", hint: "Scales both aFRR capacity prices before the saturation path; 0 tests a market without reserve income." },
+    rho: { label: "Reserve realisation", hint: "Share of the revenue at average prices the offers earn, after availability: not every block is won at the average." },
+    act: {
+      label: "aFRR activation",
+      hint:
+        "Energy called in each direction per offered MW-hour. It wears the battery; its margin is taken as zero — income " +
+        "less recharging and losses.",
+    },
     dur: {
       label: "Duration",
       hint:
@@ -245,6 +302,8 @@ export const deEn = {
   } as Record<string, { label: string; hint: string }>,
   options: {
     path: { reference: "Reference", low: "Low", high: "High" },
+    rev: { central: "With reserves, central", fast: "With reserves, fast exit", slow: "With reserves, slow", dayahead: "Day-ahead only" },
+    rwin: { "ytd-2026": "Jan–Sep 2026", "ltm-2026-09": "Oct 2025 – Sep 2026" },
     snap: { "DE-2025": "2025", "DE-LTM-2026-09": "Oct 2025 – Sep 2026" },
     dur: { "1": "1 h", "2": "2 h", "4": "4 h" },
     rte: { "0.85": "85%", "0.88": "88%", "0.9": "90%" },
@@ -260,6 +319,7 @@ export const deEn = {
     months: "months",
   } as Record<string, string>,
   pathName: { reference: "reference", low: "low", high: "high" } as Record<string, string>,
+  reservePathName: { central: "Central (FfE/PwC)", fast: "Fast exit", slow: "Slow" } as Record<string, string>,
   tabs: {
     overview: "Overview",
     revenue: "Revenue",
@@ -275,6 +335,10 @@ export const deEn = {
     revenue: (toll: string, market: string, total: string, share: string) =>
       `In 2029, the first full year, the toller pays ${toll} per MW for ${share} of the battery; the rest earns ${market} per MW on the day-ahead market — ${total} per MW in all.`,
     revenueMerchant: (market: string) => `In 2029, the first full year, the whole battery earns ${market} per MW on the day-ahead market.`,
+    revenueStack: (toll: string, market: string, total: string, share: string, da: string, id: string, afrr: string) =>
+      `In 2029, the first full year, the toller pays ${toll} per MW for ${share} of the battery; the rest earns ${market} per MW on the market — ${da} from day-ahead trading, ${id} from intraday and ${afrr} from aFRR capacity, less the optimiser’s fee — ${total} per MW in all.`,
+    revenueMerchantStack: (market: string, da: string, id: string, afrr: string) =>
+      `In 2029, the first full year, the whole battery earns ${market} per MW on the market: ${da} from day-ahead trading, ${id} from intraday and ${afrr} from aFRR capacity, less the optimiser’s fee.`,
     costs: (opex: string, ebitda: string) => `Operating costs and grid charges take ${opex} per MW, which leaves EBITDA of ${ebitda} per MW.`,
     investment: (capex: string, perKw: string, debt: string, gearing: string, equity: string) =>
       `Building the battery costs ${capex} (${perKw} per kW). The bank looks at the low spread path and lends ${debt} — ${gearing} of the cost without VAT; the owner pays in ${equity}.`,
@@ -288,6 +352,7 @@ export const deEn = {
     chartNote: "€ million, nominal.",
     toll: "Toll fee",
     market: "Day-ahead trading",
+    marketStack: "Market trading",
     opex: "Operating costs",
     cfads: "Cash for debt service",
   },
@@ -298,6 +363,8 @@ export const deEn = {
     purchases: "Purchases (charging)",
     margin: "Perfect-foresight margin",
     capture: "Realism factor",
+    intraday: "Intraday uplift",
+    afrr: "aFRR capacity",
     fee: "Optimiser’s fee",
     market: "Market revenue",
     toll: "Toll fee earned",
@@ -315,6 +382,12 @@ export const deEn = {
     summer: "July",
     tb2Title: "Daily spread of the two dearest and two cheapest hours",
     tb2Note: (mean: string) => `Mean ${mean} per MWh; deciles of the days.`,
+    stackTitle: "Reserves and intraday by year",
+    stackNote:
+      "€ million, nominal. aFRR capacity is offered only in the years it earns at least as much per MW as trading — the " +
+      "annual rule of the methodology; the intraday uplift runs from commercial operation.",
+    held: (years: string) => `aFRR held in ${years}.`,
+    heldNone: "aFRR is held in no year: trading pays more throughout.",
   },
   toll: {
     termsTitle: "The contract",
@@ -388,6 +461,12 @@ export const deEn = {
       agnes: { label: "AgNes fee", low: "0", high: "€7,000" },
       bkz: { label: "Grid contribution", low: "0", high: "€165/kW" },
       afaBattery: { label: "Battery tax life", low: "—", high: "10 years" },
+      reservePrice: { label: "aFRR prices", low: "0", high: "+20%" },
+      reservePath: { label: "Reserve saturation", low: "fast exit", high: "slow" },
+      afrrShare: { label: "aFRR share", low: "half", high: "—" },
+      realisation: { label: "Reserve realisation", low: "75%", high: "100%" },
+      intraday: { label: "Intraday uplift", low: "0", high: "48%" },
+      activation: { label: "aFRR activation", low: "0", high: "10%" },
     } as Record<string, { label: string; low: string; high: string }>,
     noResult: (list: string) => `No result, shown as a status: ${list}.`,
     statusShort: { inputUnsupported: "inputs outside the model", calcError: "calculation check failed" } as Record<string, string>,
@@ -406,9 +485,14 @@ export const deEn = {
       high: "High spread path",
       ltm: "Prices of the last 12 months",
       noDebt: "No loan",
-      merchant: "Day-ahead only, no loan",
+      merchant: "No toll, no loan",
       grandfathered: "Grid-fee exemption kept",
       loan15: "15-year loan",
+      dayAhead: "Day-ahead only",
+      stack: "Market with reserves",
+      reserveLtm: "aFRR prices of the last 12 months",
+      stackFast: "Fast exit from reserves",
+      stackSlow: "Slow reserve saturation",
     } as Record<string, string>,
   },
   compare: {
@@ -435,9 +519,15 @@ export const deEn = {
       deTollNoDebt: { name: "Germany, toll without loan", revenue: "Toll 80% + day-ahead", financing: "Equity" },
       deMerchant: { name: "Germany, day-ahead only", revenue: "Day-ahead market", financing: "Equity" },
     } as Record<string, { name: string; revenue: string; financing: string }>,
+    /** The German rows when the case has the revenue stack. */
+    rowsStack: {
+      deToll: { name: "Germany, toll with loan", revenue: "Toll 80% + market with reserves", financing: "Commercial-bank loan" },
+      deTollNoDebt: { name: "Germany, toll without loan", revenue: "Toll 80% + market with reserves", financing: "Equity" },
+      deMerchant: { name: "Germany, market with reserves", revenue: "Day-ahead, intraday, aFRR", financing: "Equity" },
+    } as Record<string, { name: string; revenue: string; financing: string }>,
     differencesTitle: "What differs between the two markets",
     differences: [
-      ["Revenue", "Ukraine: day-ahead trading on spreads that were among Europe’s widest in 2025. Germany: a tolling contract for 80% of the battery and day-ahead trading for the rest."],
+      ["Revenue", "Ukraine: day-ahead trading on spreads that were among Europe’s widest in 2025. Germany: a tolling contract for 80% of the battery and the market for the rest — day-ahead and intraday trading and aFRR reserves (day-ahead only in that scenario)."],
       ["Investment and costs", "Similar battery prices; Germany adds a grid connection contribution (BKZ) and from 2029 the AgNes capacity fee, Ukraine network tariffs and war risk."],
       ["Taxes", "Ukraine: 18% profit tax and 5% withholding tax on dividends to the German parent. Germany: corporate income tax, solidarity surcharge and trade tax of the GmbH."],
       ["Financing", "Ukraine: a euro loan of a development bank. Germany: a commercial bank’s loan sized on the toll and the market separately."],
@@ -459,7 +549,7 @@ export const deEn = {
       balanceSheet: "Balance sheet balances every month",
       bucketsReconcile: "Toll and market cash add up",
       taxReconcile: "Taxes paid equal taxes due",
-      sharesSumToOne: "Toll and market shares add up",
+      sharesSumToOne: "Toll, trading and aFRR shares add up",
       tollFeeWithinContract: "Toll fee within the contract",
       fundingConverged: "Loan sizing converged",
       gearingCap: "Loan within the maximum debt share",
@@ -471,6 +561,8 @@ export const deEn = {
       distributionCapped: "Payouts not cut by §30 GmbHG",
       lockup: "No payout blocked by the lock-up",
       default: "Cover never below 1.00",
+      afrrCycleBudget: "aFRR activation within the cycle limit",
+      stackRevenueReconcile: "Market revenue parts add up",
     } as Record<string, string>,
   },
   tables: {
@@ -481,6 +573,11 @@ export const deEn = {
       usable: "Usable energy, MWh (average)",
       toll: "Toll fee",
       market: "Day-ahead trading",
+      dayAhead: "Day-ahead margin captured",
+      intraday: "Intraday uplift",
+      afrr: "aFRR capacity",
+      fee: "Optimiser’s fee",
+      marketStack: "Market revenue",
       revenue: "Revenue",
       opex: "Operating costs and charges",
       ebitda: "EBITDA",
@@ -503,7 +600,7 @@ export const deEn = {
   },
   footer: {
     author: "Model and text: Igor Sabodakha",
-    data: "Prices: Bundesnetzagentur | SMARD.de via Energy-Charts (CC BY 4.0), derived statistics only",
+    data: "Prices: Bundesnetzagentur | SMARD.de via Energy-Charts (CC BY 4.0), derived statistics only; aFRR: German TSOs (regelleistung.net)",
     version: (spec: string, lib: string) => `Methodology ${spec} · revenue library DE v${lib}`,
   },
 };

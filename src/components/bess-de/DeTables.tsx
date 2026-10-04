@@ -10,11 +10,21 @@ export function DeTables({ core, t }: { core: DeCore; t: DeMessages }) {
   const L = t.tables.rows;
   const y = core.years;
   const col = (fn: (r: DeYear) => number): (number | null)[] => y.map(fn);
+  const stack = core.inputs.stackEnabled === true;
+  const market: TableRow[] = stack
+    ? [
+        { label: L.dayAhead, values: col((r) => r.dayAheadEur) },
+        { label: L.intraday, values: col((r) => r.intradayEur) },
+        { label: L.afrr, values: col((r) => r.afrrEur) },
+        { label: L.fee, values: col((r) => -r.feeEur) },
+        { label: L.marketStack, values: col((r) => r.marketEur) },
+      ]
+    : [{ label: L.market, values: col((r) => r.marketEur) }];
   const rows: TableRow[] = [
     { label: L.discharge, values: col((r) => r.dischargeMWh), format: (v) => (v ? f.num(v, 0) : "—") },
     { label: L.usable, values: y.map((r) => r.usableMWh), format: (v) => (v ? f.num(v, 1) : "—") },
     { label: L.toll, values: col((r) => r.tollEur) },
-    { label: L.market, values: col((r) => r.marketEur) },
+    ...market,
     { label: L.revenue, values: col((r) => r.revenueEur), bold: true },
     { label: L.opex, values: col((r) => -r.opexEur) },
     { label: L.ebitda, values: col((r) => r.ebitdaEur), bold: true },

@@ -1,5 +1,6 @@
-// Public sources of the German battery calculator (spec v1.2 R2.4): what each says is in the methodology and in the input
-// hints. `date` is the day the source was last checked against the model (or its publication date for a dated document).
+// Public sources of the German battery calculator (spec v1.2 R2.4; the revenue stack of spec R3.1): what each says is in
+// the methodology and in the input hints. `date` is the day the source was last checked against the model (or its
+// publication date for a dated document).
 
 export interface DeSource {
   title: string;
@@ -31,6 +32,17 @@ export const DE_SOURCES: Record<string, DeSource> = {
       "Day-ahead prices come in quarter-hours from delivery on 1 October 2025, so the model averages each hour’s four " +
       "quarter-hours and compares all prices by the hour. In January–September 2026 the quarter-hours gave a spread 4.8% " +
       "wider than their hourly averages; the model leaves that gain out.",
+    group: "prices",
+  },
+  regelleistung: {
+    title: "German transmission system operators (regelleistung.net): aFRR capacity tender results, January 2025 – September 2026",
+    url: "https://www.regelleistung.net/apps/datacenter/tenders/",
+    date: "2026-10-04",
+    used:
+      "The average accepted price of aFRR capacity — paid as bid; a simple mean of the four-hour blocks by delivery day: " +
+      "€10.440 per MW an hour upward and €14.709 downward in January–September 2026 (the base), €12.738 and €13.255 in " +
+      "October 2025 – September 2026 (the alternative). The model starts from these 2026 prices and lowers them along the " +
+      "saturation path. The operators’ FAQ allows the published data to be used without their approval.",
     group: "prices",
   },
 
@@ -67,8 +79,61 @@ export const DE_SOURCES: Record<string, DeSource> = {
     url: "https://www.enspired-trading.com/blog/bess-revenue-models-toll-floor-fully-merchant",
     date: "2026-10-03",
     used:
-      "Revenue splits between owner and optimiser of 90:10, 85:15 and 80:20: the model’s fee of 10% of the positive " +
-      "merchant margin after the capture factor, with no fee on the tolled share.",
+      "Revenue splits between owner and optimiser of 90:10, 85:15 and 80:20: the model’s fee of 10% on each positive part " +
+      "of the market revenue — the day-ahead margin after the capture factor, the intraday uplift and aFRR capacity — with " +
+      "no fee on the tolled share.",
+    group: "revenue",
+  },
+  ffePwc: {
+    title: "FfE and PwC: Finanzierung und De-Risking von BESS-Projekten (September 2026)",
+    url: "https://www.ffe.de/wp-content/uploads/2026/09/FfE_Finanzierung-und-de-risking-von-bess-projekten.pdf",
+    date: "2026-10-04",
+    used:
+      "Figure 3 forecasts a 2-hour battery’s revenue by market to 2037. Its aFRR revenue per MW, read off the chart " +
+      "(about ±€2,000), over the 2026 anchor of €110,153 gives the central saturation path: 0.51 in 2027, 0.43 in 2029, " +
+      "0.36 in 2030, 0.25 from 2033 and 0.23 from 2036. Its market revenue for 2030, about €156,000 per MW, stands next to " +
+      "the model’s on the first screen. Its intraday level — about twice the day-ahead margin — is not used; the model " +
+      "keeps a cautious 15%.",
+    group: "revenue",
+  },
+  modoOutlook: {
+    title: "Modo Energy: Germany battery investment outlook — executive summary (16 Mar 2026)",
+    url: "https://modoenergy.com/research/en/germany-battery-investment-outlook-q2-2026-executive-summary",
+    date: "2026-10-04",
+    used:
+      "A 2-hour battery’s revenue falls from about €240,000 per MW in 2026 to about €125,000 in 2030, with reserves from " +
+      "55% of it to about 5%: the fast-exit path interpolates between these points (0.50, 0.25, 0.12, then 0.05 from " +
+      "2030). Modo calibrates its whole revenue stack at 80% of the perfect-foresight value; the model’s reserve realisation " +
+      "of 90% applies to aFRR capacity alone. Modo’s April update cut lifetime revenue by 16% and its July update slowed " +
+      "the saturation of reserves.",
+    group: "revenue",
+  },
+  oeltzPfingsten: {
+    title: "Oeltz and Pfingsten, arXiv preprint: rolling intrinsic for battery valuation in day-ahead and intraday markets (v2, 29 Oct 2025)",
+    url: "https://arxiv.org/abs/2510.01956",
+    date: "2026-10-04",
+    used:
+      "A 2-hour battery with one cycle a day and the hourly day-ahead market, June 2024 – July 2025: adding the intraday " +
+      "auction earned 24.7% more than day-ahead alone, adding continuous intraday trading as well 48.3% — the high end of " +
+      "the intraday uplift in the tornado. The model’s 15% is an assumption below both.",
+    group: "revenue",
+  },
+  iseaIndex: {
+    title: "RWTH Aachen (ISEA): battery revenue index — aFRR methodology",
+    url: "https://battery-revenue-index-96345f.pages.rwth-aachen.de/methodology/single_markets/afrr/",
+    date: "2026-10-04",
+    used:
+      "For a 2-hour battery the index offers 0.5 MW of aFRR in each direction per MW: the convention behind the model’s " +
+      "aFRR share of 50%. It is a modelling convention, not an observed split.",
+    group: "revenue",
+  },
+  enspired: {
+    title: "enspired: monthly BESS revenues and market trends, Q3 2026",
+    url: "https://www.enspired-trading.com/blog/monthly-bess-revenues-and-market-trends-q3-2026",
+    date: "2026-10-04",
+    used:
+      "Its July and August 2026 aFRR revenue set against the capacity prices of those months implies about half of the " +
+      "power in aFRR in each direction — a revenue equivalent, not an observed split, and a check of the 50% share.",
     group: "revenue",
   },
   tollMarket: {
@@ -90,6 +155,17 @@ export const DE_SOURCES: Record<string, DeSource> = {
       "€116,200–129,870 per MW a year): the 84-month term, the nominal fee linked to availability (95% guaranteed in the " +
       "model) and a cross-check of the toll price. The tolled share is not disclosed; the model’s 80% is an assumption.",
     group: "revenue",
+  },
+  pqConditions: {
+    title: "German transmission system operators: prequalification of balancing reserve providers (PQ conditions, 5 Jul 2024)",
+    url: "https://www.regelleistung.net/de-de/Anbieter-werden/Pr%C3%A4qualifikationsverfahren",
+    date: "2026-10-04",
+    used:
+      "aFRR must hold at least an hour of the offered power in each direction at once (section 2.7.1), so a battery offers " +
+      "at most its usable hours over two of its power. A complete application is decided within three months: reserves " +
+      "start three months after commercial operation. Activated energy is not published for batteries; the model takes " +
+      "5% of the offered MW-hours in each direction for wear.",
+    group: "technology",
   },
   stromVkg: {
     title: "StromVKG (capacity market law of 21 Jul 2026) §12: eligibility in the 2026 auctions",

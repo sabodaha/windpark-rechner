@@ -5,7 +5,9 @@ import { DE_FIELDS, DE_GROUPS, type DeFieldDef } from "../src/bess/de/fields";
 import { deEn } from "../src/bess/de/messages";
 import { DE_BASE, DE_VARIANTS } from "../src/bess/de/registry";
 import { DE_SOURCES } from "../src/bess/de/sources";
-import { DE_STORAGE_KEY, decodeDeInputs, encodeDeInputs, ignoredDeParams } from "../src/bess/de/url-state";
+import {
+  DE_LEGACY_STORAGE_KEY, DE_STORAGE_KEY, decodeDeInputs, deLinkHasInputs, encodeDeInputs, ignoredDeParams, readDeInputs,
+} from "../src/bess/de/url-state";
 import { baseValue, type FieldValue, sameValue, toDisplay } from "../src/bess/field-kit";
 import { BESS_STORAGE_KEY } from "../src/bess/url-state";
 
@@ -75,7 +77,7 @@ describe("German calculator fields", () => {
     const four = field("dur").set(DE_BASE, "4");
     expect(four.durationHours).toBe(4);
     expect(four.tollPrice).toBe(150_000);
-    expect(encodeDeInputs(four, DE_BASE)).toBe("dur=4");
+    expect(encodeDeInputs(four, DE_BASE)).toBe("dur=4&mv=3");
   });
 });
 
@@ -104,5 +106,32 @@ describe("German calculator links", () => {
 
   it("keeps its own storage entry", () => {
     expect(DE_STORAGE_KEY).not.toBe(BESS_STORAGE_KEY);
+    expect(DE_STORAGE_KEY).not.toBe(DE_LEGACY_STORAGE_KEY);
+  });
+
+  it("a link with inputs carries the model version; one without it opens as day-ahead only (spec R3.1 §9)", () => {
+    const query = encodeDeInputs(field("tp").set(DE_BASE, 140_000), DE_BASE);
+    expect(query).toBe("tp=140000&mv=3");
+    expect(readDeInputs(query, DE_BASE)).toEqual({ inputs: { ...DE_BASE, tollPrice: 140_000 }, legacy: false });
+    const old = readDeInputs("tp=140000", DE_BASE);
+    expect(old.legacy).toBe(true);
+    expect(old.inputs).toEqual({ ...DE_BASE, stackEnabled: false, tollPrice: 140_000 });
+    // the version alone is not an input, nor something to report
+    expect(deLinkHasInputs("mv=3")).toBe(false);
+    expect(ignoredDeParams("tp=140000&mv=3")).toEqual([]);
+    // a legacy link that applies nothing still opens as day-ahead only; a stored legacy base case too
+    expect(readDeInputs("tp=-5", DE_BASE)).toEqual({ inputs: { ...DE_BASE, stackEnabled: false }, legacy: true });
+    expect(readDeInputs("", DE_BASE, true)).toEqual({ inputs: { ...DE_BASE, stackEnabled: false }, legacy: true });
+    expect(readDeInputs("", DE_BASE, false)).toEqual({ inputs: null, legacy: false });
+  });
+
+  it("the revenue scenario switches the stack and its path together", () => {
+    const da = field("rev").set(DE_BASE, "dayahead");
+    expect(da.stackEnabled).toBe(false);
+    expect(field("rev").get(da)).toBe("dayahead");
+    const slow = field("rev").set(da, "slow");
+    expect([slow.stackEnabled, slow.reservePath]).toEqual([true, "slow"]);
+    expect(encodeDeInputs(da, DE_BASE)).toBe("rev=dayahead&mv=3");
+    for (const id of ["idu", "afrr", "rwin", "rpf", "rho", "act"]) expect(field(id).hidden?.(da), id).toBe(true);
   });
 });

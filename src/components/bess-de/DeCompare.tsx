@@ -9,7 +9,7 @@ import { useFormat } from "@/components/site/LocaleProvider";
 import { deLcosText, deMetricText } from "./DeKpis";
 
 /** Germany against Ukraine with the same battery (spec §11): fixed rows; the Ukrainian library loads with this tab. */
-export function DeCompare({ result, onShow, t }: { result: DeCompareResult | null; onShow: (open: boolean) => void; t: DeMessages }) {
+export function DeCompare({ result, onShow, t, stack = false }: { result: DeCompareResult | null; onShow: (open: boolean) => void; t: DeMessages; stack?: boolean }) {
   const f = useFormat();
   const C = t.compare;
   useEffect(() => {
@@ -43,7 +43,7 @@ export function DeCompare({ result, onShow, t }: { result: DeCompareResult | nul
                 </thead>
                 <tbody>
                   {result.rows.map((r) => {
-                    const meta = C.rows[r.id]!;
+                    const meta = (stack ? C.rowsStack[r.id] : undefined) ?? C.rows[r.id]!;
                     return (
                       <tr key={r.id} className="border-b border-border last:border-0">
                         <td className="py-1.5 pr-3 font-medium">{meta.name}</td>

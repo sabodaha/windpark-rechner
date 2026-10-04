@@ -5,7 +5,7 @@ import { Placeholder } from "@/components/site/Placeholder";
 import type { Locale } from "@/lib/i18n";
 import { CONTACT, PAGE_PATHS, SITE } from "@/lib/site";
 import { bessEn } from "@/bess/messages";
-import { DE_STORAGE_KEY } from "@/bess/de/url-state";
+import { DE_LEGACY_STORAGE_KEY, DE_STORAGE_KEY } from "@/bess/de/url-state";
 import { BESS_STORAGE_KEY } from "@/bess/url-state";
 import { STORAGE_KEY } from "@/lib/url-state";
 import { MESSAGES } from "@/messages";
@@ -70,7 +70,8 @@ export function PrivacyEn() {
         browser’s local storage (key <code>{STORAGE_KEY}</code> for the wind farm calculator,{" "}
         <code>{BESS_STORAGE_KEY}</code> and <code>{DE_STORAGE_KEY}</code> for the battery storage calculators for Ukraine
         and Germany), so they are still there on your next visit;
-        without the tick nothing is stored. Local storage itself is never sent to the server; a calculator address with inputs reaches
+        without the tick nothing is stored. Inputs the German calculator kept under its earlier key{" "}
+        <code>{DE_LEGACY_STORAGE_KEY}</code> are read once and then deleted. Local storage itself is never sent to the server; a calculator address with inputs reaches
         the server only when it is loaded, as described above. The stored inputs are deleted when you untick the box or
         clear this site’s data in your browser. Legal basis: § 25 (2) no. 2 TDDDG — storage you have expressly asked for.
       </p>
@@ -159,7 +160,8 @@ export function PrivacyDe({ standalone = false }: { standalone?: boolean }) {
         verwendeten Eingaben im lokalen Speicher Ihres Browsers (Schlüssel <code>{STORAGE_KEY}</code> für den
         Windpark-Rechner, <code>{BESS_STORAGE_KEY}</code> und <code>{DE_STORAGE_KEY}</code> für die Batteriespeicher-Rechner
         für die Ukraine und Deutschland), damit sie beim nächsten Besuch
-        erhalten bleiben; ohne den Haken wird nichts gespeichert. Der lokale Speicher selbst wird nicht an den Server
+        erhalten bleiben; ohne den Haken wird nichts gespeichert. Eingaben, die der Rechner für Deutschland unter seinem
+        früheren Schlüssel <code>{DE_LEGACY_STORAGE_KEY}</code> gespeichert hat, liest er einmal und löscht sie dann. Der lokale Speicher selbst wird nicht an den Server
         übertragen; eine Rechner-Adresse mit Eingaben erreicht den Server nur beim Aufruf, wie oben beschrieben. Die gespeicherten Eingaben werden gelöscht,
         wenn Sie den Haken entfernen oder die Websitedaten in Ihrem Browser löschen. Rechtsgrundlage ist §&nbsp;25
         Abs.&nbsp;2 Nr.&nbsp;2 TDDDG: Die Speicherung erfolgt auf Ihren ausdrücklichen Wunsch.

@@ -2,12 +2,12 @@ import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 import { withDeDuration } from "@/bess/de";
 import { buildDeCapex, type DeCapexLine } from "@/bess/de/capex";
-import { DE_CASE_NAME, DE_DATA_AS_OF, DE_PUBLISHED, DE_SPEC_REVISION, DE_TOLL_MARKET, DE_UPDATED } from "@/bess/de/data";
+import { DE_CASE_NAME, DE_DATA_AS_OF, DE_MARKET_2030, DE_PUBLISHED, DE_SPEC_REVISION, DE_TOLL_MARKET, DE_UPDATED } from "@/bess/de/data";
 import { deEn } from "@/bess/de/messages";
 import { effectiveFee, spreadM } from "@/bess/de/operations";
 import {
-  DE_BASE, DE_CAPEX, DE_CASE, DE_DURATION_PRESETS, DE_ENGINE, DE_FINANCE, DE_GRID, DE_MACRO, DE_REVENUE, DE_SPREAD_PATHS, DE_TAX, DE_TECH, DE_TOLL,
-  DE_VARIANTS, idxDE,
+  DE_BASE, DE_CAPEX, DE_CASE, DE_DURATION_PRESETS, DE_ENGINE, DE_FINANCE, DE_GRID, DE_MACRO, DE_REVENUE, DE_SPREAD_PATHS, DE_STACK, DE_TAX, DE_TECH,
+  DE_TOLL, DE_VARIANTS, idxDE,
 } from "@/bess/de/registry";
 import { deBase, loadDeLibrary } from "@/bess/de/server";
 import type { DeMetric } from "@/bess/de/types";
@@ -23,9 +23,9 @@ import { absoluteUrl, BESS_DE_ID, breadcrumbJsonLd, graph, PATHS, PERSON_ID, SIT
 const TITLE = "How the German battery storage model works";
 const DESCRIPTION =
   `Methodology of the Battery Storage Investment Calculator for Germany: a tolling contract for ${pct(DE_BASE.tollShare, 0)} of a ` +
-  `fictional ${DE_BASE.powerMW} MW battery and perfect-foresight day-ahead trading for the rest, derived price data, degradation, ` +
-  "AgNes grid fees, GmbH taxes, a bank loan sized on two cash buckets, payouts under §30 GmbHG, the break-even toll price and " +
-  "the checks — with formulas.";
+  `fictional ${DE_BASE.powerMW} MW battery and the market for the rest — perfect-foresight day-ahead trading, an intraday uplift ` +
+  "and aFRR reserves in the years they pay more — derived price data, degradation, AgNes grid fees, GmbH taxes, a bank loan " +
+  "sized on two cash buckets, payouts under §30 GmbHG, the break-even toll price and the checks, with formulas.";
 
 export const metadata = pageMetadata({
   title: "German battery storage model methodology",
@@ -150,6 +150,19 @@ export default function GermanBessMethodologyPage() {
   const feeHigh = effectiveFee(DE_BASE, snap.avgPriceEUR, spreadM(DE_BASE, "high", 2028), 2028).fee;
   const paths = (["reference", "low", "high"] as const).map((id) => [id, DE_SPREAD_PATHS[id]] as const);
 
+  // the revenue stack (spec R3.1)
+  const stackYears = Array.from({ length: DE_STACK.pathYears[1] - DE_STACK.pathYears[0] + 1 }, (_, i) => DE_STACK.pathYears[0] + i);
+  const reservePaths = (["central", "fast", "slow"] as const).map((id) => [id, DE_STACK.paths[id]] as const);
+  const ytd = DE_STACK.prices["ytd-2026"];
+  const ltmPrices = DE_STACK.prices["ltm-2026-09"];
+  const anchor = 0.5 * (ytd.pos + ytd.neg) * 8760;
+  const held = core.stack?.heldYears ?? [];
+  const heldText = held.length ? andList(held.map(String)) : "no year";
+  const reserveStart = core.stack ? monthLabel(core.stack.reserveStart) : null;
+  const perDirection = inp.activationShare * 8760;
+  const cycleBudget = core.checks.find((c) => c.id === "afrrCycleBudget");
+  const m2030 = extras.market2030PerMwEur;
+
   // calendar
   const contractCod = addMonths(DE_CASE.financialClose.slice(0, 7), DE_CASE.constructionMonths);
   const lastSettlement = addMonths(cal.lastOperating, DE_CASE.settlementHorizonMonths);
@@ -234,7 +247,7 @@ export default function GermanBessMethodologyPage() {
     loan15.debtEur !== null && debt !== null && Math.abs(loan15.debtEur - debt) < 1;
   const C = deEn.compare;
   const compareRows: ReactNode[][] = compare.rows.map((r) => {
-    const meta = C.rows[r.id];
+    const meta = (inp.stackEnabled === true ? C.rowsStack[r.id] : undefined) ?? C.rows[r.id];
     const name = (
       <>
         {meta?.name ?? r.id}
@@ -313,7 +326,9 @@ export default function GermanBessMethodologyPage() {
             <dt>Revenue</dt>
             <dd>
               A tolling contract for {pct(s, 0)} of the battery’s power and energy, {inp.tollMonths} months at{" "}
-              {eur(inp.tollPrice)} per tolled MW a year; day-ahead trading for the rest, and for the whole battery after the toll
+              {eur(inp.tollPrice)} per tolled MW a year; for the rest, and for the whole battery after the toll, the market:
+              day-ahead trading with an intraday uplift of {pct(inp.intradayUplift, 0)}, and aFRR capacity in the years it pays
+              more than trading — {heldText} in the base case
             </dd>
             <dt>Timeline</dt>
             <dd>
@@ -368,8 +383,8 @@ export default function GermanBessMethodologyPage() {
           <p>
             The calculator values one fictional battery in Germany. “{DE_CASE_NAME}” stands for no real place, and no real
             municipality is named. One project company, a GmbH, builds a {P} MW battery with {H} hours of storage, rents{" "}
-            {pct(s, 0)} of it to a toll buyer for {inp.tollMonths / 12} years and trades the rest on the day-ahead market. After
-            the toll the whole battery trades.
+            {pct(s, 0)} of it to a toll buyer for {inp.tollMonths / 12} years and trades the rest on the market: day-ahead and
+            intraday, and aFRR reserves in the years they pay more than trading. After the toll the whole battery trades.
           </p>
           <p>
             It answers one question: what toll fee would the investor need? The answer is the break-even toll price T* — the
@@ -379,10 +394,12 @@ export default function GermanBessMethodologyPage() {
           </p>
           <ul>
             <li>
-              <strong>An honest result.</strong> Nothing is tuned to reach a target. The model is a scenario of the day-ahead
-              market only: reserves (FCR, aFRR) and the intraday market, which gave German batteries most of their revenue in
-              2026, are left out, and the first screen says so. The market share and the years after the toll earn day-ahead
-              margins only.
+              <strong>An honest result.</strong> Nothing is tuned to reach a target. Reserves and the intraday market, which gave
+              German batteries most of their revenue in 2026, enter on cautious assumptions: aFRR capacity only in the years it
+              earns more than trading, at prices that fall as batteries flood the market, and intraday trading as an uplift of{" "}
+              {pct(inp.intradayUplift, 0)} on the day-ahead margin (section 4). FCR, the income from aFRR activation and the
+              balancing-energy market stay out (section 16). The “day-ahead only” scenario keeps the calculation of the previous
+              version, and the first screen names the scenario it shows.
             </li>
             <li>
               <strong>Monthly and dated.</strong> The model runs month by month from financial close to the end of settlement.
@@ -576,10 +593,11 @@ S = M · S_hist + a · O        P = M · P_hist + a · I                O, I: en
             2028. There is no floor; a fee outside the library’s axis gives the case a status, not a number.
           </p>
           <h3>From the optimum to cash</h3>
-          <pre>{`margin    = (S − P) · idxDE(y) · (1 − s) · availability           nominal euros
+          <pre>{`margin    = (S − P) · idxDE(y) · wholesale share · availability   nominal euros
 captured  = ${num(inp.captureFactor, 2)} · max(margin, 0) + min(margin, 0)
-fee       = ${pct(inp.optimiserFeeRate, 0)} · max(captured, 0)
-revenue   = captured − fee`}</pre>
+intraday  = ${pct(inp.intradayUplift, 0)} · max(captured, 0)                          below
+fee       = ${pct(inp.optimiserFeeRate, 0)} · (max(captured, 0) + intraday + aFRR capacity)
+revenue   = captured + intraday + aFRR capacity − fee`}</pre>
           <ul>
             <li>
               The realism factor of {num(inp.captureFactor, 2)} stands for what perfect foresight overstates: bids go in before
@@ -589,8 +607,10 @@ revenue   = captured − fee`}</pre>
               are assumptions. A loss is never scaled down.
             </li>
             <li>
-              The optimiser keeps {pct(inp.optimiserFeeRate, 0)} of the positive captured margin of the market share and nothing
-              on the toll share.
+              The optimiser keeps {pct(inp.optimiserFeeRate, 0)} of each positive part — the captured margin, the intraday
+              uplift and aFRR capacity — once, and nothing on the toll share. A loss in trading carries no fee and does not
+              reduce the fee on the other parts: with a captured margin of −€100 and aFRR capacity of €200, the fee is €20 and the
+              revenue €80.
             </li>
             <li>
               Availability is {pct(inp.availabilityYear1, 0)} in the first 12 months of operation and {pct(inp.availability, 0)}{" "}
@@ -602,6 +622,116 @@ revenue   = captured − fee`}</pre>
               charge (§13b UStG), so they carry no VAT in cash.
             </li>
           </ul>
+          <h3>Reserves and intraday</h3>
+          <p>
+            The market share earns in up to three ways. It trades day-ahead as above; it adds an intraday uplift; and in the
+            years aFRR capacity pays more than trading, part of it is offered as aFRR capacity instead. The base case is the
+            market with reserves on the central saturation path. Three other scenarios change only the revenue:
+          </p>
+          <Table
+            head={["Scenario", "Reserves and intraday", "Saturation path", "Role"]}
+            rows={[
+              [deEn.options.rev?.central ?? "central", "on", "central, after FfE/PwC", "base case"],
+              [deEn.options.rev?.fast ?? "fast", "on", "fast exit, after Modo Energy", "variant"],
+              [deEn.options.rev?.slow ?? "slow", "on", "slow, a judgement", "variant"],
+              [deEn.options.rev?.dayahead ?? "day-ahead only", "off", "—", "the previous version’s calculation, unchanged to the byte"],
+            ]}
+          />
+          <pre>{`wholesale share = (1 − s) · (1 − f)
+aFRR share      = (1 − s) · f          f = ${pct(inp.afrrShare, 0)} in a year that holds aFRR, from its start; otherwise 0`}</pre>
+          <ul>
+            <li>
+              Each share keeps the battery’s ratio of energy to power, like the toll share. The toll buyer’s share — and its
+              reserves and intraday trading — stay the buyer’s. Half for aFRR is an equal-split assumption: it is the convention
+              of RWTH Aachen’s battery revenue index for 2-hour batteries, and one optimiser’s portfolio revenue in July–August
+              2026 implies about the same — a revenue equivalent, not an observed split.
+            </li>
+            <li>
+              aFRR starts three months after commercial operation{reserveStart ? `, in ${reserveStart} in the base case` : ""}:
+              prequalification decides a complete application within three months, and the model assumes it is filed before the
+              plant starts. A delay moves the start; the intraday uplift runs from commercial operation.
+            </li>
+            <li>
+              The battery bids through its optimiser’s prequalified pool, which provides recharging, a reserve against outages,
+              fractional and minimum bids and the 15-minute floor; their cost is inside the optimiser’s fee — an assumption.
+            </li>
+          </ul>
+          <h3>aFRR capacity</h3>
+          <pre>{`offer        = aFRR share · P · min(1; usable hours / 2)                         MW, up and down at once
+aFRR revenue = offer · (π+ + π−) · φ · R(y) · ρ · 24 · days · availability · idxDE(y) / idxDE(2026)`}</pre>
+          <ul>
+            <li>
+              <strong>The energy test.</strong> aFRR must hold at least one hour of the offered power in each direction, both at
+              once, so a battery offers at most its usable hours over two of its power — a static ceiling, not a proof of
+              prequalification. As the battery wears, its usable hours fall below two and the offer with them: an effect of the
+              split, not of physics. The offer reads the usable energy at the start of the month, augmentation included.
+            </li>
+            <li>
+              <strong>Prices.</strong> π+ and π− are the average accepted aFRR capacity prices of the German transmission system
+              operators — paid as bid; a simple mean of the four-hour blocks by delivery day — in January–September 2026:{" "}
+              {eur(ytd.pos, 3)} upward and {eur(ytd.neg, 3)} downward per MW an hour, nominal 2026. The alternative period,
+              October 2025 to September 2026, gives {eur(ltmPrices.pos, 3)} and {eur(ltmPrices.neg, 3)}. φ scales both: 1 in the
+              base case, 0 and 1.2 in the tornado.
+            </li>
+            <li>
+              <strong>Realisation.</strong> ρ = {pct(inp.reserveRealisation, 0)} cuts the revenue after availability and before
+              the fee: not every block is won at the average price. An outage earns nothing and pays no penalty.
+            </li>
+            <li>
+              Capacity revenue is a service: its VAT is passed on and paid in the same month, with no effect on cash, and it
+              settles in the same month — both assumptions.
+            </li>
+          </ul>
+          <p>R(y) is the year’s multiplier on the base prices, by calendar year; after 2037 the last value holds:</p>
+          <Table
+            head={["Path", ...stackYears.map((y) => (y === DE_STACK.pathYears[1] ? `${y} on` : String(y)))]}
+            num={stackYears.map((_, i) => i + 1)}
+            rows={reservePaths.map(([id, r]) => [deEn.reservePathName[id] ?? id, ...stackYears.map((y) => num(r[y as keyof typeof r], 3))])}
+          />
+          <p>
+            The central path is FfE/PwC’s aFRR revenue per MW in figure 3 of their September 2026 study, read off the chart
+            (about ±€2,000), over the base anchor of 0.5 · (π+ + π−) · 8,760 = {eur(anchor, 2)} per MW. It is an assumption, not
+            a price forecast: their aFRR may include activation, and their money year is not stated; the model reads it as
+            real 2026 euros. The fast path interpolates between Modo Energy’s March 2026 points, when reserves fell from 55% of
+            a 2-hour battery’s revenue in 2026 to about 5% by 2030; Modo softened that view in July. The slow path is a
+            judgement. No probabilities are attached; the tornado tests prices of zero.
+          </p>
+          <h3>The annual rule</h3>
+          <p>
+            Each calendar year the model decides once whether a MW earns more in aFRR or in trading. It reads the LCOS run — the
+            whole battery on the market, without the toll and without the stack, on the same spreads and k:
+          </p>
+          <pre>{`a(y) = Σ (π+ + π−) · φ · R(y) · ρ · 24 · days · availability · min(1; usable hours / 2) · idxDE(y)/idxDE(2026) · (1 − fee)
+w(y) = Σ [captured + u · max(captured, 0) − fee · (1 + u) · max(captured, 0)] / P
+aFRR is held in year y   if   a(y) ≥ w(y)`}</pre>
+          <p>
+            The sums run over the year’s months of operation from the start of aFRR; a year without them holds no aFRR. The rule
+            is decided in advance and does not depend on the toll price, so the break-even toll price stays well defined; at the
+            switch both choices earn the same, so the result moves smoothly with k. It leaves out the wear of activation, so
+            day-ahead only is a floor of the market revenue up to that wear and the fee. Over the life of every acceptance case
+            the stack earns at least 99% of day-ahead only, and in the base case aFRR is held in {heldText}.
+          </p>
+          <h3>Activation</h3>
+          <pre>{`activation, each direction = offer · ${pct(inp.activationShare, 0)} · 24 · days · availability          MWh`}</pre>
+          <p>
+            aFRR capacity is called now and then. The model takes {pct(inp.activationShare, 0)} of the offered MW-hours in each
+            direction — {num(perDirection, 0)} MWh per offered MW a year — an assumption, since no data for batteries are
+            published; the tornado tests 0 and 10%. Its margin is zero: the activation income less recharging and the losses
+            at {pct(inp.rte, 0)} efficiency. The discharge counts in the wear of the cohorts, the charge does not (wear follows
+            discharge). A check warns when the daily activation exceeds the cycle limit on the aFRR share’s own energy
+            {cycleBudget?.value != null ? ` — ${num(Number(cycleBudget.value), 2)} cycles a day in the base case, against ${num(inp.cycleCap, 1)}` : ""};
+            the model does not cut it.
+          </p>
+          <h3>Intraday uplift</h3>
+          <pre>{`intraday = ${pct(inp.intradayUplift, 0)} · max(captured, 0)`}</pre>
+          <p>
+            Intraday trading improves the price of the same energy: no extra cycling — an assumption; a strategy that needs more
+            cycles would need more wear. {pct(inp.intradayUplift, 0)} is an assumption, not a calibration. With the same cycle
+            limit, the hourly day-ahead market and 95% efficiency, a 2-hour battery earned 24.7% more than day-ahead alone with
+            the intraday auction, and 48.3% with continuous trading as well, in June 2024 – July 2025 (Oeltz and Pfingsten).
+            Stacks led by reserves gained 0–8% (Modo Energy, 2026). FfE/PwC’s 2030 forecast implies about 100%, which the model
+            does not take. The tornado tests 0 and 48%.
+          </p>
           <p>In 2029, the first full year, per MW of grid connection in nominal euros:</p>
           <Table
             head={["2029", "€ per MW"]}
@@ -611,6 +741,8 @@ revenue   = captured − fee`}</pre>
               [deEn.revenue.purchases, seur(-bridge.purchasesEur)],
               [deEn.revenue.margin, seur(bridge.marginEur)],
               [deEn.revenue.capture, seur(bridge.captureEur)],
+              [deEn.revenue.intraday, seur(bridge.intradayEur)],
+              [deEn.revenue.afrr, seur(bridge.afrrEur)],
               [deEn.revenue.fee, seur(-bridge.optimiserFeeEur)],
               [deEn.revenue.market, seur(bridge.marketEur)],
               [deEn.revenue.toll, seur(bridge.tollEur)],
@@ -937,8 +1069,9 @@ sources = equity + loan draws + VAT refunds up to the contract start of operatio
           <h3>Sizing on two buckets</h3>
           <p>
             The bank sizes the loan on its own case: the low spread path, the lower node of the library’s usable-energy axis, the
-            toll as signed with the buyer cycling {num(inp.tollerCyclesPerDay, 1)} times a day, and the base values for
-            everything else. It splits the cash available for debt service (CFADS) of each half-year j into a contracted and a
+            toll as signed with the buyer cycling {num(inp.tollerCyclesPerDay, 1)} times a day, no reserves and no intraday
+            uplift, and the base values for everything else. Leaving the stack out is the model’s credit policy, not a claim
+            that banks never count merchant revenue; with it the loan is the same with and without the stack. It splits the cash available for debt service (CFADS) of each half-year j into a contracted and a
             market bucket:
           </p>
           <pre>{`C_j = Σ months of j [ toll receipts − s · shared costs − w_C(y) · taxes paid ]       contracted
@@ -1125,7 +1258,8 @@ f_j             = CFADS_j − planned reserve top-up_j − [j > t] · DSRA targe
               <strong>Debt share:</strong> the loan over the uses of funds without VAT.
             </li>
             <li>
-              <strong>LCOS</strong> of the whole battery as if it traded alone on the chosen path, the toll left out: the present
+              <strong>LCOS (day-ahead only)</strong> of the whole battery as if it traded day-ahead alone on the chosen path, the
+              toll, reserves and intraday left out: the present
               value of the investment without VAT, augmentation, the overhaul, operating costs, AgNes, the charges on own
               consumption, the optimiser’s fee, charging energy and decommissioning, over the present value of the AC energy
               delivered, at the project rate from financial close. The realism factor is not a cost. Base case:{" "}
@@ -1133,7 +1267,8 @@ f_j             = CFADS_j − planned reserve top-up_j − [j > t] · DSRA targe
             </li>
             <li>
               <strong>Revenue 2029 per MW:</strong> the company’s revenue in the first full year — the toll fee earned plus the
-              market revenue after the realism factor and the optimiser’s fee — per MW of grid connection, nominal:{" "}
+              market revenue: the day-ahead margin after the realism factor, the intraday uplift and aFRR capacity, less the
+              optimiser’s fee — per MW of grid connection, nominal:{" "}
               {eur(k.revenue2029PerMwEur?.value ?? 0)}.
             </li>
             <li>
@@ -1212,8 +1347,16 @@ f_j             = CFADS_j − planned reserve top-up_j − [j > t] · DSRA targe
           <p>Four reasons, named rather than measured:</p>
           <ol>
             <li>
-              No reserves (FCR, aFRR) and no intraday trading, which gave German batteries most of their revenue in 2026: the
-              market share and the years after the toll trade day-ahead only.
+              A cautious market. Intraday trading adds {pct(inp.intradayUplift, 0)} to the day-ahead margin, where FfE/PwC’s 2030
+              forecast implies about 100%; and reserve prices fall as batteries flood the market, so aFRR beats trading only in
+              the first years.
+              {m2030 !== null && (
+                <>
+                  {" "}The model’s market revenue of the whole battery in 2030 is {eur(m2030)} per MW, against about{" "}
+                  {eur(DE_MARKET_2030.ffePwcEur)} in FfE/PwC’s forecast (September 2026) and {eur(DE_MARKET_2030.modoEur)} in Modo
+                  Energy’s (March 2026).
+                </>
+              )}
             </li>
             <li>
               A loan that amortises fully over {termYears} years and is sized on the low spread path, instead of the usual 7-year
@@ -1243,6 +1386,11 @@ f_j             = CFADS_j − planned reserve top-up_j − [j > t] · DSRA targe
             <li>
               Faster wear lowers the toll fee through the capacity factor, and an availability of{" "}
               {S.drivers.availability?.high ?? ""} in every year, the first included, through the availability factor.
+            </li>
+            <li>
+              With reserves and intraday: aFRR prices fall to zero or rise by 20%; the saturation path moves to the fast exit or
+              the slow path; the aFRR share halves; realisation is 75% or 100%; the intraday uplift 0 or 48%; activation 0 or
+              10%.
             </li>
             <li>A setting the model cannot calculate is shown as its status, not as a number.</li>
           </ul>
@@ -1376,8 +1524,18 @@ f_j             = CFADS_j − planned reserve top-up_j − [j > t] · DSRA targe
           <H2 id="limitations">16. Limitations</H2>
           <ul>
             <li>
-              Day-ahead trading and one tolling contract only: no reserves (FCR, aFRR), no intraday market, no capacity market and
-              no inertia services.
+              Reserves and intraday on cautious terms: aFRR capacity by the annual rule, the split fixed within a year and no joint
+              optimisation of the markets; one average price a year without a monthly profile, the base anchor nine months of
+              2026; the saturation paths are assumptions; intraday as a fixed uplift; activation for wear only.
+            </li>
+            <li>
+              Not modelled: FCR, the 15-minute aFRR products (FlexRL), mFRR, limits under the FCA rules (by FfE/PwC 10–35% of the
+              revenue), penalties for unavailability, collateral and payment delays on the reserve market — the liquidity
+              reserve was not tested against them — a capacity market and inertia services.
+            </li>
+            <li>
+              The owner’s share trades reserves and intraday through the same optimiser during the toll — an assumption; in
+              practice it depends on the tolling contract.
             </li>
             <li>
               Perfect foresight scaled by one realism factor; hourly comparable prices; the spread paths are assumptions, not

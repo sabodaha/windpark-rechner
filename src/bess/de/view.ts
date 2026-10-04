@@ -1,6 +1,6 @@
-// What the German battery calculator shows for one set of inputs (spec v1.2 R2.2 §9, §11, §15). The same functions run
-// at build time (the static page shows the base case) and in the browser's worker, so both always agree. The view is a
-// slim copy of the run: years, debt periods and payout dates, not the monthly ledgers.
+// What the German battery calculator shows for one set of inputs (spec v1.2 R2.2 §9, §11, §15; R3.1 §8 for the revenue
+// stack). The same functions run at build time (the static page shows the base case) and in the browser's worker, so both
+// always agree. The view is a slim copy of the run: years, debt periods and payout dates, not the monthly ledgers.
 import { toIso } from "@/engine/dates";
 import { xnpv } from "@/engine/finance";
 import { BESS_BASE, runBess, withDuration, type Library as UaLibrary, type Metric } from "../engine";
@@ -11,7 +11,7 @@ import { contractualFunding, deInputChecks, kOfCase, runDe, tStarOfCase, tStarSo
 import type { DeLibrary } from "./library";
 import { DE_VARIANTS } from "./registry";
 import { deTornado, deVariants, type DeTornado, type DeVariant } from "./sensitivity";
-import type { DeCheck, DeInputs, DeLockedFunding, DeMetric, DeStatus } from "./types";
+import type { DeCheck, DeInputs, DeLockedFunding, DeMetric, DeReservePath, DeStatus } from "./types";
 
 const ym = (i: number) => `${2027 + Math.floor((1 + i) / 12)}-${String(((1 + i) % 12) + 1).padStart(2, "0")}`;
 
@@ -22,6 +22,15 @@ export interface DeYear {
   tollEur: number;
   marketEur: number;
   revenueEur: number;
+  /** The market revenue's parts (spec R3.1 §5): the captured day-ahead margin, the intraday uplift, aFRR capacity and
+   *  the one fee on the positive parts; dayAhead + intraday + afrr − fee = market. Without the stack only the first and
+   *  the fee are non-zero. */
+  dayAheadEur: number;
+  intradayEur: number;
+  afrrEur: number;
+  feeEur: number;
+  /** aFRR held this year under the annual opportunity rule (spec R3.1 §2); null without the stack. */
+  reserveHeld: boolean | null;
   opexEur: number;
   agnesEur: number;
   ebitdaEur: number;
@@ -76,6 +85,9 @@ export interface DeBridge2029 {
   purchasesEur: number;
   marginEur: number;
   captureEur: number;
+  /** Spec R3.1: the intraday uplift and aFRR capacity revenue (0 without the stack). */
+  intradayEur: number;
+  afrrEur: number;
   optimiserFeeEur: number;
   marketEur: number;
   tollEur: number;
@@ -109,13 +121,18 @@ export interface DeCore {
   firstDeficit: string | null;
   /** With a loan: the same project without one — what the asset earns before leverage. */
   noDebt: { investorIrr: DeMetric; investorNpv: number | null } | null;
+  /** The revenue stack of the case (spec R3.1): the first aFRR month and the years aFRR is held; null without it. */
+  stack: { reserveStart: string; heldYears: number[] } | null;
 }
 
 export function computeDeCore(inputs: DeInputs, lib: DeLibrary): DeCore {
   const r = runDe(inputs, lib, { funding: contractualFunding(inputs, lib) });
   const plain = inputs.debt && r.status.primary === "ok" ? runDe({ ...inputs, debt: false }, lib) : null;
   const noDebt = plain?.kpis ? { investorIrr: plain.kpis.investorIrr!, investorNpv: plain.kpis.investorNpvEur!.value } : null;
-  const base = { inputs, status: r.status, checks: r.checks, kpis: r.kpis, funding: r.funding, market: r.market ?? null, noDebt };
+  const stack = r.stack && r.cal
+    ? { reserveStart: ym(r.stack.reserveStartIndex), heldYears: r.stack.years.filter((y) => y.held).map((y) => y.year) }
+    : null;
+  const base = { inputs, status: r.status, checks: r.checks, kpis: r.kpis, funding: r.funding, market: r.market ?? null, noDebt, stack };
   if (!r.cal || !r.ops || !r.ledger || !r.capex) {
     return { ...base, calendar: null, capex: null, years: [], periods: [], payouts: [], liquidationPayoutEur: null, bridge2029: null, minCashEur: null, firstDeficit: null };
   }
@@ -132,11 +149,17 @@ export function computeDeCore(inputs: DeInputs, lib: DeLibrary): DeCore {
     const avg = (list: number[], f: (i: number) => number) => (list.length ? list.reduce((s, i) => s + f(i), 0) / list.length : null);
     const end = lm[idx[idx.length - 1]!]!;
     const y = led.years.find((x) => x.year === year);
+    const rule = r.stack?.years.find((x) => x.year === year);
     return {
       year,
       tollEur: sum((i) => om[i]!.tollFeeAccruedEur),
       marketEur: sum((i) => om[i]!.marketNetEur),
       revenueEur: sum((i) => lm[i]!.revenueEur),
+      dayAheadEur: sum((i) => om[i]!.capturedEur),
+      intradayEur: sum((i) => om[i]!.intradayUpliftEur),
+      afrrEur: sum((i) => om[i]!.capRevAfrrEur),
+      feeEur: sum((i) => om[i]!.optimiserFeeEur),
+      reserveHeld: rule ? rule.held : null,
       opexEur: sum((i) => om[i]!.opexTotalEur),
       agnesEur: sum((i) => om[i]!.agnesEur),
       ebitdaEur: sum((i) => lm[i]!.ebitdaEur),
@@ -187,6 +210,8 @@ export function computeDeCore(inputs: DeInputs, lib: DeLibrary): DeCore {
         purchasesEur: per((i) => om[i]!.purchasesEur),
         marginEur: per((i) => om[i]!.marginEur),
         captureEur: per((i) => om[i]!.capturedEur - om[i]!.marginEur),
+        intradayEur: per((i) => om[i]!.intradayUpliftEur),
+        afrrEur: per((i) => om[i]!.capRevAfrrEur),
         optimiserFeeEur: per((i) => om[i]!.optimiserFeeEur),
         marketEur: per((i) => om[i]!.marketNetEur),
         tollEur: per((i) => om[i]!.tollFeeAccruedEur),
@@ -217,17 +242,49 @@ export function computeDeCore(inputs: DeInputs, lib: DeLibrary): DeCore {
   };
 }
 
-/** The first screen's answer (spec §9.3): the break-even toll price T* with a toll, the break-even spread multiplier k
- *  without one. Slow (about forty full runs); it follows the main run. */
-export interface DeExtras {
+/** One saturation path of the revenue stack on the first screen (spec R3.1 §8, H03): the investor's result and the
+ *  break-even toll price (or, without a toll, the spread multiplier) on that path. */
+export interface DePathResult {
+  path: DeReservePath;
+  investorIrr: DeMetric | null;
+  investorNpv: number | null;
   tStar: TStarResult | null;
   k: KResult | null;
 }
 
-export function computeDeExtras(inputs: DeInputs, lib: DeLibrary): DeExtras {
+/** The first screen's answer (spec §9.3): the break-even toll price T* with a toll, the break-even spread multiplier k
+ *  without one. Slow (about forty full runs each); it follows the main run. With the revenue stack (spec R3.1 §8): the
+ *  same for the three saturation paths, and the 2030 market revenue per MW of the whole battery without a toll — the
+ *  number set beside the public forecasts. */
+export interface DeExtras {
+  tStar: TStarResult | null;
+  k: KResult | null;
+  paths: DePathResult[] | null;
+  market2030PerMwEur: number | null;
+}
+
+const PATH_ORDER: DeReservePath[] = ["central", "fast", "slow"];
+
+function breakEven(inputs: DeInputs, lib: DeLibrary): { tStar: TStarResult | null; k: KResult | null } {
   const toll = inputs.tollEnabled && inputs.tollShare > 0;
   const delayedLoan = inputs.debt && inputs.codDelayMonths > 0;
   return { tStar: toll ? (delayedLoan ? tStarDelayed(inputs, lib) : tStarOfCase(inputs, lib)) : null, k: toll ? null : kOfCase(inputs, lib) };
+}
+
+export function computeDeExtras(inputs: DeInputs, lib: DeLibrary): DeExtras {
+  const own = breakEven(inputs, lib);
+  if (inputs.stackEnabled !== true) return { ...own, paths: null, market2030PerMwEur: null };
+  const paths = PATH_ORDER.map((path): DePathResult => {
+    const at = { ...inputs, reservePath: path };
+    const r = runDe(at, lib, { funding: contractualFunding(at, lib) });
+    const ok = r.status.primary === "ok" && r.kpis;
+    const be = path === inputs.reservePath ? own : breakEven(at, lib);
+    return { path, investorIrr: ok ? r.kpis!.investorIrr! : null, investorNpv: ok ? r.kpis!.investorNpvEur!.value : null, ...be };
+  });
+  // the whole battery on the market (the merchant variant, no loan), 2030: toll fee 0, so revenue = market revenue
+  const merchant = runDe({ ...inputs, ...DE_VARIANTS.merchant }, lib);
+  const y30 = merchant.ledger?.years.find((y) => y.year === 2030);
+  return { ...own, paths, market2030PerMwEur: merchant.status.primary === "ok" && y30 ? y30.revenueEur / inputs.powerMW : null };
 }
 
 /** T* of a delayed case with a loan: at each toll price the loan is sized on the contractual timing and the delay runs

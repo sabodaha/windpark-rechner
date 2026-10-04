@@ -16,13 +16,17 @@ export const DE_PUBLISHED = "2026-10-04";
 export const DE_UPDATED = "2026-10-04";
 
 /** Specification revision the engine implements. */
-export const DE_SPEC_REVISION = "v1.2 R2.4";
+export const DE_SPEC_REVISION = "v1.3 R3.1";
 
 export const DE_CASE_NAME = "Batteriespeicher Musterfeld";
 
 /** Market tolling offers for 2 h batteries, € per MW and year (Terralayr, 15.10.2025): a benchmark, not an offer
  *  (spec §9.3). */
 export const DE_TOLL_MARKET = { lowEur: 110_000, highEur: 150_000, source: "tollMarket" } as const;
+
+/** Public forecasts of a 2-hour battery's market revenue in 2030, € per MW, set beside the model's on the first screen
+ *  (spec R3.1 §8, H03): FfE/PwC (September 2026, figure 3) and Modo Energy (March 2026, before its April update). */
+export const DE_MARKET_2030 = { ffePwcEur: 156_000, modoEur: 125_000, sources: ["ffePwc", "modoOutlook"] } as const;
 
 /** Derived statistics of one price snapshot (de-stats-v1.json): the average price by hour for each month (€/MWh) and
  *  the distribution of the daily top-two-hour spread (TB2). */

@@ -1,15 +1,19 @@
-// German sensitivity (spec v1.2 R2.2 §15, registry SENS): the tornado with the funding fixed at close — each driver moved
-// alone, the loan as signed — and the variants before investment, each with the loan sized again. The investor NPV at
-// the hurdle is the measure (it exists in every supported case); the IRR comes along where it is defined.
+// German sensitivity (spec v1.2 R2.2 §15, registry SENS; registry-stack SENS for the revenue stack): the tornado with the
+// funding fixed at close — each driver moved alone, the loan as signed — and the variants before investment, each with
+// the loan sized again. The investor NPV at the hurdle is the measure (it exists in every supported case); the IRR comes
+// along where it is defined.
 import { contractualFunding, runDe, withDeDuration } from "./index";
 import type { DeLibrary } from "./library";
 import { DE_VARIANTS } from "./registry";
 import type { DeInputs, DeLockedFunding, DeMetric, DeStatus } from "./types";
 
 export type DeDriverId =
-  | "spread" | "capture" | "capex" | "development" | "rate" | "rte" | "degradation" | "tollPrice" | "availability" | "agnes" | "bkz" | "afaBattery";
+  | "spread" | "capture" | "capex" | "development" | "rate" | "rte" | "degradation" | "tollPrice" | "availability" | "agnes" | "bkz" | "afaBattery"
+  | "reservePrice" | "reservePath" | "afrrShare" | "realisation" | "intraday" | "activation";
 
 type Patch = (i: DeInputs) => Partial<DeInputs>;
+
+const stackOn = (i: DeInputs) => i.stackEnabled === true;
 
 /** The low and high settings of registry SENS; a stress that only goes one way has no other side. */
 export const DE_DRIVERS: { id: DeDriverId; low: Patch | null; high: Patch | null; applies?: (i: DeInputs) => boolean }[] = [
@@ -31,6 +35,13 @@ export const DE_DRIVERS: { id: DeDriverId; low: Patch | null; high: Patch | null
   { id: "agnes", low: () => ({ agnesFee: 0 }), high: () => ({ agnesFee: 7000 }) },
   { id: "bkz", low: () => ({ bkzPerKw: 0 }), high: () => ({ bkzPerKw: 165 }) },
   { id: "afaBattery", low: null, high: () => ({ afaBatteryYears: 10 }) },
+  // the revenue stack (registry-stack SENS), only where it is on
+  { id: "reservePrice", low: () => ({ reservePriceFactor: 0 }), high: (i) => ({ reservePriceFactor: i.reservePriceFactor * 1.2 }), applies: stackOn },
+  { id: "reservePath", low: () => ({ reservePath: "fast" }), high: () => ({ reservePath: "slow" }), applies: stackOn },
+  { id: "afrrShare", low: (i) => ({ afrrShare: i.afrrShare / 2 }), high: null, applies: (i) => stackOn(i) && i.afrrShare > 0 },
+  { id: "realisation", low: () => ({ reserveRealisation: 0.75 }), high: () => ({ reserveRealisation: 1 }), applies: stackOn },
+  { id: "intraday", low: () => ({ intradayUplift: 0 }), high: () => ({ intradayUplift: 0.48 }), applies: stackOn },
+  { id: "activation", low: () => ({ activationShare: 0 }), high: () => ({ activationShare: 0.1 }), applies: stackOn },
 ];
 
 export interface DeOutcome {
@@ -76,7 +87,9 @@ export function deTornado(inp: DeInputs, lib: DeLibrary, funding: DeLockedFundin
   return { base, bars: bars.sort((a, b) => swing(b) - swing(a)) };
 }
 
-export type DeVariantId = "fourHours" | "oneHour" | "low" | "high" | "ltm" | "noDebt" | "merchant" | "grandfathered" | "loan15";
+export type DeVariantId =
+  | "fourHours" | "oneHour" | "low" | "high" | "ltm" | "noDebt" | "merchant" | "grandfathered" | "loan15"
+  | "dayAhead" | "stack" | "reserveLtm" | "stackFast" | "stackSlow";
 
 /** Variants before investment (registry SENS): one change at a time, the loan sized again — on the contractual timing
  *  if the case is delayed (spec §18). */
@@ -91,6 +104,12 @@ export const DE_VARIANT_LIST: { id: DeVariantId; patch: (i: DeInputs) => DeInput
   { id: "grandfathered", patch: (i) => ({ ...i, grandfathered: true }) },
   // G07: 30 semi-annual payments 01.08.2028 … 01.02.2043
   { id: "loan15", patch: (i) => ({ ...i, repaymentCount: 30 }) },
+  // the revenue stack (spec R3.1 §0.3, registry-stack SENS): day-ahead only against the stack, and the stack's variants
+  { id: "dayAhead", patch: (i) => ({ ...i, stackEnabled: false }) },
+  { id: "stack", patch: (i) => ({ ...i, stackEnabled: true }) },
+  { id: "reserveLtm", patch: (i) => (i.stackEnabled === true ? { ...i, reservePriceWindow: "ltm-2026-09" } : i) },
+  { id: "stackFast", patch: (i) => (i.stackEnabled === true ? { ...i, reservePath: "fast" } : i) },
+  { id: "stackSlow", patch: (i) => (i.stackEnabled === true ? { ...i, reservePath: "slow" } : i) },
 ];
 
 export interface DeVariant {

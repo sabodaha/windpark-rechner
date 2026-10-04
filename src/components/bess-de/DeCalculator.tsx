@@ -91,8 +91,13 @@ export function DeCalculator({ initial, stats, libraryVersion }: Props) {
           {calc.restored && <span className="text-xs text-muted-foreground">{t.header.restored}</span>}
         </div>
         <p className="text-sm text-muted-foreground">
-          {t.header.subtitle(shown.powerMW, shown.powerMW * shown.durationHours, shown.durationHours, shown.tollEnabled && shown.tollShare > 0)}
+          {t.header.subtitle(shown.powerMW, shown.powerMW * shown.durationHours, shown.durationHours, shown.tollEnabled && shown.tollShare > 0, shown.stackEnabled === true)}
         </p>
+        {calc.legacy && (
+          <p role="status" className="w-fit max-w-3xl rounded-md border border-border bg-card px-2.5 py-1.5 text-xs">
+            {t.header.legacy}
+          </p>
+        )}
         {calc.ignored.length > 0 && (
           <p role="status" className="w-fit rounded-md border border-border bg-card px-2.5 py-1.5 text-xs">
             {t.header.ignored(calc.ignored.join(", "))}
@@ -196,7 +201,7 @@ export function DeCalculator({ initial, stats, libraryVersion }: Props) {
             <TabsContent value="debt">{!blocked && <DeDebt core={core} t={t} />}</TabsContent>
             <TabsContent value="sensitivity">{!blocked && <DeSensitivity core={core} result={calc.sensitivity} onShow={onSensitivity} t={t} />}</TabsContent>
             <TabsContent value="compare">
-              <DeCompare result={calc.compare} onShow={onCompare} t={t} />
+              <DeCompare result={calc.compare} onShow={onCompare} t={t} stack={shown.stackEnabled === true} />
             </TabsContent>
             <TabsContent value="checks">
               <DeChecks core={core} t={t} />

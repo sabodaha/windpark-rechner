@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowRight, CircleAlert, CircleCheck, Info } from "lucide-react";
-import { DE_TOLL_MARKET } from "@/bess/de/data";
+import { DE_MARKET_2030, DE_TOLL_MARKET } from "@/bess/de/data";
 import type { DeMessages } from "@/bess/de/messages";
 import type { DeCore, DeExtras } from "@/bess/de/view";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,7 +21,9 @@ export function DeBreakEven({ core, extras, t, onDetails }: { core: DeCore; extr
   const npv = core.kpis?.investorNpvEur?.value ?? null;
   const short = npv === null || npv < 0;
   const toll = inputs.tollEnabled && inputs.tollShare > 0;
+  const stack = inputs.stackEnabled === true;
   const eur = (v: number) => `€${f.num(Math.round(v / 1000) * 1000, 0)}`;
+  const kEur = (v: number) => `€${f.num(Math.round(v / 1000), 0)}k`;
 
   if (blocked) {
     return (
@@ -76,16 +78,47 @@ export function DeBreakEven({ core, extras, t, onDetails }: { core: DeCore; extr
           <div className="text-sm leading-relaxed text-foreground/85" aria-live="polite">
             {answer}
             {toll && <p className="mt-1 text-muted-foreground">{B.market(eur(DE_TOLL_MARKET.lowEur), eur(DE_TOLL_MARKET.highEur))}</p>}
+            {stack && core.stack && <p className="mt-1 text-muted-foreground">{B.reserveStart(f.dateLabel(`${core.stack.reserveStart}-01`).replace(/^\d+\s/, ""))}</p>}
+            {stack && extras?.market2030PerMwEur != null && (
+              <p className="mt-1 text-muted-foreground">{B.benchmark(kEur(extras.market2030PerMwEur), kEur(DE_MARKET_2030.ffePwcEur), kEur(DE_MARKET_2030.modoEur))}</p>
+            )}
           </div>
+          {stack && extras?.paths && (
+            <table className="w-full max-w-lg text-sm">
+              <caption className="pb-1 text-left text-xs font-medium text-muted-foreground">{B.pathsTitle}</caption>
+              <thead>
+                <tr className="border-b border-border text-xs text-muted-foreground">
+                  <th scope="col" className="py-1 pr-3 text-left font-medium">{B.pathCols.path}</th>
+                  <th scope="col" className="py-1 pr-3 text-right font-medium">{B.pathCols.irr}</th>
+                  <th scope="col" className="py-1 text-right font-medium">{toll ? B.pathCols.tStar : B.pathCols.k}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {extras.paths.map((p) => {
+                  const irr = p.investorIrr;
+                  const be = toll
+                    ? p.tStar?.outcome === "found" && p.tStar.value !== null ? eur(p.tStar.value) : "—"
+                    : p.k?.status === "found" && p.k.value !== null ? B.times(f.num(p.k.value, 2)) : "—";
+                  return (
+                    <tr key={p.path} className={cn("border-b border-border last:border-0", p.path === inputs.reservePath && "font-semibold")}>
+                      <td className="py-1 pr-3">{t.reservePathName[p.path] ?? p.path}</td>
+                      <td className="py-1 pr-3 text-right tabular">{irr?.status === "valid" && irr.value !== null ? f.pct(irr.value, 1) : "—"}</td>
+                      <td className="py-1 text-right tabular">{be}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
           <p className="flex items-start gap-1.5 text-xs leading-relaxed text-muted-foreground">
             <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-            {B.honest}
+            {stack ? B.honestStack : B.honest}
           </p>
         </div>
         <div className="flex w-full flex-col gap-1.5 lg:w-96 lg:shrink-0">
           <div className="text-xs font-medium text-muted-foreground">{B.whyTitle}</div>
           <ol className="list-decimal space-y-1 rounded-lg border border-border py-2 pl-7 pr-3 text-sm">
-            {B.why.map((line) => (
+            {(stack ? B.whyStack : B.why).map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ol>

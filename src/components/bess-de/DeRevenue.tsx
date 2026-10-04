@@ -16,6 +16,8 @@ export function DeRevenue({ core, stats, t }: { core: DeCore; stats: Record<stri
   const f = useFormat();
   const R = t.revenue;
   const b = core.bridge2029;
+  const stack = core.inputs.stackEnabled === true;
+  const stackYears = deOperatingYears(core);
   const years = deOperatingYears(core).filter((y) => y.spreadM !== null);
   const snap = stats[core.inputs.snapshot];
   const eur = (v: number) => `€${f.num(v, 0)}`;
@@ -25,6 +27,7 @@ export function DeRevenue({ core, stats, t }: { core: DeCore; stats: Record<stri
         { label: R.purchases, value: -b.purchasesEur },
         { label: R.margin, value: b.marginEur, bold: true },
         { label: R.capture, value: b.captureEur },
+        ...(stack ? [{ label: R.intraday, value: b.intradayEur }, { label: R.afrr, value: b.afrrEur }] : []),
         { label: R.fee, value: -b.optimiserFeeEur },
         { label: R.market, value: b.marketEur, bold: true },
         { label: R.toll, value: b.tollEur },
@@ -50,6 +53,28 @@ export function DeRevenue({ core, stats, t }: { core: DeCore; stats: Record<stri
                 ))}
               </tbody>
             </table>
+          </CardContent>
+        </Card>
+      )}
+      {stack && core.stack && stackYears.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{R.stackTitle}</CardTitle>
+            <CardDescription>{R.stackNote}</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            <p className="text-sm">{core.stack.heldYears.length ? R.held(core.stack.heldYears.join(", ")) : R.heldNone}</p>
+            <YearChart
+              years={stackYears.map((y) => y.year)}
+              bars={[
+                { id: "afrr", label: R.afrr, color: SERIES[0]!, values: stackYears.map((y) => y.afrrEur / 1e6) },
+                { id: "intraday", label: R.intraday, color: SERIES[1]!, values: stackYears.map((y) => y.intradayEur / 1e6) },
+              ]}
+              format={(v) => `€${f.num(v, 2)}m`}
+              yMin={0}
+              ariaLabel={R.stackTitle}
+              height={200}
+            />
           </CardContent>
         </Card>
       )}

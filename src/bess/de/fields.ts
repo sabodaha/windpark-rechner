@@ -1,12 +1,12 @@
-// Inputs of the German battery calculator as the interface shows them (spec v1.2 R2.2; registry-de.md). Values are
-// stored in engine units; `scale` converts to the displayed unit. The rest of the registry is fixed. Source ids are
-// DE_SOURCES keys.
+// Inputs of the German battery calculator as the interface shows them (spec v1.2 R2.2; registry-de.md; spec R3.1 §9 and
+// registry-stack.md for the revenue stack). Values are stored in engine units; `scale` converts to the displayed unit.
+// The rest of the registry is fixed. Source ids are DE_SOURCES keys.
 import type { FieldDef, FieldValue } from "../field-kit";
 import { withDeDuration } from "./index";
 import { DE_BASE, DE_DURATION_PRESETS, DE_VARIANTS } from "./registry";
 import type { DeInputs } from "./types";
 
-export type DeGroupId = "market" | "battery" | "toll" | "grid" | "costs" | "tax" | "financing" | "valuation";
+export type DeGroupId = "market" | "stack" | "battery" | "toll" | "grid" | "costs" | "tax" | "financing" | "valuation";
 export type DeFieldDef = FieldDef<DeInputs, DeGroupId>;
 
 type NumKey = { [K in keyof DeInputs]-?: DeInputs[K] extends number ? K : never }[keyof DeInputs];
@@ -34,6 +34,10 @@ function choice<K extends keyof DeInputs>(key: K, options: DeInputs[K][]) {
 
 const noDebt = (i: DeInputs) => !i.debt;
 const noToll = (i: DeInputs) => !i.tollEnabled;
+const noStack = (i: DeInputs) => i.stackEnabled !== true;
+
+/** The revenue scenario (spec R3.1 §0.3): the stack on one of its three saturation paths, or day-ahead only. */
+const SCENARIOS = ["central", "fast", "slow", "dayahead"] as const;
 
 /** Values that follow the toll switch (registry FIN, DE_VARIANTS.merchant): a loan only with a toll (spec §7.3) and
  *  the rates of each variant — 12 % and 8 % with a toll, 15 % and 10 % without — unless the visitor set them. */
@@ -62,6 +66,23 @@ export const DE_FIELDS: DeFieldDef[] = [
   { id: "k", group: "market", kind: "number", unit: "×", decimals: 2, min: 0.5, max: 3, usual: [0.5, 1.5], step: 0.05, sources: ["assumption"], ...number("spreadMultiplierK") },
   { id: "capt", group: "market", kind: "number", quick: true, decimals: 2, min: 0.3, max: 1, usual: [0.6, 0.9], step: 0.01, sources: ["captureDe", "assumption"], ...number("captureFactor") },
   { id: "fee", group: "market", kind: "number", unit: "%", scale: 100, decimals: 1, min: 0, max: 30, usual: [5, 15], step: 0.5, sources: ["optimiserFee"], ...number("optimiserFeeRate") },
+
+  // Reserves and intraday (the revenue stack, spec R3.1)
+  {
+    id: "rev", group: "stack", kind: "select", quick: true, sources: ["ffePwc", "modoOutlook", "assumption"],
+    options: [...SCENARIOS],
+    get: (i) => (i.stackEnabled === true ? i.reservePath : "dayahead"),
+    set: (i, v) => (v === "dayahead" ? { ...i, stackEnabled: false } : v === "central" || v === "fast" || v === "slow" ? { ...i, stackEnabled: true, reservePath: v } : i),
+  },
+  {
+    id: "idu", group: "stack", kind: "number", quick: true, unit: "%", scale: 100, decimals: 0, min: 0, max: 100, usual: [0, 48], step: 1,
+    sources: ["oeltzPfingsten", "ffePwc", "modoOutlook"], hidden: noStack, ...number("intradayUplift"),
+  },
+  { id: "afrr", group: "stack", kind: "number", unit: "%", scale: 100, decimals: 0, min: 0, max: 50, usual: [25, 50], step: 5, sources: ["iseaIndex", "enspired"], hidden: noStack, ...number("afrrShare") },
+  { id: "rwin", group: "stack", kind: "select", sources: ["regelleistung"], hidden: noStack, ...choice("reservePriceWindow", ["ytd-2026", "ltm-2026-09"]) },
+  { id: "rpf", group: "stack", kind: "number", unit: "×", decimals: 2, min: 0, max: 2, usual: [0.8, 1.2], step: 0.05, sources: ["regelleistung", "assumption"], hidden: noStack, ...number("reservePriceFactor") },
+  { id: "rho", group: "stack", kind: "number", unit: "%", scale: 100, decimals: 0, min: 50, max: 100, usual: [75, 100], step: 5, sources: ["modoOutlook", "assumption"], hidden: noStack, ...number("reserveRealisation") },
+  { id: "act", group: "stack", kind: "number", unit: "%", scale: 100, decimals: 0, min: 0, max: 20, usual: [0, 10], step: 1, sources: ["pqConditions", "assumption"], hidden: noStack, ...number("activationShare") },
 
   // Battery
   {
@@ -127,4 +148,4 @@ export const DE_FIELDS: DeFieldDef[] = [
   },
 ];
 
-export const DE_GROUPS: DeGroupId[] = ["market", "battery", "toll", "grid", "costs", "tax", "financing", "valuation"];
+export const DE_GROUPS: DeGroupId[] = ["market", "stack", "battery", "toll", "grid", "costs", "tax", "financing", "valuation"];

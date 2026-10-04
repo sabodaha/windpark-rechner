@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DeClient, SUPERSEDED } from "@/bess/de/client";
 import { DE_BASE } from "@/bess/de/registry";
 import type { DeInputs } from "@/bess/de/types";
-import { clearDeInputs, decodeDeInputs, deLinkHasInputs, encodeDeInputs, ignoredDeParams, loadDeInputs, saveDeInputs } from "@/bess/de/url-state";
+import { clearDeInputs, deLinkHasInputs, encodeDeInputs, ignoredDeParams, loadDeInputs, readDeInputs, saveDeInputs } from "@/bess/de/url-state";
 import type { DeCompare, DeCore, DeExtras, DeSensitivity } from "@/bess/de/view";
 import type { FieldDef, FieldValue } from "@/bess/field-kit";
 
@@ -37,6 +37,8 @@ export function useDeCalculator(initial: DeInitial) {
   const [restored, setRestored] = useState(false);
   const [remember, setRemember] = useState(false);
   const [ignored, setIgnored] = useState<string[]>([]);
+  // inputs from a link or a stored entry made before the revenue stack (spec R3.1 §9): opened as "day-ahead only"
+  const [legacy, setLegacy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [wantSensitivity, setWantSensitivity] = useState(false);
@@ -148,14 +150,16 @@ export function useDeCalculator(initial: DeInitial) {
     const query = window.location.search.slice(1);
     if (deLinkHasInputs(query)) {
       setIgnored(ignoredDeParams(query));
-      const fromUrl = decodeDeInputs(query, DE_BASE);
-      if (fromUrl) setInputs(fromUrl);
+      const fromUrl = readDeInputs(query, DE_BASE);
+      if (fromUrl.inputs) setInputs(fromUrl.inputs);
+      setLegacy(fromUrl.legacy);
       return;
     }
-    const fromStorage = stored ? decodeDeInputs(stored, DE_BASE) : null;
-    if (fromStorage) {
-      setInputs(fromStorage);
+    const fromStorage = stored ? readDeInputs(stored.query, DE_BASE, stored.legacy) : null;
+    if (fromStorage?.inputs) {
+      setInputs(fromStorage.inputs);
       setRestored(true);
+      setLegacy(fromStorage.legacy);
     }
   }, []);
 
@@ -175,12 +179,14 @@ export function useDeCalculator(initial: DeInitial) {
     setInputs((prev) => f.set(prev, v));
     setRestored(false);
     setIgnored([]);
+    setLegacy(false);
   }, []);
 
   const reset = useCallback(() => {
     setInputs(DE_BASE);
     setRestored(false);
     setIgnored([]);
+    setLegacy(false);
   }, []);
 
   const retry = useCallback(() => {
@@ -197,6 +203,7 @@ export function useDeCalculator(initial: DeInitial) {
     isCustom: key !== "",
     restored,
     ignored,
+    legacy,
     remember,
     setRemember,
     /** What is on screen: the result of `core.inputs`, which lag behind `inputs` while pending. */
