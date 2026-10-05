@@ -265,10 +265,10 @@ export const deEn = {
       label: "Tolling contract",
       hint:
         "A buyer pays a fixed fee per MW a year for a share of the battery’s power and energy and trades it at its own " +
-        "risk. Off: the whole battery trades day-ahead, without a loan.",
+        "risk. Off: the whole battery trades on the market, without a loan.",
     },
     tp: { label: "Toll price", hint: "Fixed nominal fee per MW of the contracted share a year, net of VAT, paid monthly a month later." },
-    ts: { label: "Contracted share", hint: "Share of power and energy given to the toller; the rest trades day-ahead." },
+    ts: { label: "Contracted share", hint: "Share of power and energy given to the toller; the rest trades on the market." },
     tm: { label: "Contract term", hint: "Months of tolling from commercial operation; the market takes the whole battery afterwards." },
     agnes: {
       label: "AgNes capacity fee",

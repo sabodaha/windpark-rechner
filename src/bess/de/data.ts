@@ -13,7 +13,7 @@ export const DE_DATA_AS_OF = "2026-09-30";
 
 /** First publication and last change of the German battery pages (datePublished, dateModified). */
 export const DE_PUBLISHED = "2026-10-04";
-export const DE_UPDATED = "2026-10-04";
+export const DE_UPDATED = "2026-10-05";
 
 /** Specification revision the engine implements. */
 export const DE_SPEC_REVISION = "v1.3 R3.1";

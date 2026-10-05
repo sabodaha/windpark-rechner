@@ -1334,7 +1334,7 @@ f_j             = CFADS_j − planned reserve top-up_j − [j > t] · DSRA targe
           )}
           <h3>Without a toll: the break-even spread multiplier k</h3>
           <p>
-            The day-ahead-only case has no loan and a hurdle of {pct(merchantHurdle, 0)}. Its break-even is the multiplier k on
+            The variant without a toll has no loan and a hurdle of {pct(merchantHurdle, 0)}. Its break-even is the multiplier k on
             the spread path at which the investor NPV is zero: points k = {num(kLo, 1)}, {num(kLo + 0.1, 1)} … {num(kHi, 1)}, a
             point outside the library skipped; the first pair of neighbouring supported points whose NPVs have opposite signs or
             touch zero is bisected — at most 40 steps, until the bracket is narrower than 10⁻⁵; a midpoint outside the library
@@ -1602,7 +1602,7 @@ f_j             = CFADS_j − planned reserve top-up_j − [j > t] · DSRA targe
             </li>
             <li>
               A fully amortising loan: no mini-perm, refinancing, KfW programme or subordinated debt, and no loan for the
-              day-ahead-only case.
+              variant without a toll.
             </li>
             <li>
               AgNes is a draft; the dynamic grid tariffs of 2030–2033 are not estimated; the BKZ is an assumption until a network
